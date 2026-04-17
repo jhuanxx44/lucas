@@ -17,7 +17,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
-DISPATCH_PROMPT_TEMPLATE = """你是 Manager，需要根据用户问题决定如何派发任务给研究员。
+DISPATCH_PROMPT_TEMPLATE = """你是 Manager，需要根据用户问题决定如何处理。
 
 ## 可用研究员
 {researchers_desc}
@@ -25,14 +25,35 @@ DISPATCH_PROMPT_TEMPLATE = """你是 Manager，需要根据用户问题决定如
 ## 用户问题
 {question}
 
-请返回 JSON，格式：
+## 知识库已有内容
+{wiki_context}
+
+请返回 JSON。首先判断用户意图：
+
+1. 如果是闲聊、问候、闲谈等非分析类问题，返回：
 {{
+  "action": "chat",
+  "reply": "你的直接回复"
+}}
+
+2. 如果知识库已有内容足以回答用户问题，直接基于知识库内容回答，返回：
+{{
+  "action": "wiki",
+  "reply": "基于知识库内容的回答"
+}}
+
+3. 如果需要研究员进行新的研究分析（知识库没有相关内容，或用户明确要求最新数据/深度分析），返回：
+{{
+  "action": "research",
   "researcher_ids": ["要派发的研究员id列表"],
   "mode": "parallel 或 serial",
   "instruction": "给研究员的统一指令（补充说明、分析重点等）"
 }}
 
 规则：
+- 问候、闲聊、简单对话直接用 chat 回复，不要派发研究员
+- 知识库已有足够信息时，优先用 wiki 直接回答，节省研究员资源
+- 只有知识库信息不足或用户需要最新实时数据时，才派发研究员
 - 根据问题性质选择合适的研究员，不必每次都全选
 - 如果问题需要多角度交叉验证，选多个研究员
 - 如果后续研究员需要参考前序结果（如先基本面再技术面），用 serial
@@ -62,15 +83,17 @@ class Manager:
             system_prompt=config.manager.system_prompt,
         )
 
-    async def _dispatch(self, question: str) -> Task:
-        """分析用户意图，决定派发策略"""
+    async def _dispatch(self, question: str) -> tuple[str, Task | str]:
+        """分析用户意图，决定派发策略。返回 (action, Task或直接回复)"""
         researchers_desc = "\n".join(
             f"- id: {r.id}, 名称: {r.name}, 擅长: {r.expertise}"
             for r in self.config.researchers
         )
+        wiki_context = _find_wiki_context(question) or "（暂无相关内容）"
         prompt = DISPATCH_PROMPT_TEMPLATE.format(
             researchers_desc=researchers_desc,
             question=question,
+            wiki_context=wiki_context,
         )
         text, _ = await self.client.chat(
             prompt=prompt,
@@ -82,10 +105,14 @@ class Manager:
         except json.JSONDecodeError:
             logger.warning("Manager dispatch JSON 解析失败，使用全部研究员")
             plan = {
+                "action": "research",
                 "researcher_ids": self.config.list_researcher_ids(),
                 "mode": "parallel",
                 "instruction": "",
             }
+
+        if plan.get("action") in ("chat", "wiki"):
+            return plan["action"], plan.get("reply", "你好！有什么A股相关的问题我可以帮你分析？")
 
         # 验证 researcher_ids
         valid_ids = set(self.config.list_researcher_ids())
@@ -93,9 +120,9 @@ class Manager:
         if not researcher_ids:
             researcher_ids = list(valid_ids)
 
-        context = _find_wiki_context(question)
+        context = wiki_context if wiki_context != "（暂无相关内容）" else ""
 
-        return Task(
+        return "research", Task(
             question=question,
             instruction=plan.get("instruction", ""),
             researcher_ids=researcher_ids,
@@ -155,7 +182,22 @@ class Manager:
 
         # 1. 派发
         status("正在分析问题，制定研究计划...")
-        task = await self._dispatch(question)
+        action, dispatch_result = await self._dispatch(question)
+
+        if action == "chat":
+            return ManagerReport(
+                question=question,
+                synthesis=dispatch_result,
+            )
+
+        if action == "wiki":
+            status("知识库已有相关内容，直接回答")
+            return ManagerReport(
+                question=question,
+                synthesis=dispatch_result,
+            )
+
+        task = dispatch_result
         names = [self.config.get_researcher(rid).name for rid in task.researcher_ids
                  if self.config.get_researcher(rid)]
         status(f"派发给: {', '.join(names)} | 模式: {task.mode}")
