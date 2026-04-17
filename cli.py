@@ -27,7 +27,7 @@ def print_report(report):
             print()
 
         print(f"{'═'*60}")
-        print("📋 Manager 综合分析")
+        print("📋 Lucas 综合分析")
         print(f"{'═'*60}")
 
     print(report.synthesis)
@@ -47,7 +47,7 @@ async def main():
     manager = Manager(config)
 
     print("Lucas 多 Agent 专家系统")
-    print(f"Manager: {config.manager.model}")
+    print(f"Lucas: {config.manager.model}")
     print(f"研究员: {', '.join(r.name for r in config.researchers)}")
     print("输入问题开始分析，/researchers 查看研究员，/quit 退出\n")
 

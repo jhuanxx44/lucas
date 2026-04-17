@@ -21,7 +21,7 @@ utils/        LLM统一调用层
 ./start.sh
 ```
 
-进入交互式 CLI，输入问题即可。Manager 会自动分析意图、选择研究员、汇总结果。
+进入交互式 CLI，输入问题即可。Lucas 会自动分析意图、选择研究员、汇总结果。
 
 ## 可用模型（内部代理）
 
@@ -43,6 +43,6 @@ utils/        LLM统一调用层
 ### Agent 分析
 1. 运行 `./start.sh` 启动 CLI
 2. 输入问题（如"分析宁德时代"）
-3. Manager 自动派发给相关研究员，汇总多视角分析
+3. Lucas 自动派发给相关研究员，汇总多视角分析
 
 详见 [CLAUDE.md](CLAUDE.md) 和 [AGENTS.md](AGENTS.md)。
