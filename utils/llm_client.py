@@ -28,7 +28,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # 路由规则：模型名前缀 → 客户端类型
-_OPENAI_COMPAT_PREFIXES = ('glm-', 'ppio/', 'huawei/', 'zai/', 'MiniMax-', 'deepseek-', 'qwen-')
+_OPENAI_COMPAT_PREFIXES = ('glm-', 'ppio/', 'huawei/', 'zai/', 'MiniMax-', 'deepseek-', 'qwen', 'claude-')
 
 MAX_RETRIES = 3
 _RETRY_WAIT = [3, 5, 10]

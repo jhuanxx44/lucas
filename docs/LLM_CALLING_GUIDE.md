@@ -106,15 +106,25 @@ contents = [
 
 ---
 
-## 5. 多模型路由（Motion Service）
+## 5. 多模型路由
 
-`motion_service/core/llm_caller.py` 根据模型名前缀自动选择客户端：
+`utils/llm_client.py` 中的 `create_client()` 根据模型名前缀自动选择客户端：
 
 | 前缀 | 客户端 | 说明 |
 |------|--------|------|
-| `gemini-*` | `GeminiClient` | Google GenAI SDK |
-| `glm-*` / `ppio/*` / `huawei/*` / `zai/*` / `MiniMax-*` | `ZhipuClient` | OpenAI SDK 兼容 |
-| `deepseek-*` | `DeepSeekClient` | OpenAI SDK 兼容 |
+| `gemini-*` | `_GeminiClient` | Google GenAI SDK |
+| `deepseek-*` / `claude-*` / `qwen*` / `glm-*` | `_OpenAICompatClient` | OpenAI SDK 兼容 |
+| `ppio/*` / `huawei/*` / `zai/*` / `MiniMax-*` | `_OpenAICompatClient` | OpenAI SDK 兼容 |
+
+### 已验证可用模型（内部代理 llmapi.bilibili.co）
+
+| 模型 | 路由 | 验证时间 |
+|------|------|----------|
+| `gemini-3.1-pro` | Gemini SDK | 2026-04 |
+| `deepseek-v3.2` | OpenAI 兼容 | 2026-04 |
+| `claude-4.6-opus` | OpenAI 兼容 | 2026-04 |
+| `glm-5-turbo` | OpenAI 兼容 | 2026-04 |
+| `qwen3.5-plus` | OpenAI 兼容 | 2026-04 |
 
 三个客户端接口统一：`await client.chat(prompt, ...) → (str, TokenUsage)`
 

@@ -66,11 +66,43 @@ verdict: agree|disagree|partial
 
 参与本项目的 LLM 在 reviews/ 和 logs/ 中使用以下标识：
 
-- `claude` — Anthropic Claude
-- `gpt` — OpenAI GPT
-- `gemini` — Google Gemini
-- `deepseek` — DeepSeek
-- `qwen` — 通义千问
+- `claude` — Anthropic Claude (`claude-4.6-opus`)
+- `gemini` — Google Gemini (`gemini-3.1-pro`)
+- `deepseek` — DeepSeek (`deepseek-v3.2`)
+- `qwen` — 通义千问 (`qwen3.5-plus`)
+- `glm` — 智谱 GLM (`glm-5-turbo`)
+
+## Agent 专家系统
+
+除了上述 Wiki 协作模式，项目还提供了多 Agent 专家系统（`agents/`），通过 CLI 交互使用。
+
+### 架构
+
+```
+用户问题
+  │
+  ▼
+Manager（意图分析 → 任务派发 → 结果汇总）
+  │
+  ├─→ 基本面分析师 (fundamental)
+  ├─→ 技术面分析师 (technical)
+  └─→ 宏观策略师 (macro)
+```
+
+### 研究员配置（agents.yaml）
+
+| ID | 名称 | 默认模型 | 擅长领域 |
+|----|------|----------|----------|
+| `fundamental` | 基本面分析师 | gemini-3.1-pro | 财务分析、估值、公司基本面 |
+| `technical` | 技术面分析师 | gemini-3.1-pro | K线形态、技术指标、量价分析 |
+| `macro` | 宏观策略师 | gemini-3.1-pro | 宏观经济、政策分析、行业趋势 |
+
+### 执行模式
+
+- `parallel` — 并行执行，各研究员独立分析（默认，限流 2 并发）
+- `serial` — 串行执行，后续研究员可参考前序结果（链式推理）
+
+Manager 根据问题意图自动选择研究员和执行模式。
 
 ## 分析请求格式
 
