@@ -52,6 +52,7 @@ class LLMClient(abc.ABC):
         prompt: str,
         response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
     ) -> Tuple[str, Optional[TokenUsage]]:
         ...
 
@@ -130,7 +131,8 @@ class _OpenAICompatClient(LLMClient):
         self._client = openai.OpenAI(base_url=base_url, api_key=api_key)
 
     async def chat(self, prompt: str, response_mime_type: str = "text/plain",
-                   temperature: Optional[float] = None) -> Tuple[str, Optional[TokenUsage]]:
+                   temperature: Optional[float] = None,
+                   thinking_budget: Optional[int] = None) -> Tuple[str, Optional[TokenUsage]]:
         messages = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
