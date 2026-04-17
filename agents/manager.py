@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import json
 import logging
 import os
@@ -13,6 +14,8 @@ from utils.llm_client import create_client
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+_WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
+_PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
 DISPATCH_PROMPT_TEMPLATE = """你是 Manager，需要根据用户问题决定如何派发任务给研究员。
 
@@ -192,6 +195,10 @@ class Manager:
         status("正在归档分析结果...")
         self._archive(report)
 
+        # 5. 整理 wiki
+        status("正在整理 wiki 知识库...")
+        await self._update_wiki(report, on_status=on_status)
+
         return report
 
     def _make_slug(self, question: str) -> str:
@@ -274,6 +281,215 @@ class Manager:
             content = content.rstrip() + f"\n\n{section_header}\n{entry}\n"
         else:
             content = content.replace(section_header, f"{section_header}\n{entry}", 1)
+
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    # ── Wiki 整理 ──────────────────────────────────────────
+
+    _WIKI_PLAN_PROMPT = """你是 Wiki 编辑，需要判断本次分析报告应该更新哪些 wiki 页面。
+
+## 分析报告
+{synthesis}
+
+## 现有 wiki 页面
+{existing_pages}
+
+## 可用页面类型
+- company: wiki/companies/{{代码}}-{{简称}}.md（公司档案）
+- industry: wiki/industries/{{行业名}}.md（行业概览）
+- concept: wiki/concepts/{{概念名}}.md（概念/主题）
+
+请返回 JSON 数组，每个元素：
+{{
+  "type": "company|industry|concept",
+  "name": "页面名称（如 300750-宁德时代）",
+  "action": "create|update",
+  "reason": "为什么需要更新/创建"
+}}
+
+规则：
+- 只列出本次分析确实涉及且有新信息可补充的页面
+- 如果分析内容太泛、没有具体可落地的信息，返回空数组 []
+- 不要创建信息量不足的页面"""
+
+    _WIKI_COMPILE_PROMPT = """你是 Wiki 编辑，需要根据分析报告更新一个 wiki 页面。
+
+## 编译模板
+{template}
+
+## 当前页面内容
+{current_content}
+
+## 本次分析报告
+{synthesis}
+
+## 任务
+{task_desc}
+
+请输出完整的更新后页面内容（包含 frontmatter）。
+
+规则：
+- 增量更新：保留已有内容，补充新信息
+- 新增信息用（{today}更新）标注
+- 如果新旧信息矛盾，保留两者并标注时间
+- 更新 frontmatter 的 updated 日期为 {today}
+- 在 sources 中追加本次分析来源
+- 严格遵循编译模板的格式"""
+
+    def _list_wiki_pages(self) -> str:
+        pages = []
+        for md_path in glob.glob(os.path.join(_WIKI_DIR, "**", "*.md"), recursive=True):
+            rel = os.path.relpath(md_path, _WIKI_DIR)
+            if rel in ("index.md", "glossary.md") or rel.startswith("reports/"):
+                continue
+            pages.append(f"- {rel}")
+        return "\n".join(pages) if pages else "（暂无）"
+
+    def _load_template(self, page_type: str) -> str:
+        type_to_template = {
+            "company": "compile-company.md",
+            "industry": "compile-industry.md",
+            "concept": "compile-concept.md",
+        }
+        template_file = type_to_template.get(page_type)
+        if not template_file:
+            return ""
+        path = os.path.join(_PROMPTS_DIR, template_file)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+    def _page_path(self, page_type: str, name: str) -> str:
+        type_to_dir = {
+            "company": "companies",
+            "industry": "industries",
+            "concept": "concepts",
+        }
+        subdir = type_to_dir.get(page_type, page_type)
+        return os.path.join(_WIKI_DIR, subdir, f"{name}.md")
+
+    async def _plan_wiki_updates(self, report: ManagerReport) -> list[dict]:
+        prompt = self._WIKI_PLAN_PROMPT.format(
+            synthesis=report.synthesis,
+            existing_pages=self._list_wiki_pages(),
+        )
+        text, _ = await self.client.chat(
+            prompt=prompt,
+            response_mime_type="application/json",
+            temperature=0.3,
+        )
+        try:
+            plans = json.loads(text)
+            if not isinstance(plans, list):
+                return []
+            return plans
+        except json.JSONDecodeError:
+            logger.warning("Wiki 更新计划 JSON 解析失败")
+            return []
+
+    async def _compile_wiki_page(self, page_plan: dict, report: ManagerReport) -> str:
+        page_type = page_plan["type"]
+        name = page_plan["name"]
+        action = page_plan.get("action", "update")
+
+        template = self._load_template(page_type)
+        page_path = self._page_path(page_type, name)
+
+        current_content = ""
+        if action == "update":
+            try:
+                with open(page_path, "r", encoding="utf-8") as f:
+                    current_content = f.read()
+            except FileNotFoundError:
+                action = "create"
+
+        if action == "create":
+            task_desc = f"创建新的 {page_type} 页面：{name}"
+            current_content = "（新页面，尚无内容）"
+        else:
+            task_desc = f"增量更新 {page_type} 页面：{name}。原因：{page_plan.get('reason', '')}"
+
+        today = date.today().isoformat()
+        prompt = self._WIKI_COMPILE_PROMPT.format(
+            template=template,
+            current_content=current_content,
+            synthesis=report.synthesis,
+            task_desc=task_desc,
+            today=today,
+        )
+        text, _ = await self.client.chat(prompt=prompt, temperature=0.3)
+        return text
+
+    async def _update_wiki(self, report: ManagerReport, on_status=None):
+        def status(msg):
+            if on_status:
+                on_status(msg)
+
+        plans = await self._plan_wiki_updates(report)
+        if not plans:
+            status("本次分析无需更新 wiki 页面")
+            return
+
+        status(f"需要更新 {len(plans)} 个 wiki 页面")
+
+        for plan in plans:
+            page_type = plan.get("type", "")
+            name = plan.get("name", "")
+            action = plan.get("action", "update")
+            if not page_type or not name:
+                continue
+
+            status(f"  {'创建' if action == 'create' else '更新'} {page_type}/{name}...")
+            try:
+                new_content = await self._compile_wiki_page(plan, report)
+                page_path = self._page_path(page_type, name)
+                os.makedirs(os.path.dirname(page_path), exist_ok=True)
+                with open(page_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+
+                # 更新 index
+                type_to_section = {
+                    "company": "## 公司档案",
+                    "industry": "## 行业概览",
+                    "concept": "## 概念/主题",
+                }
+                section = type_to_section.get(page_type)
+                if section:
+                    type_to_dir = {"company": "companies", "industry": "industries", "concept": "concepts"}
+                    rel_path = f"{type_to_dir[page_type]}/{name}.md"
+                    self._update_wiki_index(section, rel_path, name)
+
+                status(f"  ✓ {page_type}/{name}")
+            except Exception as e:
+                logger.warning("更新 wiki 页面失败 %s/%s: %s", page_type, name, e)
+                status(f"  ✗ {page_type}/{name}: {e}")
+
+    def _update_wiki_index(self, section_header: str, rel_path: str, display_name: str):
+        index_path = os.path.join(_WIKI_DIR, "index.md")
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            return
+
+        if rel_path in content:
+            return
+
+        entry = f"- [{display_name}]({rel_path})"
+        placeholder = "（暂无，等待编译）"
+
+        if section_header in content:
+            section_content = content.split(section_header, 1)[1]
+            if placeholder in section_content.split("\n##")[0]:
+                content = content.replace(
+                    f"{section_header}\n{placeholder}",
+                    f"{section_header}\n{entry}",
+                )
+            else:
+                content = content.replace(section_header, f"{section_header}\n{entry}", 1)
 
         with open(index_path, "w", encoding="utf-8") as f:
             f.write(content)
