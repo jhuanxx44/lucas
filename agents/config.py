@@ -11,6 +11,7 @@ class ResearcherConfig:
     model: str
     expertise: str
     system_prompt: str
+    enable_search: bool = True
 
 
 @dataclass
@@ -52,5 +53,6 @@ def load_config(config_path: str = None) -> AgentsConfig:
             model=r["model"],
             expertise=r.get("expertise", ""),
             system_prompt=r.get("system_prompt", ""),
+            enable_search=r.get("enable_search", True),
         ))
     return AgentsConfig(manager=manager, researchers=researchers)

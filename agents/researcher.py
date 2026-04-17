@@ -6,6 +6,7 @@ from typing import Optional
 from agents.config import ResearcherConfig
 from agents.models import Task, ResearchResult
 from utils.llm_client import create_client
+from utils.web_search import search as web_search
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,20 @@ async def run_researcher(
     """执行单个研究员的分析任务"""
     client = create_client(model=config.model, system_prompt=config.system_prompt)
 
+    # 搜索实时信息
+    search_context = ""
+    if config.enable_search:
+        try:
+            search_context = await web_search(f"{task.question} {config.expertise}", max_results=5)
+        except Exception as e:
+            logger.warning("[%s] 搜索失败: %s", config.name, e)
+
     # 构建 prompt
     parts = [f"## 用户问题\n{task.question}"]
     if task.instruction:
         parts.append(f"## Manager 指令\n{task.instruction}")
+    if search_context:
+        parts.append(f"## 网络搜索参考（实时信息）\n{search_context}")
     if task.context:
         parts.append(f"## 知识库参考\n{task.context}")
     if prior_results:
