@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 # 路由规则：模型名前缀 → 客户端类型
 _OPENAI_COMPAT_PREFIXES = ('glm-', 'ppio/', 'huawei/', 'zai/', 'MiniMax-', 'deepseek-', 'qwen', 'claude-')
 
+# 特定模型前缀 → 独立的 API_KEY / BASE_URL 环境变量
+_PROVIDER_ENV_OVERRIDES = {
+    'MiniMax-': ('MINIMAX_API_KEY', 'MINIMAX_BASE_URL'),
+}
+
 MAX_RETRIES = 3
 _RETRY_WAIT = [3, 5, 10]
 
@@ -124,10 +129,21 @@ class _OpenAICompatClient(LLMClient):
     def __init__(self, model: str, system_prompt: Optional[str] = None):
         super().__init__(model, system_prompt)
         import openai
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL", "")
+
+        api_key = None
+        base_url = None
+        for prefix, (key_env, url_env) in _PROVIDER_ENV_OVERRIDES.items():
+            if model.startswith(prefix):
+                api_key = os.environ.get(key_env)
+                base_url = os.environ.get(url_env)
+                break
+
         if not api_key:
-            raise ValueError("OPENAI_API_KEY 未设置")
+            api_key = os.environ.get("OPENAI_API_KEY")
+        if not base_url:
+            base_url = os.environ.get("OPENAI_BASE_URL", "")
+        if not api_key:
+            raise ValueError("API_KEY 未设置")
         self._client = openai.OpenAI(base_url=base_url, api_key=api_key)
 
     async def chat(self, prompt: str, response_mime_type: str = "text/plain",
