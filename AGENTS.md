@@ -76,6 +76,35 @@ verdict: agree|disagree|partial
 
 除了上述 Wiki 协作模式，项目还提供了多 Agent 专家系统（`agents/`），通过 CLI 交互使用。
 
+### 核心设计理念：感知 → 决策 → 执行 → 记忆
+
+Lucas 遵循经典 Agent 四模块架构：
+
+```
+        ┌──────────┐
+        │   感知    │  用户输入、文件系统、联网搜索、行情数据
+        └────┬─────┘
+             ▼
+        ┌──────────┐
+        │   决策    │  意图分类 → 选择 action / 研究员 → tool-use loop
+        └────┬─────┘
+             ▼
+        ┌──────────┐
+        │   执行    │  工具调用、研究员并行分析、wiki 编译
+        └────┬─────┘
+             ▼
+        ┌──────────┐
+        │   记忆    │  对话上下文、用户偏好、历史结论
+        └──────────┘
+```
+
+| 模块 | 实现 | 对应代码 |
+|------|------|----------|
+| **感知** | 用户输入 + tool-use（list_files, read_file, search_files, recall）+ 研究员工具（web_search, get_stock_data） | `agents/tools.py`, `utils/web_search.py`, `utils/stock_data.py` |
+| **决策** | dispatch 意图分类 → 选择 direct/research/compile → tool-use loop 多轮推理 | `agents/manager.py` |
+| **执行** | 工具调用、研究员并行/串行分析、raw→wiki 编译 | `agents/manager.py`, `agents/researcher.py` |
+| **记忆** | 三层：对话上下文（内存）、用户偏好（YAML）、历史结论（JSONL 关键词检索） | `agents/memory.py` |
+
 ### 架构
 
 ```

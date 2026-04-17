@@ -55,3 +55,13 @@
 - 缺少 `/help`、`/history`、`/memory` 等命令
 - 没有 `.env.example` 引导新用户配置环境变量
 - 对话历史没有持久化，退出后无法回顾
+
+### 产品化架构（长期）
+- **当前**：纯 Python CLI，依赖 pipx/uv 安装
+- **目标**：npm 全局安装，覆盖更广的开发者群体
+- **方案**：Python 做 HTTP/WebSocket server（AI + 数据源 + 工具），TS CLI 做客户端交互层
+  - Python 侧保留 akshare/AI SDK 优势，无需重写
+  - TS CLI 用 npm 分发，可打包成二进制（pkg/bun compile）
+  - 参考架构：opencode、Cursor（前端壳 + 后端引擎分离）
+  - Python server 用 FastAPI 暴露 API，打包成 Docker 或 pyinstaller 二进制随 npm 包分发
+- **时机**：现阶段不需要，等产品化时再考虑

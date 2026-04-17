@@ -6,3 +6,4 @@ reviews/*.md
 __pycache__/
 .env
 memory/
+.obsidian/
