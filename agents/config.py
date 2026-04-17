@@ -12,6 +12,11 @@ class ResearcherConfig:
     expertise: str
     system_prompt: str
     enable_search: bool = True
+    data_types: list[str] = None
+
+    def __post_init__(self):
+        if self.data_types is None:
+            self.data_types = []
 
 
 @dataclass
@@ -54,5 +59,6 @@ def load_config(config_path: str = None) -> AgentsConfig:
             expertise=r.get("expertise", ""),
             system_prompt=r.get("system_prompt", ""),
             enable_search=r.get("enable_search", True),
+            data_types=r.get("data_types", []),
         ))
     return AgentsConfig(manager=manager, researchers=researchers)

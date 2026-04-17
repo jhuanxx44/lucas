@@ -7,6 +7,7 @@ from agents.config import ResearcherConfig
 from agents.models import Task, ResearchResult
 from utils.llm_client import create_client
 from utils.web_search import search as web_search
+from utils.stock_data import get_stock_data
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,20 @@ async def run_researcher(
         except Exception as e:
             logger.warning("[%s] 搜索失败: %s", config.name, e)
 
+    # 拉取结构化市场数据
+    market_data = ""
+    if config.data_types:
+        try:
+            market_data = await get_stock_data(task.question, config.data_types)
+        except Exception as e:
+            logger.warning("[%s] 获取市场数据失败: %s", config.name, e)
+
     # 构建 prompt
     parts = [f"## 用户问题\n{task.question}"]
     if task.instruction:
         parts.append(f"## Manager 指令\n{task.instruction}")
+    if market_data:
+        parts.append(f"## 市场数据（结构化）\n{market_data}")
     if search_context:
         parts.append(f"## 网络搜索参考（实时信息）\n{search_context}")
     if task.context:
