@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import os
+from datetime import date
 from typing import Optional
 
 from agents.config import AgentsConfig
@@ -9,6 +11,8 @@ from agents.researcher import run_researcher, _find_wiki_context
 from utils.llm_client import create_client
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
 DISPATCH_PROMPT_TEMPLATE = """你是 Manager，需要根据用户问题决定如何派发任务给研究员。
 
@@ -177,9 +181,99 @@ class Manager:
 
         total_tokens = sum(r.token_usage.total_tokens for r in results if r.token_usage)
 
-        return ManagerReport(
+        report = ManagerReport(
             question=question,
             results=results,
             synthesis=synthesis,
             total_tokens=total_tokens,
         )
+
+        # 4. 归档
+        status("正在归档分析结果...")
+        self._archive(report)
+
+        return report
+
+    def _make_slug(self, question: str) -> str:
+        """从问题生成简短文件名片段"""
+        slug = question.replace(" ", "_").replace("/", "_").replace("?", "").replace("？", "")
+        return slug[:40]
+
+    def _archive(self, report: ManagerReport):
+        """归档：研究员原始分析 → raw/reports/，Manager 汇总 → wiki/reports/"""
+        today = date.today().isoformat()
+        slug = self._make_slug(report.question)
+
+        # raw/reports/ — 每个研究员的原始分析
+        raw_dir = os.path.join(_PROJECT_ROOT, "raw", "reports", today)
+        os.makedirs(raw_dir, exist_ok=True)
+        for r in report.results:
+            filename = f"{r.researcher_id}_{slug}.md"
+            path = os.path.join(raw_dir, filename)
+            content = (
+                f"---\n"
+                f"question: {report.question}\n"
+                f"researcher: {r.researcher_name}\n"
+                f"model: {r.model}\n"
+                f"date: {today}\n"
+                f"---\n\n"
+                f"{r.content}\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+        # wiki/reports/ — Manager 汇总报告
+        wiki_dir = os.path.join(_PROJECT_ROOT, "wiki", "reports")
+        os.makedirs(wiki_dir, exist_ok=True)
+        wiki_filename = f"{today}_{slug}.md"
+        wiki_path = os.path.join(wiki_dir, wiki_filename)
+
+        sources = "\n".join(
+            f"  - raw/reports/{today}/{r.researcher_id}_{slug}.md"
+            for r in report.results
+        )
+        researchers_list = ", ".join(
+            f"{r.researcher_name}({r.model})" for r in report.results
+        )
+        wiki_content = (
+            f"---\n"
+            f"title: {report.question}\n"
+            f"type: report\n"
+            f"created: {today}\n"
+            f"updated: {today}\n"
+            f"sources:\n{sources}\n"
+            f"researchers: {researchers_list}\n"
+            f"tags: [分析报告]\n"
+            f"confidence: medium\n"
+            f"---\n\n"
+            f"{report.synthesis}\n"
+        )
+        with open(wiki_path, "w", encoding="utf-8") as f:
+            f.write(wiki_content)
+
+        # 更新 wiki/index.md
+        self._update_index(wiki_filename, report.question)
+
+        logger.info("归档完成: raw/reports/%s/ + wiki/reports/%s", today, wiki_filename)
+
+    def _update_index(self, wiki_filename: str, question: str):
+        index_path = os.path.join(_PROJECT_ROOT, "wiki", "index.md")
+        entry = f"- [{question}](reports/{wiki_filename})"
+
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            content = "# Lucas A股股市 Wiki 索引\n"
+
+        if wiki_filename in content:
+            return
+
+        section_header = "## 分析报告"
+        if section_header not in content:
+            content = content.rstrip() + f"\n\n{section_header}\n{entry}\n"
+        else:
+            content = content.replace(section_header, f"{section_header}\n{entry}", 1)
+
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(content)
