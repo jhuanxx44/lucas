@@ -1,5 +1,5 @@
 manager:
-  model: gemini-3.1-pro
+  provider: minimax
   system_prompt: |
     你是 Lucas，A股股市知识库的首席分析师。你的职责是：
     1. 理解用户的问题，判断需要哪些研究员参与分析
@@ -13,7 +13,7 @@ manager:
 researchers:
   - name: 基本面分析师
     id: fundamental
-    model: gemini-3.1-pro
+    provider: minimax
     expertise: 财务分析、估值、公司基本面
     data_types: [financials, quote]
     system_prompt: |
@@ -24,7 +24,7 @@ researchers:
 
   - name: 技术面分析师
     id: technical
-    model: gemini-3.1-pro
+    provider: minimax
     expertise: K线形态、技术指标、量价分析
     data_types: [kline, quote]
     system_prompt: |
@@ -35,7 +35,7 @@ researchers:
 
   - name: 宏观策略师
     id: macro
-    model: gemini-3.1-pro
+    provider: minimax
     expertise: 宏观经济、政策分析、行业趋势
     data_types: [north_flow, sector_flow]
     system_prompt: |
