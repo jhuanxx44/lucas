@@ -23,6 +23,7 @@ from typing import Optional, Tuple, List
 from dotenv import load_dotenv
 
 from utils.token_tracker import TokenUsage, extract_token_usage
+from utils.providers import get_provider_config, resolve_env_vars, get_provider_model
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -130,14 +131,15 @@ class _OpenAICompatClient(LLMClient):
         super().__init__(model, system_prompt)
         import openai
 
+        # 先尝试从 provider 配置获取
         api_key = None
         base_url = None
         for prefix, (key_env, url_env) in _PROVIDER_ENV_OVERRIDES.items():
             if model.startswith(prefix):
-                api_key = os.environ.get(key_env)
-                base_url = os.environ.get(url_env)
+                api_key, base_url = resolve_env_vars(key_env, url_env)
                 break
 
+        # 兜底：使用默认环境变量
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY")
         if not base_url:
@@ -185,21 +187,44 @@ def create_client(
     model: Optional[str] = None,
     system_prompt: Optional[str] = None,
     enable_thinking: bool = True,
+    provider: Optional[str] = None,
 ) -> LLMClient:
     """
-    工厂函数：根据模型名自动选择客户端。
+    工厂函数：根据模型名或 provider 自动选择客户端。
+
+    方式1: 指定 provider（推荐）
+        create_client(provider="minimax")
+
+    方式2: 直接指定模型名（向后兼容）
+        create_client(model="gemini-3.1-pro")
+
+    方式3: 同时指定 provider + model（model 覆盖 provider 默认）
+        create_client(provider="gemini", model="gemini-3.1-pro")
 
     路由规则：
-        glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-*  → OpenAI 兼容
+        glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-* / claude-*  → OpenAI 兼容
         其余（gemini-* 等）→ Gemini SDK
+    """
+    if provider:
+        # 从 provider 配置获取模型
+        actual_model = get_provider_model(provider, model)
+    else:
+        actual_model = model or os.environ.get("OPENAI_MODEL", "gemini-3.1-pro")
+
+    if any(actual_model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
+        return _OpenAICompatClient(model=actual_model, system_prompt=system_prompt)
+    return _GeminiClient(model=actual_model, system_prompt=system_prompt, enable_thinking=enable_thinking)
+
+
+def create_client_from_agent(agent_config: dict) -> LLMClient:
+    """
+    从 agents.yaml 中的 agent 配置创建客户端
 
     Args:
-        model: 模型名，默认读 OPENAI_MODEL 环境变量
-        system_prompt: 系统提示词
-        enable_thinking: 是否启用思考模式（仅 Gemini 生效）
+        agent_config: agents.yaml 中单个 agent 的配置 dict
     """
-    model = model or os.environ.get("OPENAI_MODEL", "gemini-3.1-pro")
-
-    if any(model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
-        return _OpenAICompatClient(model=model, system_prompt=system_prompt)
-    return _GeminiClient(model=model, system_prompt=system_prompt, enable_thinking=enable_thinking)
+    return create_client(
+        model=agent_config.get("model"),
+        provider=agent_config.get("provider"),
+        system_prompt=agent_config.get("system_prompt"),
+    )
