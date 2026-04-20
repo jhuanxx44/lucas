@@ -3,12 +3,15 @@ import yaml
 from dataclasses import dataclass
 from typing import Optional
 
+from utils.providers import get_provider_model, load_providers
+
 
 @dataclass
 class ResearcherConfig:
     id: str
     name: str
     model: str
+    provider: str
     expertise: str
     system_prompt: str
     enable_search: bool = True
@@ -22,6 +25,7 @@ class ResearcherConfig:
 @dataclass
 class ManagerConfig:
     model: str
+    provider: str
     system_prompt: str
 
 
@@ -43,22 +47,41 @@ class AgentsConfig:
 def load_config(config_path: str = None) -> AgentsConfig:
     if config_path is None:
         config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents.yaml")
+
+    # 加载 providers 配置
+    providers_config = load_providers()
+
     with open(config_path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
+    # 解析 manager
+    manager_raw = raw["manager"]
+    manager_provider = manager_raw.get("provider", "gemini")
+    manager_model_override = manager_raw.get("model")
+    manager_model = get_provider_model(manager_provider, manager_model_override)
+
     manager = ManagerConfig(
-        model=raw["manager"]["model"],
-        system_prompt=raw["manager"]["system_prompt"],
+        model=manager_model,
+        provider=manager_provider,
+        system_prompt=manager_raw["system_prompt"],
     )
+
+    # 解析 researchers
     researchers = []
     for r in raw.get("researchers", []):
+        researcher_provider = r.get("provider", "gemini")
+        researcher_model_override = r.get("model")
+        researcher_model = get_provider_model(researcher_provider, researcher_model_override)
+
         researchers.append(ResearcherConfig(
             id=r["id"],
             name=r["name"],
-            model=r["model"],
+            model=researcher_model,
+            provider=researcher_provider,
             expertise=r.get("expertise", ""),
             system_prompt=r.get("system_prompt", ""),
             enable_search=r.get("enable_search", True),
             data_types=r.get("data_types", []),
         ))
+
     return AgentsConfig(manager=manager, researchers=researchers)

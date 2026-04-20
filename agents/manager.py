@@ -12,6 +12,7 @@ from agents.memory import ManagerMemory
 from agents.researcher import run_researcher, _find_wiki_context
 from agents.tools import get_tools_description, execute_tool
 from utils.llm_client import create_client
+from utils.json_extract import extract_json
 from utils.verify import verify_result
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ DISPATCH_PROMPT_TEMPLATE = """你是 Lucas，需要根据用户问题决定如�
 ## 记忆
 {memory_context}
 
-请返回 JSON。判断用户意图：
+**重要：只返回 JSON，不要其他任何文字。**判断用户意图：
 
 1. 如果不需要派发研究员（闲聊、问候、查询历史、询问文件位置、基于知识库回答等），返回：
 {{
@@ -90,6 +91,7 @@ class Manager:
         self.client = create_client(
             model=config.manager.model,
             system_prompt=config.manager.system_prompt,
+            enable_thinking=False,  # Manager 不需要思考模型，保持 JSON 输出稳定
         )
 
     async def _dispatch(self, question: str) -> tuple[str, Task | str | dict]:
@@ -111,10 +113,9 @@ class Manager:
             response_mime_type="application/json",
             temperature=0.3,
         )
-        try:
-            plan = json.loads(text)
-        except json.JSONDecodeError:
-            logger.warning("Manager dispatch JSON 解析失败，使用全部研究员")
+        plan = extract_json(text)
+        if plan is None:
+            logger.warning("Manager dispatch JSON 解析失败，使用全部研究员: %s", text[:200])
             plan = {
                 "action": "research",
                 "researcher_ids": self.config.list_researcher_ids(),
@@ -272,9 +273,8 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.3,
             )
-            try:
-                result = json.loads(text)
-            except json.JSONDecodeError:
+            result = extract_json(text)
+            if result is None:
                 return text
 
             if result.get("action") == "answer":
@@ -433,7 +433,9 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.1,
             )
-            data = json.loads(text)
+            data = extract_json(text)
+            if data is None:
+                return
             self.memory.add_conclusion(
                 question=report.question,
                 topics=data.get("topics", []),
@@ -457,7 +459,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.1,
             )
-            data = json.loads(text)
+            data = extract_json(text)
             if data:
                 self.memory.save_preferences(data)
         except Exception as e:
@@ -692,14 +694,11 @@ class Manager:
             response_mime_type="application/json",
             temperature=0.3,
         )
-        try:
-            plans = json.loads(text)
-            if not isinstance(plans, list):
-                return []
-            return plans
-        except json.JSONDecodeError:
-            logger.warning("Wiki 更新计划 JSON 解析失败")
+        plans = extract_json(text)
+        if plans is None or not isinstance(plans, list):
+            logger.warning("Wiki 更新计划 JSON 解析失败: %s", text[:200])
             return []
+        return plans
 
     async def _compile_wiki_page(self, page_plan: dict, report: ManagerReport) -> str:
         page_type = page_plan["type"]
@@ -936,11 +935,8 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.3,
             )
-            try:
-                plans = json.loads(text)
-                if not isinstance(plans, list):
-                    plans = []
-            except json.JSONDecodeError:
+            plans = extract_json(text)
+            if plans is None or not isinstance(plans, list):
                 logger.warning("编译分类 JSON 解析失败: %s", rel_path)
                 plans = []
 
