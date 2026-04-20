@@ -15,14 +15,16 @@ Lucas LLM 统一调用层
 """
 import os
 import abc
+import re
 import time
 import asyncio
 import logging
-from typing import Optional, Tuple, List
+from typing import AsyncGenerator, Optional, Tuple, List
 
 from dotenv import load_dotenv
 
 from utils.token_tracker import TokenUsage, extract_token_usage
+from utils.providers import get_provider_config, resolve_env_vars, get_provider_model
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -38,10 +40,21 @@ _PROVIDER_ENV_OVERRIDES = {
 MAX_RETRIES = 3
 _RETRY_WAIT = [3, 5, 10]
 
+_THINK_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
+
+
+def _strip_think_tags(text: str) -> str:
+    return _THINK_RE.sub('', text)
+
 
 def _is_retryable(e: Exception) -> bool:
     s = str(e).lower()
     return any(k in s for k in ['429', 'resource_exhausted', 'rate limit', '499', '500', '502', '503', '504'])
+
+
+def _strip_think_tags(text: str) -> str:
+    """移除 <think>...</think> 标签及其内容"""
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
 
 class LLMClient(abc.ABC):
@@ -59,6 +72,15 @@ class LLMClient(abc.ABC):
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
     ) -> Tuple[str, Optional[TokenUsage]]:
+        ...
+
+    @abc.abstractmethod
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> "AsyncGenerator[str, None]":
         ...
 
 
@@ -122,6 +144,31 @@ class _GeminiClient(LLMClient):
         usage = extract_token_usage(response, self.model, latency) if response else None
         return text, usage
 
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> AsyncGenerator[str, None]:
+        from google.genai import types
+        contents = []
+        if self.system_prompt:
+            contents.append(types.Content(role="user", parts=[types.Part(text=self.system_prompt)]))
+            contents.append(types.Content(role="model", parts=[types.Part(text="好的，我明白了。")]))
+        contents.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
+        _budget = thinking_budget if thinking_budget is not None else 24576
+        config = types.GenerateContentConfig(
+            temperature=temperature if temperature is not None else 1.0,
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=_budget if self.enable_thinking else 0
+            ),
+        )
+        async for chunk in self._client.aio.models.generate_content_stream(
+            model=self.model, contents=contents, config=config
+        ):
+            if chunk.text:
+                yield chunk.text
+
 
 class _OpenAICompatClient(LLMClient):
     """OpenAI 兼容客户端，适用于 Zhipu/DeepSeek/Qwen 等"""
@@ -130,21 +177,22 @@ class _OpenAICompatClient(LLMClient):
         super().__init__(model, system_prompt)
         import openai
 
+        # 先尝试从 provider 配置获取
         api_key = None
         base_url = None
         for prefix, (key_env, url_env) in _PROVIDER_ENV_OVERRIDES.items():
             if model.startswith(prefix):
-                api_key = os.environ.get(key_env)
-                base_url = os.environ.get(url_env)
+                api_key, base_url = resolve_env_vars(key_env, url_env)
                 break
 
+        # 兜底：使用默认环境变量
         if not api_key:
             api_key = os.environ.get("OPENAI_API_KEY")
         if not base_url:
             base_url = os.environ.get("OPENAI_BASE_URL", "")
         if not api_key:
             raise ValueError("API_KEY 未设置")
-        self._client = openai.OpenAI(base_url=base_url, api_key=api_key)
+        self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     async def chat(self, prompt: str, response_mime_type: str = "text/plain",
                    temperature: Optional[float] = None,
@@ -163,11 +211,12 @@ class _OpenAICompatClient(LLMClient):
         if response_mime_type == "application/json":
             params["response_format"] = {"type": "json_object"}
 
-        response = await asyncio.to_thread(self._client.chat.completions.create, **params)
+        response = await self._client.chat.completions.create(**params)
 
         text = ""
         if response.choices and response.choices[0].message.content:
             text = response.choices[0].message.content
+            text = _strip_think_tags(text)
 
         usage = None
         if hasattr(response, "usage") and response.usage:
@@ -180,26 +229,101 @@ class _OpenAICompatClient(LLMClient):
             )
         return text, usage
 
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> AsyncGenerator[str, None]:
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 65536,
+            "temperature": temperature if temperature is not None else 1.0,
+            "stream": True,
+        }
+        stream = await self._client.chat.completions.create(**params)
+        buf = ""
+        in_think = False
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                buf += chunk.choices[0].delta.content
+                while True:
+                    if in_think:
+                        end = buf.find("</think>")
+                        if end == -1:
+                            buf = ""
+                            break
+                        buf = buf[end + 8:]
+                        in_think = False
+                    else:
+                        start = buf.find("<think>")
+                        if start == -1:
+                            if "<" in buf and not buf.endswith(">"):
+                                # partial tag — hold back
+                                safe = buf[:buf.rfind("<")]
+                                if safe:
+                                    yield safe
+                                buf = buf[len(safe):]
+                            else:
+                                if buf:
+                                    yield buf
+                                buf = ""
+                            break
+                        if start > 0:
+                            yield buf[:start]
+                        buf = buf[start + 7:]
+                        in_think = True
+        if buf and not in_think:
+            yield buf
+
 
 def create_client(
     model: Optional[str] = None,
     system_prompt: Optional[str] = None,
     enable_thinking: bool = True,
+    provider: Optional[str] = None,
 ) -> LLMClient:
     """
-    工厂函数：根据模型名自动选择客户端。
+    工厂函数：根据模型名或 provider 自动选择客户端。
+
+    方式1: 指定 provider（推荐）
+        create_client(provider="minimax")
+
+    方式2: 直接指定模型名（向后兼容）
+        create_client(model="gemini-3.1-pro")
+
+    方式3: 同时指定 provider + model（model 覆盖 provider 默认）
+        create_client(provider="gemini", model="gemini-3.1-pro")
 
     路由规则：
-        glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-*  → OpenAI 兼容
+        glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-* / claude-*  → OpenAI 兼容
         其余（gemini-* 等）→ Gemini SDK
+    """
+    if provider:
+        # 从 provider 配置获取模型
+        actual_model = get_provider_model(provider, model)
+    else:
+        actual_model = model or os.environ.get("OPENAI_MODEL", "gemini-3.1-pro")
+
+    if any(actual_model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
+        return _OpenAICompatClient(model=actual_model, system_prompt=system_prompt)
+    return _GeminiClient(model=actual_model, system_prompt=system_prompt, enable_thinking=enable_thinking)
+
+
+def create_client_from_agent(agent_config: dict) -> LLMClient:
+    """
+    从 agents.yaml 中的 agent 配置创建客户端
 
     Args:
-        model: 模型名，默认读 OPENAI_MODEL 环境变量
-        system_prompt: 系统提示词
-        enable_thinking: 是否启用思考模式（仅 Gemini 生效）
+        agent_config: agents.yaml 中单个 agent 的配置 dict
     """
-    model = model or os.environ.get("OPENAI_MODEL", "gemini-3.1-pro")
-
-    if any(model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
-        return _OpenAICompatClient(model=model, system_prompt=system_prompt)
-    return _GeminiClient(model=model, system_prompt=system_prompt, enable_thinking=enable_thinking)
+    return create_client(
+        model=agent_config.get("model"),
+        provider=agent_config.get("provider"),
+        system_prompt=agent_config.get("system_prompt"),
+    )

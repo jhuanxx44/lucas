@@ -28,61 +28,65 @@ _PE_TOLERANCE = 0.20
 _MARKET_CAP_TOLERANCE = 0.20
 _EXTREME_TOLERANCE = 0.50
 
-# ── 1. URL 溯源 ──────────────────────────────────────
+# ── 1. URL 溯源 + 可达性（合并校验） ─────────────────────
 
-def check_url_provenance(result: ResearchResult) -> list[VerificationIssue]:
+async def check_urls(result: ResearchResult) -> list[VerificationIssue]:
+    """对研究员输出中的所有链接做溯源 + 可达性检查。
+
+    逻辑：
+    - 在搜索结果中的链接：只做可达性检查
+    - 不在搜索结果中的链接：先验活，能访问则标 info，不能访问才标 warning
+    """
     content_links = _MD_LINK_RE.findall(result.content)
-    if not content_links:
+    source_urls = {u["url"] for u in result.source_urls}
+    all_urls = {url for _, url in content_links} | source_urls
+    if not all_urls:
         return []
 
-    known_urls = {u["url"] for u in result.source_urls}
-    issues = []
-    for title, url in content_links:
-        if url not in known_urls:
-            issues.append(VerificationIssue(
-                dimension="url_provenance",
-                severity="error",
-                message=f"疑似伪造链接: [{title}]({url}) 不在搜索结果中",
-            ))
-    return issues
-
-
-# ── 2. URL 可达性 ─────────────────────────────────────
-
-async def check_url_liveness(result: ResearchResult) -> list[VerificationIssue]:
-    urls = [u["url"] for u in result.source_urls]
-    if not urls:
-        return []
+    untraced = {url for _, url in content_links if url not in source_urls}
 
     sem = asyncio.Semaphore(_URL_CONCURRENCY)
     issues = []
 
     async def _check_one(url: str, client: httpx.AsyncClient):
         async with sem:
+            reachable = False
+            status = None
             try:
                 resp = await client.head(url, timeout=_URL_HEAD_TIMEOUT, follow_redirects=True)
-                if resp.status_code >= 400:
+                status = resp.status_code
+                reachable = status < 400
+            except (httpx.TimeoutException, httpx.ConnectError):
+                pass
+            except Exception:
+                pass
+
+            if url in untraced:
+                if reachable:
+                    issues.append(VerificationIssue(
+                        dimension="url_provenance",
+                        severity="info",
+                        message=f"链接不在搜索结果中（但可访问）: {url}",
+                    ))
+                else:
+                    detail = f"HTTP {status}" if status else "超时或连接失败"
+                    issues.append(VerificationIssue(
+                        dimension="url_provenance",
+                        severity="warning",
+                        message=f"链接不在搜索结果中且不可达（{detail}）: {url}",
+                    ))
+            else:
+                if not reachable:
+                    detail = f"HTTP {status}" if status else "超时或连接失败"
                     issues.append(VerificationIssue(
                         dimension="url_liveness",
-                        severity="warning",
-                        message=f"链接不可达 (HTTP {resp.status_code}): {url}",
+                        severity="info",
+                        message=f"链接不可达（{detail}）: {url}",
                     ))
-            except (httpx.TimeoutException, httpx.ConnectError):
-                issues.append(VerificationIssue(
-                    dimension="url_liveness",
-                    severity="info",
-                    message=f"链接超时或连接失败: {url}",
-                ))
-            except Exception as e:
-                issues.append(VerificationIssue(
-                    dimension="url_liveness",
-                    severity="info",
-                    message=f"链接检查异常: {url} ({e})",
-                ))
 
     try:
         async with httpx.AsyncClient() as client:
-            tasks = [_check_one(url, client) for url in urls]
+            tasks = [_check_one(url, client) for url in all_urls]
             await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
                 timeout=_URL_CHECK_OVERALL_TIMEOUT,
@@ -203,9 +207,8 @@ async def verify_result(result: ResearchResult) -> VerificationResult:
     """对单个 ResearchResult 执行全部校验，就地更新 verification 和 confidence"""
     all_issues = []
 
-    all_issues.extend(check_url_provenance(result))
     all_issues.extend(check_financial_data(result))
-    all_issues.extend(await check_url_liveness(result))
+    all_issues.extend(await check_urls(result))
 
     vr = VerificationResult(
         issues=all_issues,
