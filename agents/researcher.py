@@ -1,4 +1,5 @@
 import os
+import re
 import glob
 import logging
 from typing import Optional
@@ -12,6 +13,19 @@ from utils.stock_data import get_stock_data
 logger = logging.getLogger(__name__)
 
 WIKI_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "wiki")
+
+_MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^\s\)]+)\)')
+
+
+def _extract_urls_from_search(search_text: str) -> list[dict]:
+    """从搜索结果文本中提取所有 URL 及标题"""
+    urls = []
+    seen = set()
+    for title, url in _MD_LINK_RE.findall(search_text):
+        if url not in seen:
+            seen.add(url)
+            urls.append({"title": title.strip(), "url": url.strip()})
+    return urls
 
 
 def _find_wiki_context(question: str) -> str:
@@ -47,9 +61,12 @@ async def run_researcher(
 
     # 搜索实时信息
     search_context = ""
+    search_urls = []
     if config.enable_search:
         try:
             search_context = await web_search(f"{task.question} {config.expertise}", max_results=5)
+            if search_context:
+                search_urls = _extract_urls_from_search(search_context)
         except Exception as e:
             logger.warning("[%s] 搜索失败: %s", config.name, e)
 
@@ -78,6 +95,14 @@ async def run_researcher(
 
     prompt = "\n\n".join(parts)
     prompt += "\n\n请给出你的专业分析。"
+    if search_urls:
+        prompt += (
+            "\n\n**重要：参考资料引用规则**"
+            "\n- 在分析正文中引用信息时，用 Markdown 链接标注来源，如 [来源标题](URL)"
+            "\n- 在分析末尾添加 `## 参考资料` 部分，列出你实际引用的链接"
+            "\n- 只能使用上方「网络搜索参考」中提供的 URL，严禁编造或猜测链接"
+            "\n- 如果搜索结果中没有相关链接，不要伪造，直接省略即可"
+        )
 
     logger.info("[%s] 开始分析 (model=%s)", config.name, config.model)
     text, usage = await client.chat(prompt=prompt, temperature=0.7, thinking_budget=8192)
@@ -89,4 +114,6 @@ async def run_researcher(
         model=config.model,
         content=text,
         token_usage=usage,
+        source_urls=search_urls,
+        market_data=market_data,
     )

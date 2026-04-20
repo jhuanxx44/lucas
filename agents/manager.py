@@ -12,6 +12,7 @@ from agents.memory import ManagerMemory
 from agents.researcher import run_researcher, _find_wiki_context
 from agents.tools import get_tools_description, execute_tool
 from utils.llm_client import create_client
+from utils.verify import verify_result
 
 logger = logging.getLogger(__name__)
 
@@ -173,10 +174,15 @@ class Manager:
 
     async def _synthesize(self, question: str, results: list[ResearchResult]) -> str:
         """汇总各研究员结果"""
-        results_text = "\n\n".join(
-            f"### {r.researcher_name}（{r.model}）\n{r.content}"
-            for r in results
-        )
+        parts = []
+        for r in results:
+            section = f"### {r.researcher_name}（{r.model}）\n{r.content}"
+            if r.verification and r.verification.issues:
+                warnings = [i for i in r.verification.issues if i.severity in ("error", "warning")]
+                if warnings:
+                    section += "\n\n**⚠ 数据验证提示：**\n" + "\n".join(f"- {i.message}" for i in warnings)
+            parts.append(section)
+        results_text = "\n\n".join(parts)
         prompt = SYNTHESIS_PROMPT_TEMPLATE.format(
             question=question,
             results=results_text,
@@ -340,6 +346,15 @@ class Manager:
         for r in results:
             status(f"✓ {r.researcher_name} 完成")
 
+        # 2.5 验证
+        status("正在验证研究结果...")
+        await asyncio.gather(*(verify_result(r) for r in results))
+        for r in results:
+            if r.verification and not r.verification.passed:
+                status(f"⚠ {r.researcher_name}: {r.verification.error_count} 个数据问题, 置信度={r.confidence}")
+            else:
+                status(f"✓ {r.researcher_name} 验证通过")
+
         # 3. 汇总
         if len(results) > 1:
             status("正在汇总分析结果...")
@@ -464,14 +479,27 @@ class Manager:
         for r in report.results:
             filename = f"{r.researcher_id}_{slug}.md"
             path = os.path.join(raw_dir, filename)
+
+            # 兜底：如果正文中缺少参考资料章节，从 source_urls 补全
+            body = r.content
+            if r.source_urls and "## 参考资料" not in body:
+                urls_section = "\n\n## 参考资料\n" + "\n".join(
+                    f"- [{u['title']}]({u['url']})" for u in r.source_urls
+                )
+                body += urls_section
+
+            if r.verification and r.verification.issues:
+                body += r.verification.to_markdown()
+
             content = (
                 f"---\n"
                 f"question: {report.question}\n"
                 f"researcher: {r.researcher_name}\n"
                 f"model: {r.model}\n"
                 f"date: {today}\n"
+                f"confidence: {r.confidence}\n"
                 f"---\n\n"
-                f"{r.content}\n"
+                f"{body}\n"
             )
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -489,6 +517,42 @@ class Manager:
         researchers_list = ", ".join(
             f"{r.researcher_name}({r.model})" for r in report.results
         )
+
+        # 汇总所有研究员的参考链接
+        all_urls = []
+        seen_urls = set()
+        for r in report.results:
+            for u in r.source_urls:
+                if u["url"] not in seen_urls:
+                    seen_urls.add(u["url"])
+                    all_urls.append(u)
+        ref_section = ""
+        if all_urls:
+            ref_section = (
+                "\n\n## 参考资料\n"
+                + "\n".join(f"- [{u['title']}]({u['url']})" for u in all_urls)
+                + "\n"
+            )
+
+        # 动态置信度：取所有研究员中最低的
+        confidences = [r.confidence for r in report.results]
+        if "low" in confidences:
+            overall_confidence = "low"
+        elif all(c == "high" for c in confidences):
+            overall_confidence = "high"
+        else:
+            overall_confidence = "medium"
+
+        # 验证汇总
+        verify_section = ""
+        all_issues = []
+        for r in report.results:
+            if r.verification:
+                for issue in r.verification.issues:
+                    all_issues.append(f"- [{r.researcher_name}] {issue.message}")
+        if all_issues:
+            verify_section = "\n\n## 数据验证汇总\n" + "\n".join(all_issues) + "\n"
+
         wiki_content = (
             f"---\n"
             f"title: {report.question}\n"
@@ -498,9 +562,9 @@ class Manager:
             f"sources:\n{sources}\n"
             f"researchers: {researchers_list}\n"
             f"tags: [分析报告]\n"
-            f"confidence: medium\n"
+            f"confidence: {overall_confidence}\n"
             f"---\n\n"
-            f"{report.synthesis}\n"
+            f"{report.synthesis}{ref_section}{verify_section}\n"
         )
         with open(wiki_path, "w", encoding="utf-8") as f:
             f.write(wiki_content)
