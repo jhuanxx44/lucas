@@ -3,7 +3,6 @@ import glob
 import json
 import logging
 import os
-import re
 from datetime import date
 from typing import Optional
 
@@ -13,62 +12,9 @@ from agents.memory import ManagerMemory
 from agents.researcher import run_researcher, _find_wiki_context
 from agents.tools import get_tools_description, execute_tool
 from utils.llm_client import create_client
+from utils.json_extract import extract_json
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_json(text: str) -> Optional[dict | list]:
-    """
-    从 LLM 返回的文本中提取 JSON 对象。
-    处理多种格式：
-    - 纯 JSON: {"action": "direct"}
-    - Markdown 代码块: ```json\\n{"action": "direct"}\\n```
-    - 混有思考过程（MiniMax thinking 模型）:
-      <think>\n...(thinking, sometimes contains JSON fragments)...</think>\n...(final JSON answer)...
-    """
-    # 1. 去掉 markdown 代码块
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        if len(lines) >= 2:
-            stripped = "\n".join(lines[1:-1])
-        else:
-            stripped = stripped.strip("`")
-    stripped = stripped.strip()
-    # 2. 直接解析
-    try:
-        return json.loads(stripped)
-    except json.JSONDecodeError:
-        pass
-    # 3. 思考模型：优先从 </think> 之后找（最终答案所在位置）
-    think_end = stripped.rfind("</think>")
-    if think_end >= 0:
-        after_think = stripped[think_end + 9:].strip()
-        # 3a. 先直接试
-        try:
-            return json.loads(after_think)
-        except json.JSONDecodeError:
-            pass
-        # 3b. 从后往前找最后一个能解析的 { 或 [
-        matches = list(re.finditer(r'[\[{]', after_think))
-        for m in reversed(matches):
-            try:
-                obj = json.loads(after_think[m.start():])
-                if obj:
-                    return obj
-            except json.JSONDecodeError:
-                continue
-    # 4. 兜底：全文从后往前找最后一个能解析的 { 或 [
-    matches = list(re.finditer(r'[\[{]', stripped))
-    for m in reversed(matches):
-        try:
-            obj = json.loads(stripped[m.start():])
-            if obj:
-                return obj
-        except json.JSONDecodeError:
-            continue
-    return None
-
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
@@ -166,7 +112,7 @@ class Manager:
             response_mime_type="application/json",
             temperature=0.3,
         )
-        plan = _extract_json(text)
+        plan = extract_json(text)
         if plan is None:
             logger.warning("Manager dispatch JSON 解析失败，使用全部研究员: %s", text[:200])
             plan = {
@@ -321,7 +267,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.3,
             )
-            result = _extract_json(text)
+            result = extract_json(text)
             if result is None:
                 return text
 
@@ -472,7 +418,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.1,
             )
-            data = _extract_json(text)
+            data = extract_json(text)
             if data is None:
                 return
             self.memory.add_conclusion(
@@ -498,7 +444,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.1,
             )
-            data = _extract_json(text)
+            data = extract_json(text)
             if data:
                 self.memory.save_preferences(data)
         except Exception as e:
@@ -684,7 +630,7 @@ class Manager:
             response_mime_type="application/json",
             temperature=0.3,
         )
-        plans = _extract_json(text)
+        plans = extract_json(text)
         if plans is None or not isinstance(plans, list):
             logger.warning("Wiki 更新计划 JSON 解析失败: %s", text[:200])
             return []
@@ -925,7 +871,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.3,
             )
-            plans = _extract_json(text)
+            plans = extract_json(text)
             if plans is None or not isinstance(plans, list):
                 logger.warning("编译分类 JSON 解析失败: %s", rel_path)
                 plans = []
