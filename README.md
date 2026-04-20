@@ -1,6 +1,6 @@
-# Lucas — A股股市 LLM Wiki + 多 Agent 专家系统
+# Lucas — 投研认知的复利引擎
 
-基于 Karpathy LLM Wiki 模式构建的A股市场知识库，配合多 Agent 专家系统进行智能分析。
+基于 Karpathy LLM Wiki 模式构建的A股专属知识库，持续将原始资料编译为结构化认知，配合多 Agent 专家系统进行深度分析。
 
 ## 结构
 

@@ -40,6 +40,12 @@ _PROVIDER_ENV_OVERRIDES = {
 MAX_RETRIES = 3
 _RETRY_WAIT = [3, 5, 10]
 
+_THINK_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
+
+
+def _strip_think_tags(text: str) -> str:
+    return _THINK_RE.sub('', text)
+
 
 def _is_retryable(e: Exception) -> bool:
     s = str(e).lower()
@@ -210,6 +216,7 @@ class _OpenAICompatClient(LLMClient):
         text = ""
         if response.choices and response.choices[0].message.content:
             text = response.choices[0].message.content
+            text = _strip_think_tags(text)
 
         usage = None
         if hasattr(response, "usage") and response.usage:

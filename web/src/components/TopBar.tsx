@@ -13,7 +13,7 @@ export function TopBar({ linked, onToggleLink, onSearch }: TopBarProps) {
   return (
     <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex items-center px-4 gap-4 shrink-0">
       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">Lucas</span>
-      <span className="text-sm text-zinc-400 dark:text-zinc-500">A股智能分析系统</span>
+      <span className="text-sm text-zinc-400 dark:text-zinc-500">投研认知的复利引擎</span>
       <div className="ml-auto flex items-center gap-2">
         <button
           onClick={toggle}

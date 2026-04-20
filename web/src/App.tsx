@@ -20,7 +20,8 @@ export default function App() {
   }, []);
 
   const handleRightResize = useCallback((delta: number) => {
-    setRightWidth((w) => Math.max(300, Math.min(600, w - delta)));
+    const maxW = Math.floor(window.innerWidth / 2);
+    setRightWidth((w) => Math.max(300, Math.min(maxW, w - delta)));
   }, []);
 
   const navigateTo = useCallback((path: string) => {

@@ -1,25 +1,73 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@/hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
 import { ResearcherCard } from "./ResearcherCard";
 import { SynthesisCard } from "./SynthesisCard";
-import { MessageSquare, TrendingUp, Building2, Lightbulb } from "lucide-react";
+import { fetchWikiIndex } from "@/lib/api";
+import { MessageSquare, RefreshCw, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
+import type { WikiItem } from "@/types";
 
 interface ChatPanelProps {
   onResearchTarget?: (target: string) => void;
 }
 
-const SUGGESTIONS = [
-  { icon: TrendingUp, text: "宁德时代最近的财报表现如何？" },
-  { icon: Building2, text: "AI芯片概念有哪些值得关注的公司？" },
-  { icon: Lightbulb, text: "当前宏观经济环境对A股有什么影响？" },
-];
+const ICONS = [TrendingUp, Building2, Lightbulb, BarChart3, Globe];
+
+const TEMPLATES: Record<string, (name: string) => string> = {
+  公司档案: (n) => `${n}最近的基本面和走势如何？`,
+  行业概览: (n) => `${n}行业目前的景气度和投资机会？`,
+  "概念/主题": (n) => `${n}概念有哪些核心受益标的？`,
+  宏观环境: (n) => `${n}对当前市场有什么影响？`,
+  分析报告: (n) => `${n}的核心结论是什么？`,
+  策略方法: (n) => `${n}策略的适用场景和要点？`,
+};
+
+const FALLBACK = (n: string) => `帮我分析一下${n}`;
+
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
+
+function generateSuggestions(
+  items: { item: WikiItem; section: string }[]
+): { icon: typeof TrendingUp; text: string }[] {
+  const picked = pickRandom(items, 3);
+  return picked.map(({ item, section }, i) => {
+    const template = TEMPLATES[section] || FALLBACK;
+    return {
+      icon: ICONS[i % ICONS.length],
+      text: template(item.name),
+    };
+  });
+}
 
 export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
   const { state, sendMessage } = useChat(onResearchTarget);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+
+  const [allItems, setAllItems] = useState<{ item: WikiItem; section: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ icon: typeof TrendingUp; text: string }[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchWikiIndex().then((idx) => {
+      const flat = idx.sections.flatMap((s) =>
+        s.items.map((item) => ({ item, section: s.title }))
+      );
+      setAllItems(flat);
+      setSuggestions(generateSuggestions(flat));
+    });
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (allItems.length === 0) return;
+    setRefreshing(true);
+    setSuggestions(generateSuggestions(allItems));
+    setTimeout(() => setRefreshing(false), 300);
+  }, [allItems]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -45,13 +93,13 @@ export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
               <MessageSquare size={22} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <h3 className="text-base font-medium text-zinc-800 dark:text-zinc-200 mb-1">
-              Lucas 智能分析
+              Lucas
             </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              多研究员协作分析，为你提供全面的A股市场洞察
+              投研认知的复利引擎 — 多研究员协作，持续编译你的专属知识库
             </p>
             <div className="w-full space-y-2">
-              {SUGGESTIONS.map(({ icon: Icon, text }) => (
+              {suggestions.map(({ icon: Icon, text }) => (
                 <button
                   key={text}
                   onClick={() => sendMessage(text)}
@@ -62,6 +110,15 @@ export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
                 </button>
               ))}
             </div>
+            {allItems.length > 3 && (
+              <button
+                onClick={handleRefresh}
+                className="mt-3 flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+              >
+                <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+                换一换
+              </button>
+            )}
           </div>
         )}
 
