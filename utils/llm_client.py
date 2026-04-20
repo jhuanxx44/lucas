@@ -186,7 +186,7 @@ class _OpenAICompatClient(LLMClient):
             base_url = os.environ.get("OPENAI_BASE_URL", "")
         if not api_key:
             raise ValueError("API_KEY 未设置")
-        self._client = openai.OpenAI(base_url=base_url, api_key=api_key)
+        self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     async def chat(self, prompt: str, response_mime_type: str = "text/plain",
                    temperature: Optional[float] = None,
@@ -205,7 +205,7 @@ class _OpenAICompatClient(LLMClient):
         if response_mime_type == "application/json":
             params["response_format"] = {"type": "json_object"}
 
-        response = await asyncio.to_thread(self._client.chat.completions.create, **params)
+        response = await self._client.chat.completions.create(**params)
 
         text = ""
         if response.choices and response.choices[0].message.content:
@@ -239,13 +239,40 @@ class _OpenAICompatClient(LLMClient):
             "temperature": temperature if temperature is not None else 1.0,
             "stream": True,
         }
-        stream = await asyncio.to_thread(self._client.chat.completions.create, **params)
-        for chunk in stream:
+        stream = await self._client.chat.completions.create(**params)
+        buf = ""
+        in_think = False
+        async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
-                text = chunk.choices[0].delta.content
-                text = _strip_think_tags(text)
-                if text:
-                    yield text
+                buf += chunk.choices[0].delta.content
+                while True:
+                    if in_think:
+                        end = buf.find("</think>")
+                        if end == -1:
+                            buf = ""
+                            break
+                        buf = buf[end + 8:]
+                        in_think = False
+                    else:
+                        start = buf.find("<think>")
+                        if start == -1:
+                            if "<" in buf and not buf.endswith(">"):
+                                # partial tag — hold back
+                                safe = buf[:buf.rfind("<")]
+                                if safe:
+                                    yield safe
+                                buf = buf[len(safe):]
+                            else:
+                                if buf:
+                                    yield buf
+                                buf = ""
+                            break
+                        if start > 0:
+                            yield buf[:start]
+                        buf = buf[start + 7:]
+                        in_think = True
+        if buf and not in_think:
+            yield buf
 
 
 def create_client(

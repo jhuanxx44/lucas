@@ -8,7 +8,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Lucas", docs_url="/api/docs")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:5173", "http://localhost:8000"],
         allow_methods=["*"],
         allow_headers=["*"],
     )

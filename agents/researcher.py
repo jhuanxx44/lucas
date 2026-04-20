@@ -51,15 +51,7 @@ def _find_wiki_context(question: str) -> str:
     return "\n\n".join(context_parts[:3])
 
 
-async def run_researcher(
-    config: ResearcherConfig,
-    task: Task,
-    prior_results: list[ResearchResult] = None,
-) -> ResearchResult:
-    """执行单个研究员的分析任务"""
-    client = create_client(model=config.model, system_prompt=config.system_prompt)
-
-    # 搜索实时信息
+async def _build_prompt(config: ResearcherConfig, task: Task, prior_results=None) -> str:
     search_context = ""
     search_urls = []
     if config.enable_search:
@@ -70,7 +62,6 @@ async def run_researcher(
         except Exception as e:
             logger.warning("[%s] 搜索失败: %s", config.name, e)
 
-    # 拉取结构化市场数据
     market_data = ""
     if config.data_types:
         try:
@@ -78,7 +69,6 @@ async def run_researcher(
         except Exception as e:
             logger.warning("[%s] 获取市场数据失败: %s", config.name, e)
 
-    # 构建 prompt
     parts = [f"## 用户问题\n{task.question}"]
     if task.instruction:
         parts.append(f"## Manager 指令\n{task.instruction}")
@@ -93,8 +83,7 @@ async def run_researcher(
         for pr in prior_results:
             parts.append(f"### {pr.researcher_name}（{pr.model}）\n{pr.content}")
 
-    prompt = "\n\n".join(parts)
-    prompt += "\n\n请给出你的专业分析。"
+    prompt = "\n\n".join(parts) + "\n\n请给出你的专业分析。"
     if search_urls:
         prompt += (
             "\n\n**重要：参考资料引用规则**"
@@ -103,6 +92,17 @@ async def run_researcher(
             "\n- 只能使用上方「网络搜索参考」中提供的 URL，严禁编造或猜测链接"
             "\n- 如果搜索结果中没有相关链接，不要伪造，直接省略即可"
         )
+    return prompt, search_urls, market_data
+
+
+async def run_researcher(
+    config: ResearcherConfig,
+    task: Task,
+    prior_results: list[ResearchResult] = None,
+) -> ResearchResult:
+    """执行单个研究员的分析任务"""
+    client = create_client(model=config.model, system_prompt=config.system_prompt)
+    prompt, search_urls, market_data = await _build_prompt(config, task, prior_results)
 
     logger.info("[%s] 开始分析 (model=%s)", config.name, config.model)
     text, usage = await client.chat(prompt=prompt, temperature=0.7, thinking_budget=8192)
@@ -126,40 +126,7 @@ async def run_researcher_stream(
 ) -> AsyncGenerator[dict, None]:
     """执行单个研究员的分析任务（流式版本），yield SSE event dicts"""
     client = create_client(model=config.model, system_prompt=config.system_prompt)
-
-    # 搜索实时信息（非流式准备阶段）
-    search_context = ""
-    if config.enable_search:
-        try:
-            search_context = await web_search(f"{task.question} {config.expertise}", max_results=5)
-        except Exception as e:
-            logger.warning("[%s] 搜索失败: %s", config.name, e)
-
-    # 拉取结构化市场数据（非流式准备阶段）
-    market_data = ""
-    if config.data_types:
-        try:
-            market_data = await get_stock_data(task.question, config.data_types)
-        except Exception as e:
-            logger.warning("[%s] 获取市场数据失败: %s", config.name, e)
-
-    # 构建 prompt（与 run_researcher 相同逻辑）
-    parts = [f"## 用户问题\n{task.question}"]
-    if task.instruction:
-        parts.append(f"## Manager 指令\n{task.instruction}")
-    if market_data:
-        parts.append(f"## 市场数据（结构化）\n{market_data}")
-    if search_context:
-        parts.append(f"## 网络搜索参考（实时信息）\n{search_context}")
-    if task.context:
-        parts.append(f"## 知识库参考\n{task.context}")
-    if prior_results:
-        parts.append("## 前序研究员的分析（供参考）")
-        for pr in prior_results:
-            parts.append(f"### {pr.researcher_name}（{pr.model}）\n{pr.content}")
-
-    prompt = "\n\n".join(parts)
-    prompt += "\n\n请给出你的专业分析。"
+    prompt, _, _ = await _build_prompt(config, task, prior_results)
 
     logger.info("[%s] 开始流式分析 (model=%s)", config.name, config.model)
     async for chunk in client.chat_stream(prompt=prompt, temperature=0.7):

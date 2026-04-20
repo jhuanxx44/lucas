@@ -29,10 +29,22 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
     [onResize]
   );
 
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowLeft") onResize(-10);
+      else if (e.key === "ArrowRight") onResize(10);
+    },
+    [onResize]
+  );
+
   return (
     <div
-      className="w-1 bg-zinc-800 hover:bg-indigo-500 cursor-col-resize transition-colors shrink-0"
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      className="w-1 bg-zinc-800 hover:bg-indigo-500 focus:bg-indigo-500 cursor-col-resize transition-colors shrink-0 outline-none"
       onMouseDown={onMouseDown}
+      onKeyDown={onKeyDown}
     />
   );
 }

@@ -9,7 +9,8 @@ export async function fetchWikiIndex(): Promise<WikiIndex> {
 }
 
 export async function fetchWikiPage(path: string): Promise<WikiPage> {
-  const res = await fetch(`${BASE}/wiki/${path}`);
+  const safePath = path.split("/").map(encodeURIComponent).join("/");
+  const res = await fetch(`${BASE}/wiki/${safePath}`);
   if (!res.ok) throw new Error(`Failed to fetch wiki page: ${res.status}`);
   return res.json();
 }

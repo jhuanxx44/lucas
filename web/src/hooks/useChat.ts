@@ -2,6 +2,9 @@ import { useReducer, useCallback, useRef } from "react";
 import { useSSE } from "./useSSE";
 import type { ChatMessage, ResearcherState } from "@/types";
 
+let _msgId = 0;
+function nextId() { return `msg-${++_msgId}`; }
+
 interface ChatState {
   messages: ChatMessage[];
   researchers: Map<string, ResearcherState>;
@@ -23,7 +26,7 @@ function reducer(state: ChatState, action: Action): ChatState {
     case "USER_MESSAGE":
       return {
         ...state,
-        messages: [...state.messages, { role: "user", content: action.question }],
+        messages: [...state.messages, { id: nextId(), role: "user", content: action.question }],
         researchers: new Map(),
         synthesis: "",
         isLoading: true,
@@ -49,6 +52,7 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, synthesis: state.synthesis + action.text };
     case "DONE": {
       const assistantMsg: ChatMessage = {
+        id: nextId(),
         role: "assistant",
         content: state.synthesis,
         researchers: Array.from(state.researchers.values()),
@@ -79,6 +83,9 @@ export function useChat(onResearchTarget?: (target: string) => void) {
   const { send } = useSSE();
   const abortRef = useRef<AbortController | null>(null);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const sendMessage = useCallback(
     async (question: string) => {
       abortRef.current?.abort();
@@ -87,9 +94,15 @@ export function useChat(onResearchTarget?: (target: string) => void) {
 
       dispatch({ type: "USER_MESSAGE", question });
 
+      const history = stateRef.current.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
       try {
         await send(
           question,
+          history,
           (event, data: unknown) => {
             const d = data as Record<string, string>;
             switch (event) {

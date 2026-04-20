@@ -12,9 +12,16 @@ interface ChatPanelProps {
 export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
   const { state, sendMessage } = useChat(onResearchTarget);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottom = useRef(true);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    isNearBottom.current = scrollHeight - scrollTop - clientHeight < 80;
+  };
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && isNearBottom.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [state.messages, state.researchers, state.synthesis]);
@@ -23,9 +30,9 @@ export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {state.messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {state.messages.map((msg) => (
+          <ChatMessage key={msg.id} message={msg} />
         ))}
 
         {state.isLoading && activeResearchers.length > 0 && (

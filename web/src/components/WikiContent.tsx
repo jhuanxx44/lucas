@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { fetchWikiPage } from "@/lib/api";
+import { fetchWikiPage, searchWiki } from "@/lib/api";
 import { processWikiLinks } from "@/lib/markdown";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
 import type { WikiPage } from "@/types";
@@ -66,7 +66,12 @@ export function WikiContent() {
                 const target = href.replace("#wiki:", "");
                 return (
                   <button
-                    onClick={() => navigateTo(target)}
+                    onClick={async () => {
+                      const results = await searchWiki(target);
+                      if (results.length > 0) {
+                        navigateTo(results[0].path);
+                      }
+                    }}
                     className="text-indigo-400 hover:text-indigo-300 underline"
                   >
                     {children}

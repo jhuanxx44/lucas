@@ -57,3 +57,22 @@ def test_wiki_search(monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
+
+
+def test_wiki_path_traversal_blocked(monkeypatch):
+    from server.app import create_app
+    import server.routers.wiki as wiki_mod
+    import os
+    wiki_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "wiki")
+    monkeypatch.setattr(wiki_mod, "WIKI_DIR", wiki_dir)
+    app = create_app()
+    client = TestClient(app)
+    # Starlette 会规范化 ../，所以用 URL 编码绕过框架层测试后端防护
+    resp = client.get("/api/wiki/%2e%2e/requirements.txt")
+    assert resp.status_code in (403, 404)
+
+    # 直接测试路由函数的防护逻辑
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        wiki_mod.get_page("../../etc/passwd")
+    assert exc_info.value.status_code == 403

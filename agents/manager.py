@@ -441,35 +441,37 @@ class Manager:
         # 用 asyncio.Queue 合并并行流式事件
         results: list[ResearchResult] = []
 
-        async def _stream_one(rc, prior: list[ResearchResult] | None = None):
-            """流式跑单个研究员，把事件放入 queue"""
+        async def _stream_one(rc, prior: list[ResearchResult] | None = None) -> ResearchResult:
+            """流式跑单个研究员，把事件放入 queue，返回结果"""
             full_text = []
-            async for evt in run_researcher_stream(rc, task, prior_results=prior):
-                await queue.put(evt)
-                if evt["event"] == "researcher_chunk":
-                    full_text.append(evt["data"]["text"])
-            # 构造 ResearchResult 供后续汇总
+            try:
+                async for evt in run_researcher_stream(rc, task, prior_results=prior):
+                    await queue.put(evt)
+                    if evt["event"] == "researcher_chunk":
+                        full_text.append(evt["data"]["text"])
+            except Exception as e:
+                logger.error("[%s] 研究员异常: %s", rc.name, e)
+                await queue.put({"event": "researcher_error", "data": {"id": rc.id, "message": str(e)}})
             result = ResearchResult(
                 researcher_id=rc.id,
                 researcher_name=rc.name,
                 model=rc.model,
-                content="".join(full_text),
+                content="".join(full_text) or f"[分析失败]",
                 token_usage=None,
             )
             await queue.put({"event": "_researcher_result", "data": {"id": rc.id, "result": result}})
             await queue.put({"event": "researcher_done", "data": {"id": rc.id}})
+            return result
 
         queue: asyncio.Queue = asyncio.Queue()
 
         if task.mode == "serial":
-            # 串行：顺序执行，每个研究员等前一个完成
             async def _run_serial_stream():
-                prior: list[ResearchResult] = []
+                serial_prior: list[ResearchResult] = []
                 for rc in researcher_configs:
                     await queue.put({"event": "researcher_start", "data": {"id": rc.id, "name": rc.name}})
-                    await _stream_one(rc, prior=prior if prior else None)
-                    # 取出最新结果加入 prior
-                    prior = list(results)  # results 在主循环中更新
+                    result = await _stream_one(rc, prior=serial_prior if serial_prior else None)
+                    serial_prior.append(result)
                 await queue.put({"event": "_all_done", "data": {}})
 
             task_obj = asyncio.create_task(_run_serial_stream())
