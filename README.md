@@ -17,11 +17,23 @@ utils/        LLM统一调用层
 
 ## 快速启动
 
+### CLI 模式
+
 ```bash
-./start.sh
+./cli.sh
 ```
 
 进入交互式 CLI，输入问题即可。Lucas 会自动分析意图、选择研究员、汇总结果。
+
+### Web 模式
+
+```bash
+./dev.sh
+```
+
+一键启动前后端。后端 `localhost:8000`，前端 `localhost:5173`，`Ctrl+C` 同时关闭。
+
+生产部署：先 `cd web && npm run build`，再 `python -m server.app`——FastAPI 会自动 serve 静态文件。
 
 ## 可用模型（内部代理）
 
@@ -41,7 +53,7 @@ utils/        LLM统一调用层
 3. LLM 自动生成/更新 wiki 页面并维护索引
 
 ### Agent 分析
-1. 运行 `./start.sh` 启动 CLI
+1. 运行 `./cli.sh` 启动 CLI
 2. 输入问题（如"分析宁德时代"）
 3. Lucas 自动派发给相关研究员，汇总多视角分析
 
