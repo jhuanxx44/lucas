@@ -15,10 +15,11 @@ Lucas LLM 统一调用层
 """
 import os
 import abc
+import re
 import time
 import asyncio
 import logging
-from typing import Optional, Tuple, List
+from typing import AsyncGenerator, Optional, Tuple, List
 
 from dotenv import load_dotenv
 
@@ -45,6 +46,11 @@ def _is_retryable(e: Exception) -> bool:
     return any(k in s for k in ['429', 'resource_exhausted', 'rate limit', '499', '500', '502', '503', '504'])
 
 
+def _strip_think_tags(text: str) -> str:
+    """移除 <think>...</think> 标签及其内容"""
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+
 class LLMClient(abc.ABC):
     """统一接口：所有 LLM 客户端都实现这个协议"""
 
@@ -60,6 +66,15 @@ class LLMClient(abc.ABC):
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
     ) -> Tuple[str, Optional[TokenUsage]]:
+        ...
+
+    @abc.abstractmethod
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> "AsyncGenerator[str, None]":
         ...
 
 
@@ -123,6 +138,31 @@ class _GeminiClient(LLMClient):
         usage = extract_token_usage(response, self.model, latency) if response else None
         return text, usage
 
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> AsyncGenerator[str, None]:
+        from google.genai import types
+        contents = []
+        if self.system_prompt:
+            contents.append(types.Content(role="user", parts=[types.Part(text=self.system_prompt)]))
+            contents.append(types.Content(role="model", parts=[types.Part(text="好的，我明白了。")]))
+        contents.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
+        _budget = thinking_budget if thinking_budget is not None else 24576
+        config = types.GenerateContentConfig(
+            temperature=temperature if temperature is not None else 1.0,
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=_budget if self.enable_thinking else 0
+            ),
+        )
+        async for chunk in self._client.aio.models.generate_content_stream(
+            model=self.model, contents=contents, config=config
+        ):
+            if chunk.text:
+                yield chunk.text
+
 
 class _OpenAICompatClient(LLMClient):
     """OpenAI 兼容客户端，适用于 Zhipu/DeepSeek/Qwen 等"""
@@ -181,6 +221,31 @@ class _OpenAICompatClient(LLMClient):
                 total_tokens=getattr(u, "total_tokens", 0) or 0,
             )
         return text, usage
+
+    async def chat_stream(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        thinking_budget: Optional[int] = None,
+    ) -> AsyncGenerator[str, None]:
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        params = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": 65536,
+            "temperature": temperature if temperature is not None else 1.0,
+            "stream": True,
+        }
+        stream = await asyncio.to_thread(self._client.chat.completions.create, **params)
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                text = chunk.choices[0].delta.content
+                text = _strip_think_tags(text)
+                if text:
+                    yield text
 
 
 def create_client(

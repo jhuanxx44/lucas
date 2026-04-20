@@ -2,7 +2,7 @@ import os
 import re
 import glob
 import logging
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from agents.config import ResearcherConfig
 from agents.models import Task, ResearchResult
@@ -117,3 +117,50 @@ async def run_researcher(
         source_urls=search_urls,
         market_data=market_data,
     )
+
+
+async def run_researcher_stream(
+    config: ResearcherConfig,
+    task: Task,
+    prior_results: list[ResearchResult] = None,
+) -> AsyncGenerator[dict, None]:
+    """执行单个研究员的分析任务（流式版本），yield SSE event dicts"""
+    client = create_client(model=config.model, system_prompt=config.system_prompt)
+
+    # 搜索实时信息（非流式准备阶段）
+    search_context = ""
+    if config.enable_search:
+        try:
+            search_context = await web_search(f"{task.question} {config.expertise}", max_results=5)
+        except Exception as e:
+            logger.warning("[%s] 搜索失败: %s", config.name, e)
+
+    # 拉取结构化市场数据（非流式准备阶段）
+    market_data = ""
+    if config.data_types:
+        try:
+            market_data = await get_stock_data(task.question, config.data_types)
+        except Exception as e:
+            logger.warning("[%s] 获取市场数据失败: %s", config.name, e)
+
+    # 构建 prompt（与 run_researcher 相同逻辑）
+    parts = [f"## 用户问题\n{task.question}"]
+    if task.instruction:
+        parts.append(f"## Manager 指令\n{task.instruction}")
+    if market_data:
+        parts.append(f"## 市场数据（结构化）\n{market_data}")
+    if search_context:
+        parts.append(f"## 网络搜索参考（实时信息）\n{search_context}")
+    if task.context:
+        parts.append(f"## 知识库参考\n{task.context}")
+    if prior_results:
+        parts.append("## 前序研究员的分析（供参考）")
+        for pr in prior_results:
+            parts.append(f"### {pr.researcher_name}（{pr.model}）\n{pr.content}")
+
+    prompt = "\n\n".join(parts)
+    prompt += "\n\n请给出你的专业分析。"
+
+    logger.info("[%s] 开始流式分析 (model=%s)", config.name, config.model)
+    async for chunk in client.chat_stream(prompt=prompt, temperature=0.7):
+        yield {"event": "researcher_chunk", "data": {"id": config.id, "text": chunk}}

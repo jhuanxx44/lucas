@@ -9,3 +9,6 @@ httpx>=0.25
 tavily-python>=0.5
 ddgs>=4.0
 akshare>=1.10
+fastapi>=0.115
+uvicorn>=0.30
+pytest>=7.0

@@ -7,3 +7,6 @@ __pycache__/
 .env
 memory/
 .obsidian/
+web/node_modules/
+web/dist/
+.superpowers/

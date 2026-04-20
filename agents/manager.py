@@ -4,12 +4,12 @@ import json
 import logging
 import os
 from datetime import date
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from agents.config import AgentsConfig
 from agents.models import Task, ResearchResult, ManagerReport
 from agents.memory import ManagerMemory
-from agents.researcher import run_researcher, _find_wiki_context
+from agents.researcher import run_researcher, run_researcher_stream, _find_wiki_context
 from agents.tools import get_tools_description, execute_tool
 from utils.llm_client import create_client
 from utils.verify import verify_result
@@ -388,6 +388,150 @@ class Manager:
         await self._extract_and_save_preferences(question, synthesis)
 
         return report
+
+    async def analyze_stream(self, question: str) -> AsyncGenerator[dict, None]:
+        """
+        流式分析流程，yield SSE event dicts。
+
+        事件类型：
+          status          — {"message": str}
+          dispatch        — {"researchers": [{"id", "name"}], "mode": str}
+          researcher_start — {"id": str, "name": str}
+          researcher_chunk — {"id": str, "text": str}
+          researcher_done  — {"id": str}
+          synthesis_chunk  — {"text": str}
+          done             — {"total_tokens": int}
+        """
+        def _evt(event: str, data: dict) -> dict:
+            return {"event": event, "data": data}
+
+        yield _evt("status", {"message": "正在分析问题..."})
+        action, dispatch_result = await self._dispatch(question)
+
+        # ── direct ──────────────────────────────────────────
+        if action == "direct":
+            yield _evt("status", {"message": "正在思考..."})
+            reply = await self._tool_use_loop(question)
+            self.memory.add_turn(question, "direct", reply)
+            yield _evt("synthesis_chunk", {"text": reply})
+            yield _evt("done", {"total_tokens": 0})
+            return
+
+        # ── compile ─────────────────────────────────────────
+        if action == "compile":
+            yield _evt("status", {"message": "开始编译原始资料到 wiki..."})
+            summary = await self._compile_from_raw(dispatch_result)
+            self.memory.add_turn(question, "compile", summary)
+            yield _evt("synthesis_chunk", {"text": summary})
+            yield _evt("done", {"total_tokens": 0})
+            return
+
+        # ── research ─────────────────────────────────────────
+        task: Task = dispatch_result
+        researcher_configs = [
+            rc for rid in task.researcher_ids
+            if (rc := self.config.get_researcher(rid)) is not None
+        ]
+
+        yield _evt("dispatch", {
+            "researchers": [{"id": rc.id, "name": rc.name} for rc in researcher_configs],
+            "mode": task.mode,
+        })
+
+        # 用 asyncio.Queue 合并并行流式事件
+        results: list[ResearchResult] = []
+
+        async def _stream_one(rc, prior: list[ResearchResult] | None = None):
+            """流式跑单个研究员，把事件放入 queue"""
+            full_text = []
+            async for evt in run_researcher_stream(rc, task, prior_results=prior):
+                await queue.put(evt)
+                if evt["event"] == "researcher_chunk":
+                    full_text.append(evt["data"]["text"])
+            # 构造 ResearchResult 供后续汇总
+            result = ResearchResult(
+                researcher_id=rc.id,
+                researcher_name=rc.name,
+                model=rc.model,
+                content="".join(full_text),
+                token_usage=None,
+            )
+            await queue.put({"event": "_researcher_result", "data": {"id": rc.id, "result": result}})
+            await queue.put({"event": "researcher_done", "data": {"id": rc.id}})
+
+        queue: asyncio.Queue = asyncio.Queue()
+
+        if task.mode == "serial":
+            # 串行：顺序执行，每个研究员等前一个完成
+            async def _run_serial_stream():
+                prior: list[ResearchResult] = []
+                for rc in researcher_configs:
+                    await queue.put({"event": "researcher_start", "data": {"id": rc.id, "name": rc.name}})
+                    await _stream_one(rc, prior=prior if prior else None)
+                    # 取出最新结果加入 prior
+                    prior = list(results)  # results 在主循环中更新
+                await queue.put({"event": "_all_done", "data": {}})
+
+            task_obj = asyncio.create_task(_run_serial_stream())
+        else:
+            # 并行：同时启动所有研究员
+            async def _run_parallel_stream():
+                for rc in researcher_configs:
+                    await queue.put({"event": "researcher_start", "data": {"id": rc.id, "name": rc.name}})
+                sem = asyncio.Semaphore(2)
+
+                async def _with_sem(rc_inner):
+                    async with sem:
+                        await _stream_one(rc_inner)
+
+                await asyncio.gather(*[_with_sem(rc) for rc in researcher_configs])
+                await queue.put({"event": "_all_done", "data": {}})
+
+            task_obj = asyncio.create_task(_run_parallel_stream())
+
+        # 消费 queue，转发事件给调用方
+        pending_done = len(researcher_configs)
+        while True:
+            evt = await queue.get()
+            if evt["event"] == "_researcher_result":
+                results.append(evt["data"]["result"])
+                continue
+            if evt["event"] == "_all_done":
+                break
+            yield evt
+
+        await task_obj  # 确保任务完成，传播异常
+
+        # 汇总
+        yield _evt("status", {"message": "正在汇总分析结果..."})
+        if len(results) > 1:
+            synthesis = await self._synthesize(question, results)
+        elif len(results) == 1:
+            synthesis = results[0].content
+        else:
+            synthesis = "没有研究员返回结果。"
+
+        total_tokens = sum(r.token_usage.total_tokens for r in results if r.token_usage)
+
+        report = ManagerReport(
+            question=question,
+            results=results,
+            synthesis=synthesis,
+            total_tokens=total_tokens,
+        )
+
+        yield _evt("synthesis_chunk", {"text": synthesis})
+
+        # 归档 + wiki + 记忆
+        yield _evt("status", {"message": "正在归档分析结果..."})
+        self._archive(report)
+        yield _evt("status", {"message": "正在整理 wiki 知识库..."})
+        await self._update_wiki(report)
+        self.memory.add_turn(question, "research", synthesis)
+        await self._extract_and_save_conclusion(report)
+        await self._extract_and_save_preferences(question, synthesis)
+
+        yield _evt("done", {"total_tokens": total_tokens})
 
     _CONCLUSION_EXTRACT_PROMPT = """从分析报告中提取结论摘要。
 
