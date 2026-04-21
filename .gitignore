@@ -8,3 +8,6 @@ __pycache__/
 memory/
 .obsidian/
 .superpowers/
+web/.vite
+wiki/
+raw/
