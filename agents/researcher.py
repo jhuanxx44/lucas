@@ -69,9 +69,18 @@ async def _build_prompt(config: ResearcherConfig, task: Task, prior_results=None
         except Exception as e:
             logger.warning("[%s] 获取市场数据失败: %s", config.name, e)
 
+    # 优先使用 per-researcher 差异化子任务
+    rt = task.get_researcher_task(config.id) if hasattr(task, 'get_researcher_task') else None
+
     parts = [f"## 用户问题\n{task.question}"]
+    if rt and rt.sub_question:
+        parts.append(f"## 你需要回答的子问题\n{rt.sub_question}")
+    if rt and rt.focus:
+        parts.append(f"## 聚焦维度（只分析这些）\n{rt.focus}")
+    if rt and rt.avoid:
+        parts.append(f"## 不要涉及（属于其他研究员的领域）\n{rt.avoid}")
     if task.instruction:
-        parts.append(f"## Manager 指令\n{task.instruction}")
+        parts.append(f"## Manager 补充指令\n{task.instruction}")
     if market_data:
         parts.append(f"## 市场数据（结构化）\n{market_data}")
     if search_context:

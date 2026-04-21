@@ -5,12 +5,24 @@ from utils.token_tracker import TokenUsage
 
 
 @dataclass
+class ResearcherTask:
+    """每个研究员收到的差异化子任务"""
+    sub_question: str = ""
+    focus: str = ""
+    avoid: str = ""
+
+
+@dataclass
 class Task:
     question: str
     instruction: str = ""
     context: str = ""
     researcher_ids: list[str] = field(default_factory=list)
     mode: str = "parallel"
+    researcher_tasks: dict[str, ResearcherTask] = field(default_factory=dict)
+
+    def get_researcher_task(self, researcher_id: str) -> ResearcherTask | None:
+        return self.researcher_tasks.get(researcher_id)
 
 
 @dataclass
