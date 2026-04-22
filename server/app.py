@@ -1,7 +1,15 @@
+import logging
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+logging.basicConfig(
+    format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.INFO,
+)
 
 
 def create_app() -> FastAPI:
@@ -25,4 +33,11 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server.app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "server.app:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+        access_log=True,
+    )
