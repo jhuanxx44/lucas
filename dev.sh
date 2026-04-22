@@ -17,20 +17,26 @@ if [ ! -d "$DIR/web/node_modules" ]; then
     (cd "$DIR/web" && npm install)
 fi
 
-echo "🚀 启动后端 (localhost:8000) ..."
-"$VENV/bin/python" -m server.app &
-PID_BACKEND=$!
-
 echo "🚀 启动前端 (localhost:5173) ..."
-(cd "$DIR/web" && npm run dev) &
+(cd "$DIR/web" && npm run dev > /dev/null 2>&1) &
 PID_FRONTEND=$!
+
+sleep 1
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 启动后端 (localhost:8000)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
 cleanup() {
     echo ""
     echo "⏹ 关闭服务..."
-    kill "$PID_FRONTEND" "$PID_BACKEND" 2>/dev/null
-    wait "$PID_FRONTEND" "$PID_BACKEND" 2>/dev/null
+    kill "$PID_FRONTEND" 2>/dev/null
+    wait "$PID_FRONTEND" 2>/dev/null
+    exit 0
 }
 trap cleanup INT TERM
 
-wait
+cd "$DIR"
+"$VENV/bin/uvicorn" server.app:app --host 0.0.0.0 --port 8000 --reload --log-level info

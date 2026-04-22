@@ -39,13 +39,13 @@ function SectionItem({ section }: { section: WikiSection }) {
   );
 }
 
-export function WikiSidebar() {
+export function WikiSidebar({ refreshKey = 0 }: { refreshKey?: number }) {
   const [index, setIndex] = useState<WikiIndex | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWikiIndex().then(setIndex).catch((e) => setError(e.message));
-  }, []);
+  }, [refreshKey]);
 
   if (error) return <div className="text-sm text-red-500 dark:text-red-400 p-2">{error}</div>;
   if (!index) return <div className="text-sm text-zinc-400 dark:text-zinc-500 p-2">加载中...</div>;

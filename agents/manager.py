@@ -22,118 +22,6 @@ _WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 _MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
 
-DISPATCH_PROMPT_TEMPLATE = """你是 Lucas，需要根据用户问题决定如何处理。
-
-## 可用研究员
-{researchers_desc}
-
-## 用户问题
-{question}
-
-## 知识库已有内容
-{wiki_context}
-
-## 记忆
-{memory_context}
-
-**重要：只返回 JSON，不要其他任何文字。**判断用户意图：
-
-1. 如果不需要派发研究员（闲聊、问候、查询历史、询问文件位置、基于知识库回答等），返回：
-{{
-  "action": "direct"
-}}
-
-2. 如果需要研究员进行新的研究分析（知识库没有相关内容，或用户明确要求最新数据/深度分析），返回：
-{{
-  "action": "research",
-  "researcher_ids": ["要派发的研究员id列表"],
-  "mode": "parallel 或 serial",
-  "tasks": {{
-    "研究员id": {{
-      "sub_question": "该研究员需要回答的具体子问题（从其专业视角拆解）",
-      "focus": "该研究员应聚焦的分析维度（具体到指标/方法）",
-      "avoid": "该研究员不应涉及的内容（属于其他研究员的领域）"
-    }}
-  }}
-}}
-
-**tasks 拆分规则**：
-- 每个研究员的 sub_question 必须不同，从各自专业角度拆解用户问题
-- focus 要具体，如基本面写"ROE趋势、毛利率变化、估值水平"，而非笼统的"财务分析"
-- avoid 要明确划清边界，如基本面分析师 avoid "K线形态、技术指标、支撑压力位"
-- 避免所有研究员都回答同一个笼统问题
-
-3. 如果用户要求编译 raw/ 中的原始资料到 wiki（如"编译 raw/xxx.md"、"处理这份研报"、"整理原始资料"、"更新知识库"），返回：
-{{
-  "action": "compile",
-  "sources": ["raw/路径/文件.md"],
-  "scope": "all 或 specific"
-}}
-
-规则：
-- 大多数非研究类问题用 direct（Lucas 会自己判断是否需要查文件）
-- 只有需要研究员做深度分析时才用 research
-- "编译"、"整理 wiki"、"处理研报"、"更新知识库" 等指令用 compile
-- 结合对话历史理解用户意图（如"继续分析"指的是上一轮的主题）
-- **精准选人，宁少勿多**：只派与问题直接相关的研究员，不相关的坚决不派
-- 如果后续研究员需要参考前序结果（如先基本面再技术面），用 serial
-- 每个研究员的 tasks 必须差异化，严禁给出相同或高度相似的 sub_question
-
-研究员选择参考（不是硬规则，根据具体问题灵活判断）：
-- 季报/年报/财务数据/估值/盈利 → fundamental，通常不需要 technical
-- 股价走势/买卖点/支撑压力位 → technical，通常不需要 fundamental
-- 行业政策/宏观经济/板块轮动 → macro
-- "怎么看这家公司" 这类综合问题 → 可以多选，但也要看问题侧重
-- 只有用户明确要求全面分析或多角度交叉验证时，才考虑全选"""
-
-SYNTHESIS_PROMPT_TEMPLATE = """你是 Lucas，需要批判性地综合各研究员的分析结果。
-
-你收到了来自不同专业视角的研究员分析：
-- **基本面分析师**：关注财务数据、估值模型、公司基本面
-- **技术面分析师**：关注K线形态、技术指标、量价关系
-- **宏观策略师**：关注宏观经济、政策环境、行业趋势
-
-## 用户原始问题
-{question}
-
-## 各研究员分析
-{results}
-
----
-
-**你的任务不是简单拼接这些观点，而是批判性地综合它们。**
-
-请按以下步骤进行深度分析：
-
-### 1. 识别共识（Consensus）
-三位研究员在哪些核心判断上达成一致？这些共识点通常更可靠，因为它们跨越了不同分析框架的验证。
-
-### 2. 识别分歧（Divergence）
-在哪些关键问题上存在矛盾或不同结论？分析分歧的根源：
-- 是数据解读差异？
-- 是时间维度不同（短期 vs 长期）？
-- 是风险偏好不同？
-
-### 3. 评估偏差（Bias Assessment）
-批判性评估每位研究员可能的视角局限：
-- 基本面分析师可能过度关注财报数字，忽视市场情绪
-- 技术面分析师可能过度依赖历史形态，忽视基本面变化
-- 宏观策略师可能过于宏观，忽视个股特质
-
-### 4. 交叉验证（Cross-Validation）
-不同视角的结论是否相互支撑？例如：
-- 基本面改善 + 技术面突破 = 强信号
-- 基本面恶化 + 技术面走强 = 需警惕背离
-
-### 5. 综合结论（Synthesis）
-基于以上分析，给出你的综合判断：
-- **核心结论**：一段话总结（50-100字）
-- **投资建议**：明确的操作建议（买入/持有/观望/减仓），并说明理由
-- **风险提示**：主要风险点和不确定性
-- **关键观察指标**：后续需要跟踪的关键变量
-
-**重要**：你的综合分析应该比任何单一研究员的观点更全面、更可靠、更有洞察力。"""
-
 
 class Manager:
     def __init__(self, config: AgentsConfig):
@@ -142,8 +30,13 @@ class Manager:
         self.client = create_client(
             model=config.manager.model,
             system_prompt=config.manager.system_prompt,
-            enable_thinking=False,  # Manager 不需要思考模型，保持 JSON 输出稳定
+            enable_thinking=False,
         )
+
+    def _load_prompt(self, name: str) -> str:
+        path = os.path.join(_PROMPTS_DIR, f"{name}.md")
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
 
     async def _dispatch(self, question: str) -> tuple[str, Task | str | dict]:
         """分析用户意图，决定派发策略。返回 (action, Task或直接回复或compile计划)"""
@@ -153,7 +46,7 @@ class Manager:
         )
         wiki_context = _find_wiki_context(question) or "（暂无相关内容）"
         memory_context = self.memory.get_memory_context(question)
-        prompt = DISPATCH_PROMPT_TEMPLATE.format(
+        prompt = self._load_prompt("dispatch").format(
             researchers_desc=researchers_desc,
             question=question,
             wiki_context=wiki_context,
@@ -247,7 +140,7 @@ class Manager:
                     section += "\n\n**⚠ 数据验证提示：**\n" + "\n".join(f"- {i.message}" for i in warnings)
             parts.append(section)
         results_text = "\n\n".join(parts)
-        prompt = SYNTHESIS_PROMPT_TEMPLATE.format(
+        prompt = self._load_prompt("synthesis").format(
             question=question,
             results=results_text,
         )
@@ -255,48 +148,6 @@ class Manager:
         return text
 
     # ── Tool-Use Loop ─────────────────────────────────────
-
-    _TOOL_USE_PROMPT = """你是 Lucas，A股股市知识库的首席分析师。请回答用户的问题。
-
-## 用户问题
-{question}
-
-## 记忆
-{memory_context}
-
-## 知识库已有内容
-{wiki_context}
-
-## 可用工具
-你可以调用以下工具来获取信息：
-{tools_desc}
-
-**重要：当你对问题涉及的公司、行业或概念不够确定时，先用 recall 或 search_files 查一查再回答，不要凭猜测回答。**
-
-## 已调用的工具结果
-{tool_results}
-
-请返回 JSON：
-
-如果你需要调用工具来获取更多信息，返回：
-{{
-  "action": "tool",
-  "tool": "工具名",
-  "args": {{"参数名": "参数值"}}
-}}
-
-如果你已有足够信息可以回答用户，返回：
-{{
-  "action": "answer",
-  "reply": "你的回答（支持 Markdown 格式）"
-}}
-
-规则：
-- 涉及文件位置、文件内容、目录结构等问题时，必须用工具查实际文件系统，不要猜测
-- 闲聊、问候等简单问题直接回答，不需要调用工具
-- 基于记忆和知识库能确定的信息可以直接回答
-- 每次只调用一个工具
-- 回答要基于事实，不要编造文件路径或内容"""
 
     async def _tool_use_loop(self, question: str, on_status=None, max_rounds: int = 5) -> str:
         """让 Lucas 自主决定是否调用工具，循环直到给出最终回答"""
@@ -324,7 +175,7 @@ class Manager:
             tool_results = "（预查无相关结果）"
 
         for round_num in range(max_rounds):
-            prompt = self._TOOL_USE_PROMPT.format(
+            prompt = self._load_prompt("tool-use").format(
                 question=question,
                 memory_context=memory_context,
                 wiki_context=wiki_context,
@@ -436,7 +287,9 @@ class Manager:
             total_tokens=total_tokens,
         )
 
-        # 4. 归档
+        # 4. 生成标题 + 归档
+        status("正在生成报告标题...")
+        report.title = await self._generate_title(question, synthesis)
         status("正在归档分析结果...")
         self._archive(report)
 
@@ -587,7 +440,8 @@ class Manager:
 
         yield _evt("synthesis_chunk", {"text": synthesis})
 
-        # 归档 + wiki + 记忆
+        # 生成标题 + 归档 + wiki + 记忆
+        report.title = await self._generate_title(question, synthesis)
         yield _evt("status", {"message": "正在归档分析结果..."})
         self._archive(report)
         yield _evt("status", {"message": "正在整理 wiki 知识库..."})
@@ -598,43 +452,23 @@ class Manager:
 
         yield _evt("done", {"total_tokens": total_tokens})
 
-    _CONCLUSION_EXTRACT_PROMPT = """从分析报告中提取结论摘要。
-
-## 报告
-{synthesis}
-
-返回 JSON：
-{{
-  "topics": ["涉及的股票代码或关键主题，如 300750、宁德时代、新能源"],
-  "conclusion": "一句话核心结论（50字以内）",
-  "sentiment": "bullish 或 bearish 或 neutral"
-}}"""
-
-    _PREFERENCE_EXTRACT_PROMPT = """从本次对话中提取用户偏好变化。
-
-## 用户问题
-{question}
-
-## 分析摘要
-{summary}
-
-## 当前用户偏好
-{current_prefs}
-
-如果发现新的关注股票、行业、风险偏好等，返回更新后的完整 JSON：
-{{
-  "watchlist": ["股票代码列表"],
-  "focus_industries": ["行业列表"],
-  "risk_preference": "conservative 或 moderate 或 aggressive",
-  "analysis_style": "简洁 或 详细",
-  "custom_notes": ["用户特殊偏好备注"]
-}}
-
-如果没有明显变化，返回 null。"""
+    async def _generate_title(self, question: str, synthesis: str) -> str:
+        try:
+            prompt = self._load_prompt("title-extract").format(
+                question=question,
+                synthesis=synthesis[:500],
+            )
+            title, _ = await self.client.chat(prompt=prompt, temperature=0.1)
+            title = title.strip().strip('"').strip("'").strip("《》")
+            if 3 <= len(title) <= 40:
+                return title
+        except Exception as e:
+            logger.warning("生成报告标题失败: %s", e)
+        return question[:40]
 
     async def _extract_and_save_conclusion(self, report: ManagerReport):
         try:
-            prompt = self._CONCLUSION_EXTRACT_PROMPT.format(
+            prompt = self._load_prompt("conclusion-extract").format(
                 synthesis=report.synthesis[:1000],
             )
             text, _ = await self.client.chat(
@@ -658,7 +492,7 @@ class Manager:
     async def _extract_and_save_preferences(self, question: str, synthesis: str):
         try:
             current = self.memory.load_preferences()
-            prompt = self._PREFERENCE_EXTRACT_PROMPT.format(
+            prompt = self._load_prompt("preference-extract").format(
                 question=question,
                 summary=synthesis[:500],
                 current_prefs=json.dumps(current, ensure_ascii=False) if current else "（暂无）",
@@ -682,7 +516,8 @@ class Manager:
     def _archive(self, report: ManagerReport):
         """归档：研究员原始分析 → raw/reports/，Manager 汇总 → wiki/reports/"""
         today = date.today().isoformat()
-        slug = self._make_slug(report.question)
+        title = report.title or report.question[:40]
+        slug = self._make_slug(title)
 
         # raw/reports/ — 每个研究员的原始分析
         raw_dir = os.path.join(_PROJECT_ROOT, "raw", "reports", today)
@@ -766,7 +601,7 @@ class Manager:
 
         wiki_content = (
             f"---\n"
-            f"title: {report.question}\n"
+            f"title: {title}\n"
             f"type: report\n"
             f"created: {today}\n"
             f"updated: {today}\n"
@@ -781,7 +616,7 @@ class Manager:
             f.write(wiki_content)
 
         # 更新 wiki/index.md
-        self._update_index(wiki_filename, report.question)
+        self._update_index(wiki_filename, title)
 
         logger.info("归档完成: raw/reports/%s/ + wiki/reports/%s", today, wiki_filename)
 
@@ -808,56 +643,6 @@ class Manager:
             f.write(content)
 
     # ── Wiki 整理 ──────────────────────────────────────────
-
-    _WIKI_PLAN_PROMPT = """你是 Wiki 编辑，需要判断本次分析报告应该更新哪些 wiki 页面。
-
-## 分析报告
-{synthesis}
-
-## 现有 wiki 页面
-{existing_pages}
-
-## 可用页面类型
-- company: wiki/companies/{{代码}}-{{简称}}.md（公司档案）
-- industry: wiki/industries/{{行业名}}.md（行业概览）
-- concept: wiki/concepts/{{概念名}}.md（概念/主题）
-
-请返回 JSON 数组，每个元素：
-{{
-  "type": "company|industry|concept",
-  "name": "页面名称（如 300750-宁德时代）",
-  "action": "create|update",
-  "reason": "为什么需要更新/创建"
-}}
-
-规则：
-- 只列出本次分析确实涉及且有新信息可补充的页面
-- 如果分析内容太泛、没有具体可落地的信息，返回空数组 []
-- 不要创建信息量不足的页面"""
-
-    _WIKI_COMPILE_PROMPT = """你是 Wiki 编辑，需要根据分析报告更新一个 wiki 页面。
-
-## 编译模板
-{template}
-
-## 当前页面内容
-{current_content}
-
-## 本次分析报告
-{synthesis}
-
-## 任务
-{task_desc}
-
-请输出完整的更新后页面内容（包含 frontmatter）。
-
-规则：
-- 增量更新：保留已有内容，补充新信息
-- 新增信息用（{today}更新）标注
-- 如果新旧信息矛盾，保留两者并标注时间
-- 更新 frontmatter 的 updated 日期为 {today}
-- 在 sources 中追加本次分析来源
-- 严格遵循编译模板的格式"""
 
     def _list_wiki_pages(self) -> str:
         pages = []
@@ -894,7 +679,7 @@ class Manager:
         return os.path.join(_WIKI_DIR, subdir, f"{name}.md")
 
     async def _plan_wiki_updates(self, report: ManagerReport) -> list[dict]:
-        prompt = self._WIKI_PLAN_PROMPT.format(
+        prompt = self._load_prompt("wiki-plan").format(
             synthesis=report.synthesis,
             existing_pages=self._list_wiki_pages(),
         )
@@ -932,7 +717,7 @@ class Manager:
             task_desc = f"增量更新 {page_type} 页面：{name}。原因：{page_plan.get('reason', '')}"
 
         today = date.today().isoformat()
-        prompt = self._WIKI_COMPILE_PROMPT.format(
+        prompt = self._load_prompt("wiki-compile").format(
             template=template,
             current_content=current_content,
             synthesis=report.synthesis,
@@ -1015,56 +800,6 @@ class Manager:
 
     # ── 从 raw/ 编译 wiki ─────────────────────────────────────
 
-    _RAW_CLASSIFY_PROMPT = """你是 Wiki 编辑。根据以下原始资料的内容，判断应该编译成什么类型的 wiki 页面。
-
-## 原始资料路径
-{raw_path}
-
-## 原始资料内容
-{raw_content}
-
-## 现有 wiki 页面
-{existing_pages}
-
-请返回 JSON 数组，每个元素代表一个应创建或更新的 wiki 页面：
-{{
-  "type": "company|industry|concept",
-  "name": "页面名称（如 300750-宁德时代）",
-  "action": "create|update",
-  "reason": "为什么需要创建/更新"
-}}
-
-规则：
-- 一份资料可能涉及多个页面（如一份研报同时涉及公司和行业）
-- 公司页面用 "股票代码-简称" 命名（如 300750-宁德时代）
-- 如果现有页面中已有相关页面，action 设为 update
-- 如果资料信息量不足以支撑一个页面，返回空数组 []"""
-
-    _RAW_COMPILE_PROMPT = """你是 Wiki 编辑，需要根据原始资料编译一个 wiki 页面。
-
-## 编译模板
-{template}
-
-## 当前页面内容
-{current_content}
-
-## 原始资料
-{raw_content}
-
-## 任务
-{task_desc}
-
-请输出完整的页面内容（包含 frontmatter）。
-
-规则：
-- 增量更新：保留已有内容，补充新信息
-- 新增信息用（{today}更新）标注
-- 如果新旧信息矛盾，保留两者并标注时间
-- 更新 frontmatter 的 updated 日期为 {today}
-- 在 sources 中包含原始资料路径：{raw_path}
-- 严格遵循编译模板的格式
-- 区分事实和观点，观点标注来源"""
-
     def _find_compiled_sources(self) -> set[str]:
         """扫描 wiki/ 页面的 frontmatter，收集已编译过的 raw/ 路径"""
         compiled = set()
@@ -1134,7 +869,7 @@ class Manager:
                 continue
 
             # 1. 分类：判断应该生成哪些 wiki 页面
-            classify_prompt = self._RAW_CLASSIFY_PROMPT.format(
+            classify_prompt = self._load_prompt("raw-classify").format(
                 raw_path=rel_path,
                 raw_content=raw_content[:8000],
                 existing_pages=self._list_wiki_pages(),
@@ -1179,7 +914,7 @@ class Manager:
                     task_desc = f"根据原始资料增量更新 {page_type} 页面：{name}。原因：{plan.get('reason', '')}"
 
                 today = date.today().isoformat()
-                compile_prompt = self._RAW_COMPILE_PROMPT.format(
+                compile_prompt = self._load_prompt("raw-compile").format(
                     template=template,
                     current_content=current_content,
                     raw_content=raw_content[:8000],

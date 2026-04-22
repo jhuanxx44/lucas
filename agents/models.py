@@ -89,3 +89,4 @@ class ManagerReport:
     results: list[ResearchResult] = field(default_factory=list)
     synthesis: str = ""
     total_tokens: int = 0
+    title: str = ""

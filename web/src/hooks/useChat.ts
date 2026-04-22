@@ -78,7 +78,7 @@ const initialState: ChatState = {
   isLoading: false,
 };
 
-export function useChat(onResearchTarget?: (target: string) => void) {
+export function useChat(onResearchTarget?: (target: string) => void, onDone?: () => void) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { send } = useSSE();
   const abortRef = useRef<AbortController | null>(null);
@@ -125,6 +125,7 @@ export function useChat(onResearchTarget?: (target: string) => void) {
                 break;
               case "done":
                 dispatch({ type: "DONE" });
+                onDone?.();
                 break;
               case "error":
                 dispatch({ type: "ERROR", message: d.message });
@@ -139,7 +140,7 @@ export function useChat(onResearchTarget?: (target: string) => void) {
         }
       }
     },
-    [send, onResearchTarget]
+    [send, onResearchTarget, onDone]
   );
 
   return { state, sendMessage };

@@ -14,6 +14,7 @@ export default function App() {
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(400);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [sidebarKey, setSidebarKey] = useState(0);
 
   const handleLeftResize = useCallback((delta: number) => {
     setLeftWidth((w) => Math.max(180, Math.min(400, w + delta)));
@@ -45,6 +46,10 @@ export default function App() {
     [linked]
   );
 
+  const handleResearchDone = useCallback(() => {
+    setSidebarKey((k) => k + 1);
+  }, []);
+
   const handleSearch = useCallback(async (query: string) => {
     const results = await searchWiki(query);
     if (results.length > 0) {
@@ -63,7 +68,7 @@ export default function App() {
           />
           <div className="flex flex-1 overflow-hidden">
             <div style={{ width: leftWidth }} className="shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 p-3">
-              <WikiSidebar />
+              <WikiSidebar refreshKey={sidebarKey} />
             </div>
             <ResizableDivider onResize={handleLeftResize} />
             <div className="flex-1 overflow-y-auto p-4">
@@ -71,7 +76,7 @@ export default function App() {
             </div>
             <ResizableDivider onResize={handleRightResize} />
             <div style={{ width: rightWidth }} className="shrink-0 overflow-hidden flex flex-col border-l border-zinc-200 dark:border-zinc-800">
-              <ChatPanel onResearchTarget={handleResearchTarget} />
+              <ChatPanel onResearchTarget={handleResearchTarget} onResearchDone={handleResearchDone} />
             </div>
           </div>
         </div>

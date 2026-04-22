@@ -10,6 +10,7 @@ import type { WikiItem } from "@/types";
 
 interface ChatPanelProps {
   onResearchTarget?: (target: string) => void;
+  onResearchDone?: () => void;
 }
 
 const ICONS = [TrendingUp, Building2, Lightbulb, BarChart3, Globe];
@@ -43,8 +44,8 @@ function generateSuggestions(
   });
 }
 
-export function ChatPanel({ onResearchTarget }: ChatPanelProps) {
-  const { state, sendMessage } = useChat(onResearchTarget);
+export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) {
+  const { state, sendMessage } = useChat(onResearchTarget, onResearchDone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
 
