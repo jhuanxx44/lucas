@@ -1,122 +1,55 @@
-# Lucas — A股股市 LLM Wiki
+# Lucas
 
-这是一个基于 Karpathy LLM Wiki 模式的A股市场知识库。LLM 作为"编译器"，将原始资料持续编译成结构化的 Markdown Wiki。
+A股股市 LLM Wiki — 基于 Karpathy LLM Wiki 模式，多 Agent 协作分析A股市场。
 
-你是一个Agent设计专家，负责设计和实现 Lucas 知识库的智能体。
+你是 Agent 设计专家兼资深全栈开发。从第一性原理出发，目标或路径不清晰时先讨论再动手。用中文回复。
 
-Think from first principles. Don't always assume I know exactly what I want or how to get it. Stay rigorous, start from the underlying needs and problems. If the motivation and goals are unclear, pause and discuss with me. If the goals are clear but the path isn't the most efficient, tell me and suggest a better approach. If the requirements are unclear, clarify with the user before making changes. Response in Chinese.
+## 命令
+
+```bash
+./dev.sh                    # 一键启动前后端（后端 :8000，前端 :5173）
+pytest                      # 跑全部测试
+pytest tests/test_xxx.py    # 跑单个测试
+cd web && npm run build     # 构建前端（产物 web/dist/，后端自动 serve）
+cd web && npm run dev       # 单独启动前端 dev server
+```
+
+## 技术栈
+
+- 后端：FastAPI + uvicorn（`server/`），API 前缀 `/api`
+- 前端：React 19 + Vite + Tailwind（`web/`）
+- Agent 系统：Python，Manager-Researcher 架构（`agents/`）
+- LLM 调用：统一走 OpenAI SDK 兼容接口，支持多 provider
+- 数据源：akshare（A股行情）、tavily/ddgs（搜索）
 
 ## 架构
 
-三层结构，严格分离：
-
-- `raw/` — 原始资料，**只读不改**。用户放入，LLM 只读取、不修改、不删除。
-- `wiki/` — LLM 编译输出。所有 wiki 页面由 LLM 生成和维护。
-- `prompts/` — 编译模板。定义如何将 raw 资料转化为 wiki 页面。
-
-辅助目录：
-- `reviews/` — 多 LLM 交叉验证记录
-- `logs/` — 编译日志
-
-## raw/ 目录分类
-
-| 子目录 | 内容 |
-|--------|------|
-| `financial-reports/` | 财报、年报、季报 |
-| `research/` | 券商研报、分析师报告 |
-| `news/` | 财经新闻、公司公告 |
-| `macro/` | 宏观经济数据和分析 |
-| `industry/` | 行业研究报告 |
-| `strategy/` | 投资策略、方法论资料 |
-
-原始文件命名规范：`YYYY-MM-DD_来源_标题.md`（如 `2026-04-17_中信证券_宁德时代深度报告.md`）
-
-## wiki/ 页面类型
-
-| 子目录 | 类型 | 说明 |
-|--------|------|------|
-| `companies/` | 公司档案 | 每家公司一个文件，以股票代码命名（如 `300750-宁德时代.md`） |
-| `industries/` | 行业概览 | 按行业分类的趋势分析 |
-| `concepts/` | 概念/主题 | 投资主题（如 AI芯片、新能源） |
-| `macro/` | 宏观环境 | 宏观经济和政策分析 |
-| `timeline/` | 时间线 | 重要事件的时间线记录 |
-| `strategies/` | 策略方法 | 投资策略和分析方法论 |
-
-## Wiki 页面格式
-
-每个页面必须包含 frontmatter：
-
-```yaml
----
-title: 页面标题
-type: company|industry|concept|macro|timeline|strategy
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-sources:
-  - raw/路径/文件名.md
-tags: [标签1, 标签2]
-confidence: high|medium|low
----
+```
+server/          FastAPI 后端
+  routers/       chat.py（SSE 聊天）、wiki.py（wiki API）
+  services/      stream.py（流式输出）、wiki_parser.py
+agents/          多 Agent 系统
+  manager.py     Manager：派发子任务、聚合结论
+  researcher.py  Researcher：执行具体分析
+  config.py      从 agents.yaml 加载配置
+  models.py      数据模型
+  tools.py       工具调用（行情、搜索）
+web/             React 前端
+prompts/         LLM prompt 模板（dispatch、synthesis 等）
+raw/             原始资料（只读，不要修改）
+wiki/            LLM 编译输出的 wiki 页面
+utils/           provider 管理、通用工具
 ```
 
-页面正文结构：
-1. `## 概述` — 一段话总结
-2. 主体内容（根据类型不同而不同）
-3. `## 相关链接` — 用 `[[页面名]]` 交叉链接
-4. `## 来源` — 引用 raw/ 中的原始资料
+## 配置
 
-## 编译规则
+- `agents.yaml` — Agent 角色定义（manager + researchers），每个 agent 指定 provider 和 system_prompt
+- `providers.yaml` — LLM provider 配置（gemini/minimax/deepseek/qwen/claude），映射 env var 名
+- `.env` — API keys（参考 `.env.example`），按需配置使用的 provider
 
-当用户要求处理新的原始资料时：
+## 关键约束
 
-1. **读取** raw/ 中的原始资料
-2. **查阅** prompts/ 中对应类型的编译模板
-3. **检查** wiki/ 中是否已有相关页面
-4. **编译**：
-   - 如果是新主题 → 创建新 wiki 页面
-   - 如果已有页面 → 增量更新，保留已有内容，补充新信息
-5. **更新** wiki/index.md 索引
-6. **交叉链接** — 在相关页面之间添加链接
-7. **记录** 编译日志到 logs/
-
-增量更新原则：
-- 不要覆盖已有分析，而是补充新信息
-- 如果新信息与旧信息矛盾，保留两者并标注时间
-- 更新 frontmatter 中的 `updated` 日期和 `sources` 列表
-
-## 多 LLM 交叉验证
-
-本项目支持多个 LLM 协作，详见 AGENTS.md。
-
-当进行交叉验证时：
-1. LLM-A 编译生成 wiki 页面
-2. LLM-B 审核同一页面，将审核意见写入 `reviews/`
-3. 审核文件命名：`YYYY-MM-DD_审核对象_审核者.md`
-4. 如有分歧，在 wiki 页面的 confidence 字段标注
-
-## 常用工作流
-
-### 编译新资料
-用户说："编译 raw/research/xxx.md" 或 "处理这份研报"
-→ 读取资料 → 查阅模板 → 生成/更新 wiki 页面 → 更新索引
-
-### 查询知识库
-用户说："宁德时代最近怎么样" 或 "AI芯片概念有哪些公司"
-→ 在 wiki/ 中查找相关页面 → 综合回答
-
-### 批量编译
-用户说："编译 raw/news/ 下所有新文件"
-→ 逐个处理 → 更新相关 wiki 页面 → 更新索引
-
-### 交叉验证
-用户说："让另一个LLM验证这个分析"
-→ 参照 AGENTS.md 流程
-
-## 注意事项
-
-- 所有 wiki 内容用中文撰写
-- 永远不要修改 raw/ 中的文件
-- 每次编译后更新 wiki/index.md
-- 保持交叉链接的准确性
-- 标注信息的时效性，股市信息变化快
-- 区分事实和观点，观点需标注来源
+- `raw/` 目录只读，永远不要修改或删除其中的文件
+- wiki 内容用中文撰写，区分事实和观点，观点标注来源
+- Agent 系统的 prompt 模板在 `prompts/` 目录，修改 agent 行为优先改 prompt 而非硬编码
+- 前后端开发时 CORS 已配置 localhost:5173 和 localhost:8000
