@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { fetchWikiPage, searchWiki } from "@/lib/api";
 import { processWikiLinks } from "@/lib/markdown";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
+import { RawReportPanel } from "@/components/RawReportPanel";
 import type { WikiPage } from "@/types";
 
 export function WikiContent() {
@@ -85,6 +86,7 @@ export function WikiContent() {
           {processed}
         </ReactMarkdown>
       </article>
+      <RawReportPanel sources={fm.sources} researchers={fm.researchers} />
     </div>
   );
 }

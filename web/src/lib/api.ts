@@ -20,3 +20,11 @@ export async function searchWiki(query: string): Promise<SearchResult[]> {
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
   return res.json();
 }
+
+export async function fetchRawReport(rawPath: string): Promise<WikiPage> {
+  const stripped = rawPath.replace(/^raw\/reports\//, "");
+  const safePath = stripped.split("/").map(encodeURIComponent).join("/");
+  const res = await fetch(`${BASE}/wiki/raw-report/${safePath}`);
+  if (!res.ok) throw new Error(`Failed to fetch raw report: ${res.status}`);
+  return res.json();
+}
