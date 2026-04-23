@@ -288,7 +288,7 @@ _name_cache: dict[str, str] = {}
 
 
 async def _extract_company_names(text: str) -> list[str]:
-    """用轻量 LLM 调用从用户问题中提取公司名称"""
+    """用轻量 LLM 调用从用户问题中提取公司名称 [llm-weight: light]"""
     from utils.llm_client import create_client
     try:
         client = create_client(model=None, system_prompt="你是一个实体提取工具。", enable_thinking=False)

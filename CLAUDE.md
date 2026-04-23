@@ -53,3 +53,16 @@ utils/           provider 管理、通用工具
 - wiki 内容用中文撰写，区分事实和观点，观点标注来源
 - Agent 系统的 prompt 模板在 `prompts/` 目录，修改 agent 行为优先改 prompt 而非硬编码
 - 前后端开发时 CORS 已配置 localhost:5173 和 localhost:8000
+
+## LLM 调用分级
+
+每个 prompt 模板和内联 LLM 调用都用 `llm-weight` 标注复杂度，为未来模型分流做准备。
+
+- `heavy` — 深度推理、长文生成、核心产出。当前用主力模型。
+  - researcher 分析（agents.yaml 定义）、synthesis、wiki-compile、raw-compile、tool-use
+- `medium` — 结构化判断、分类决策。当前用主力模型，未来可降级。
+  - dispatch、wiki-plan、raw-classify
+- `light` — 短文本提取、JSON 抽取。当前用主力模型，未来应换小模型以提速降本。
+  - title-extract、conclusion-extract、preference-extract、stock_data._extract_company_names
+
+新增 LLM 调用时必须标注 `llm-weight`：prompt 文件用 `<!-- llm-weight: xxx -->` 注释，内联调用在 docstring 中标注 `[llm-weight: xxx]`。
