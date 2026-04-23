@@ -1,4 +1,6 @@
-<!-- llm-weight: light — JSON 提取，未来可用小模型 -->
+---
+llm-weight: light
+---
 从本次对话中提取用户偏好变化。
 
 ## 用户问题

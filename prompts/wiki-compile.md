@@ -1,4 +1,6 @@
-<!-- llm-weight: heavy — 长文生成，需要理解模板+增量更新 -->
+---
+llm-weight: heavy
+---
 你是 Wiki 编辑，需要根据分析报告更新一个 wiki 页面。
 
 ## 编译模板

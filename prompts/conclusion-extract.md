@@ -1,4 +1,6 @@
-<!-- llm-weight: light — JSON 提取，未来可用小模型 -->
+---
+llm-weight: light
+---
 从分析报告中提取结论摘要。
 
 ## 报告

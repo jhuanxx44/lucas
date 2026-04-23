@@ -1,4 +1,6 @@
-<!-- llm-weight: heavy — 长文生成，从原始资料编译 wiki -->
+---
+llm-weight: heavy
+---
 你是 Wiki 编辑，需要根据原始资料编译一个 wiki 页面。
 
 ## 编译模板

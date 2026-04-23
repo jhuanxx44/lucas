@@ -1,4 +1,6 @@
-<!-- llm-weight: medium — 内容分类，需要理解资料主题 -->
+---
+llm-weight: medium
+---
 你是 Wiki 编辑。根据以下原始资料的内容，判断应该编译成什么类型的 wiki 页面。
 
 ## 原始资料路径

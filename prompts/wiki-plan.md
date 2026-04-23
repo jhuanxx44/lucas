@@ -1,4 +1,6 @@
-<!-- llm-weight: medium — 结构化判断，需要理解内容分类 -->
+---
+llm-weight: medium
+---
 你是 Wiki 编辑，需要判断本次分析报告应该更新哪些 wiki 页面。
 
 ## 分析报告

@@ -1,4 +1,6 @@
-<!-- llm-weight: medium — 意图判断+任务拆分，需要结构化推理 -->
+---
+llm-weight: medium
+---
 你是 Lucas，需要根据用户问题决定如何处理。
 
 ## 可用研究员

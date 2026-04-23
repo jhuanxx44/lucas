@@ -45,7 +45,7 @@ function generateSuggestions(
 }
 
 export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) {
-  const { state, sendMessage } = useChat(onResearchTarget, onResearchDone);
+  const { state, sendMessage, cancel } = useChat(onResearchTarget, onResearchDone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
 
@@ -89,7 +89,7 @@ export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) 
     <div className="flex flex-col h-full">
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="flex flex-col items-center justify-center h-full text-center px-4 mx-auto max-w-md">
             <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center mb-4">
               <MessageSquare size={22} className="text-indigo-600 dark:text-indigo-400" />
             </div>
@@ -135,12 +135,8 @@ export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) 
             <SynthesisCard text={state.synthesis} loading={state.isLoading} />
           </div>
         )}
-
-        {state.isLoading && activeResearchers.length === 0 && (
-          <div className="text-xs text-zinc-400 dark:text-zinc-500 animate-pulse">正在分析...</div>
-        )}
       </div>
-      <ChatInput onSend={sendMessage} disabled={state.isLoading} />
+      <ChatInput onSend={sendMessage} onCancel={cancel} phase={state.phase} />
     </div>
   );
 }

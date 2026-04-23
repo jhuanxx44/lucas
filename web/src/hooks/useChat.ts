@@ -5,15 +5,19 @@ import type { ChatMessage, ResearcherState } from "@/types";
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
 
+export type ChatPhase = "idle" | "dispatching" | "researching" | "synthesizing";
+
 interface ChatState {
   messages: ChatMessage[];
   researchers: Map<string, ResearcherState>;
   synthesis: string;
   isLoading: boolean;
+  phase: ChatPhase;
 }
 
 type Action =
   | { type: "USER_MESSAGE"; question: string }
+  | { type: "DISPATCH" }
   | { type: "RESEARCHER_START"; id: string; name: string }
   | { type: "RESEARCHER_CHUNK"; id: string; text: string }
   | { type: "RESEARCHER_DONE"; id: string }
@@ -30,11 +34,14 @@ function reducer(state: ChatState, action: Action): ChatState {
         researchers: new Map(),
         synthesis: "",
         isLoading: true,
+        phase: "dispatching",
       };
+    case "DISPATCH":
+      return { ...state, phase: "dispatching" };
     case "RESEARCHER_START": {
       const researchers = new Map(state.researchers);
       researchers.set(action.id, { id: action.id, name: action.name, status: "running", text: "" });
-      return { ...state, researchers };
+      return { ...state, researchers, phase: "researching" };
     }
     case "RESEARCHER_CHUNK": {
       const researchers = new Map(state.researchers);
@@ -49,7 +56,7 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, researchers };
     }
     case "SYNTHESIS_CHUNK":
-      return { ...state, synthesis: state.synthesis + action.text };
+      return { ...state, synthesis: state.synthesis + action.text, phase: "synthesizing" };
     case "DONE": {
       const assistantMsg: ChatMessage = {
         id: nextId(),
@@ -62,10 +69,11 @@ function reducer(state: ChatState, action: Action): ChatState {
         ...state,
         messages: [...state.messages, assistantMsg],
         isLoading: false,
+        phase: "idle",
       };
     }
     case "ERROR":
-      return { ...state, isLoading: false, synthesis: `错误: ${action.message}` };
+      return { ...state, isLoading: false, phase: "idle", synthesis: `错误: ${action.message}` };
     default:
       return state;
   }
@@ -76,6 +84,7 @@ const initialState: ChatState = {
   researchers: new Map(),
   synthesis: "",
   isLoading: false,
+  phase: "idle",
 };
 
 export function useChat(onResearchTarget?: (target: string) => void, onDone?: () => void) {
@@ -85,6 +94,12 @@ export function useChat(onResearchTarget?: (target: string) => void, onDone?: ()
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    dispatch({ type: "ERROR", message: "已取消" });
+  }, []);
 
   const sendMessage = useCallback(
     async (question: string) => {
@@ -107,9 +122,8 @@ export function useChat(onResearchTarget?: (target: string) => void, onDone?: ()
             const d = data as Record<string, string>;
             switch (event) {
               case "dispatch":
-                if (onResearchTarget) {
-                  onResearchTarget(question);
-                }
+                dispatch({ type: "DISPATCH" });
+                onResearchTarget?.(question);
                 break;
               case "researcher_start":
                 dispatch({ type: "RESEARCHER_START", id: d.id, name: d.name });
@@ -143,5 +157,5 @@ export function useChat(onResearchTarget?: (target: string) => void, onDone?: ()
     [send, onResearchTarget, onDone]
   );
 
-  return { state, sendMessage };
+  return { state, sendMessage, cancel };
 }

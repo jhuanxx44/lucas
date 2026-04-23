@@ -12,7 +12,7 @@ export default function App() {
   const themeCtx = useThemeProvider();
   const [linked, setLinked] = useState(true);
   const [leftWidth, setLeftWidth] = useState(240);
-  const [rightWidth, setRightWidth] = useState(400);
+  const [rightWidth, setRightWidth] = useState(520);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
 
@@ -70,12 +70,16 @@ export default function App() {
             <div style={{ width: leftWidth }} className="shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 p-3">
               <WikiSidebar refreshKey={sidebarKey} />
             </div>
-            <ResizableDivider onResize={handleLeftResize} />
-            <div className="flex-1 overflow-y-auto p-4">
-              <WikiContent />
-            </div>
-            <ResizableDivider onResize={handleRightResize} />
-            <div style={{ width: rightWidth }} className="shrink-0 overflow-hidden flex flex-col border-l border-zinc-200 dark:border-zinc-800">
+            {currentPath && (
+              <>
+                <ResizableDivider onResize={handleLeftResize} />
+                <div className="flex-1 overflow-y-auto p-4">
+                  <WikiContent />
+                </div>
+                <ResizableDivider onResize={handleRightResize} />
+              </>
+            )}
+            <div style={currentPath ? { width: rightWidth } : undefined} className={`${currentPath ? 'shrink-0' : 'flex-1'} overflow-hidden flex flex-col border-l border-zinc-200 dark:border-zinc-800`}>
               <ChatPanel onResearchTarget={handleResearchTarget} onResearchDone={handleResearchDone} />
             </div>
           </div>

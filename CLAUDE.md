@@ -65,4 +65,4 @@ utils/           provider 管理、通用工具
 - `light` — 短文本提取、JSON 抽取。当前用主力模型，未来应换小模型以提速降本。
   - title-extract、conclusion-extract、preference-extract、stock_data._extract_company_names
 
-新增 LLM 调用时必须标注 `llm-weight`：prompt 文件用 `<!-- llm-weight: xxx -->` 注释，内联调用在 docstring 中标注 `[llm-weight: xxx]`。
+新增 LLM 调用时必须在 prompt 文件 frontmatter 或 docstring 中标注 `llm-weight`。

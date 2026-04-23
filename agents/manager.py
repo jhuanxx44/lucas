@@ -36,7 +36,12 @@ class Manager:
     def _load_prompt(self, name: str) -> str:
         path = os.path.join(_PROMPTS_DIR, f"{name}.md")
         with open(path, "r", encoding="utf-8") as f:
-            return f.read()
+            content = f.read()
+        if content.startswith("---\n"):
+            end = content.find("\n---\n", 4)
+            if end != -1:
+                content = content[end + 5:]
+        return content
 
     async def _dispatch(self, question: str) -> tuple[str, Task | str | dict]:
         """分析用户意图，决定派发策略。返回 (action, Task或直接回复或compile计划)"""
