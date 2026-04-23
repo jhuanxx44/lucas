@@ -264,18 +264,62 @@ def format_sector_flow(records: list[FlowRecord]) -> str:
 
 # ── 名称映射 ──────────────────────────────────────
 
-_NAME_TO_CODE = {
-    "宁德时代": "300750", "贵州茅台": "600519", "比亚迪": "002594",
-    "中国平安": "601318", "招商银行": "600036", "隆基绿能": "601012",
-    "药明康德": "603259", "中芯国际": "688981",
-}
+_CODE_RE = re.compile(r'\b([036]\d{5})\b')
 
 
-def extract_stock_codes(text: str) -> list[str]:
-    codes = re.findall(r'\b([036]\d{5})\b', text)
-    for name, code in _NAME_TO_CODE.items():
-        if name in text:
-            codes.append(code)
+async def _search_stock_code(name: str) -> Optional[str]:
+    """通过腾讯搜索接口将股票名称转为代码"""
+    try:
+        import urllib.request, urllib.parse
+        q = urllib.parse.quote(name)
+        url = f"https://smartbox.gtimg.cn/s3/?v=2&q={q}&t=gp"
+        resp = await asyncio.to_thread(
+            lambda: urllib.request.urlopen(url, timeout=5).read().decode("utf-8")
+        )
+        parts = resp.split("~")
+        if len(parts) >= 3 and re.match(r'[036]\d{5}', parts[1]):
+            return parts[1]
+    except Exception as e:
+        logger.warning("腾讯搜索 stock code 失败 %s: %s", name, e)
+    return None
+
+
+_name_cache: dict[str, str] = {}
+
+
+async def _extract_company_names(text: str) -> list[str]:
+    """用轻量 LLM 调用从用户问题中提取公司名称"""
+    from utils.llm_client import create_client
+    try:
+        client = create_client(model=None, system_prompt="你是一个实体提取工具。", enable_thinking=False)
+        prompt = (
+            "从以下文本中提取所有A股上市公司名称，只返回公司名称列表，用逗号分隔。"
+            f"如果没有公司名称，返回'无'。\n\n文本：{text}"
+        )
+        resp, _ = await client.chat(prompt=prompt, temperature=0)
+        if not resp or "无" in resp.strip():
+            return []
+        names = [n.strip() for n in resp.split(",") if n.strip()]
+        return names
+    except Exception as e:
+        logger.warning("LLM 提取公司名称失败: %s", e)
+        return []
+
+
+async def extract_stock_codes(text: str) -> list[str]:
+    codes = _CODE_RE.findall(text)
+
+    if not codes:
+        names = await _extract_company_names(text)
+        for name in names:
+            if name in _name_cache:
+                codes.append(_name_cache[name])
+                continue
+            code = await _search_stock_code(name)
+            if code:
+                _name_cache[name] = code
+                codes.append(code)
+
     return list(dict.fromkeys(codes))
 
 
@@ -297,7 +341,7 @@ def set_provider(provider: StockDataProvider):
 
 
 async def get_stock_data(question: str, data_types: list[str]) -> str:
-    codes = extract_stock_codes(question)
+    codes = await extract_stock_codes(question)
     provider = get_provider()
     parts = []
 
