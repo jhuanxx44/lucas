@@ -17,9 +17,21 @@ if [ ! -d "$DIR/web/node_modules" ]; then
     (cd "$DIR/web" && npm install)
 fi
 
+PIDS=()
+
+cleanup() {
+    echo ""
+    echo "⏹ 关闭服务..."
+    for pid in "${PIDS[@]}"; do
+        kill -TERM "$pid" 2>/dev/null && wait "$pid" 2>/dev/null
+    done
+    exit 0
+}
+trap cleanup INT TERM
+
 echo "🚀 启动前端 (localhost:5173) ..."
-(cd "$DIR/web" && npm run dev > /dev/null 2>&1) &
-PID_FRONTEND=$!
+(cd "$DIR/web" && exec npm run dev) > /dev/null 2>&1 &
+PIDS+=($!)
 
 sleep 1
 
@@ -28,15 +40,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "🚀 启动后端 (localhost:8000)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-
-cleanup() {
-    echo ""
-    echo "⏹ 关闭服务..."
-    kill "$PID_FRONTEND" 2>/dev/null
-    wait "$PID_FRONTEND" 2>/dev/null
-    exit 0
-}
-trap cleanup INT TERM
 
 cd "$DIR"
 "$VENV/bin/uvicorn" server.app:app --host 0.0.0.0 --port 8000 --reload --log-level info
