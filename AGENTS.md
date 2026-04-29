@@ -1,7 +1,3 @@
-# Lucas — 多 LLM 协作规范
-
-本文件定义了多个 LLM（Claude、GPT、Gemini 等）在本知识库中的协作规则。
-
 ## Coding Guidelines
 
 ### 1. Think Before Coding
