@@ -8,10 +8,11 @@
 raw/          原始资料（只读）
 wiki/         LLM编译的结构化Wiki
 prompts/      编译模板
-reviews/      多LLM交叉验证记录
-logs/         编译日志
 agents/       多Agent专家系统
 agents.yaml   研究员配置
+providers.yaml 模型提供商配置
+server/       FastAPI 后端
+web/          React 前端
 utils/        LLM统一调用层
 ```
 
@@ -35,15 +36,17 @@ utils/        LLM统一调用层
 
 生产部署：先 `cd web && npm run build`，再 `python -m server.app`——FastAPI 会自动 serve 静态文件。
 
-## 可用模型（内部代理）
+## 可用模型
 
-| 模型 | 路由 | 状态 |
-|------|------|------|
-| `gemini-3.1-pro` | Gemini SDK | ✅ |
-| `deepseek-v3.2` | OpenAI 兼容 | ✅ |
-| `claude-4.6-opus` | OpenAI 兼容 | ✅ |
-| `glm-5-turbo` | OpenAI 兼容 | ✅ |
-| `qwen3.5-plus` | OpenAI 兼容 | ✅ |
+配置见 `providers.yaml`，当前支持：
+
+| Provider | 默认模型 | 路由 |
+|----------|----------|------|
+| MiniMax | `MiniMax-M2.7` | OpenAI 兼容 |
+| Gemini | `gemini-3.1-pro` | OpenAI 兼容 |
+| DeepSeek | `deepseek-v3` | OpenAI 兼容 |
+| Qwen | `qwen-plus` | OpenAI 兼容 |
+| Claude | `claude-3-5-sonnet` | OpenAI 兼容 |
 
 ## 使用方式
 
@@ -56,5 +59,3 @@ utils/        LLM统一调用层
 1. 运行 `./cli.sh` 启动 CLI
 2. 输入问题（如"分析宁德时代"）
 3. Lucas 自动派发给相关研究员，汇总多视角分析
-
-详见 [CLAUDE.md](CLAUDE.md) 和 [AGENTS.md](AGENTS.md)。
