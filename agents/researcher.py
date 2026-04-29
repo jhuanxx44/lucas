@@ -2,7 +2,7 @@ import os
 import re
 import glob
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from agents.config import ResearcherConfig
 from agents.models import Task, ResearchResult
@@ -104,38 +104,15 @@ async def _build_prompt(config: ResearcherConfig, task: Task, prior_results=None
     return prompt, search_urls, market_data
 
 
-async def run_researcher(
-    config: ResearcherConfig,
-    task: Task,
-    prior_results: list[ResearchResult] = None,
-) -> ResearchResult:
-    """执行单个研究员的分析任务"""
-    client = create_client(model=config.model, system_prompt=config.system_prompt)
-    prompt, search_urls, market_data = await _build_prompt(config, task, prior_results)
-
-    logger.info("[%s] 开始分析 (model=%s)", config.name, config.model)
-    text, usage = await client.chat(prompt=prompt, temperature=0.7, thinking_budget=8192)
-    logger.info("[%s] 分析完成, tokens=%s", config.name, usage.total_tokens if usage else "N/A")
-
-    return ResearchResult(
-        researcher_id=config.id,
-        researcher_name=config.name,
-        model=config.model,
-        content=text,
-        token_usage=usage,
-        source_urls=search_urls,
-        market_data=market_data,
-    )
-
-
 async def run_researcher_stream(
     config: ResearcherConfig,
     task: Task,
     prior_results: list[ResearchResult] = None,
 ) -> AsyncGenerator[dict, None]:
-    """执行单个研究员的分析任务（流式版本），yield SSE event dicts"""
     client = create_client(model=config.model, system_prompt=config.system_prompt)
-    prompt, _, _ = await _build_prompt(config, task, prior_results)
+    prompt, search_urls, market_data = await _build_prompt(config, task, prior_results)
+
+    yield {"event": "_meta", "data": {"id": config.id, "source_urls": search_urls, "market_data": market_data}}
 
     logger.info("[%s] 开始流式分析 (model=%s)", config.name, config.model)
     async for chunk in client.chat_stream(prompt=prompt, temperature=0.7):

@@ -18,7 +18,7 @@ async def chat_event_stream(question: str, history: list[dict] | None = None) ->
                     manager.memory.add_turn(turn["content"], "user", "")
                 elif turn.get("role") == "assistant" and turn.get("content"):
                     manager.memory.add_turn("", "assistant", turn["content"])
-        async for evt in manager.analyze_stream(question):
+        async for evt in manager.analyze(question):
             event_type = evt["event"]
             data = json.dumps(evt["data"], ensure_ascii=False)
             yield f"event: {event_type}\ndata: {data}\n\n"

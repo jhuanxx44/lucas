@@ -40,7 +40,7 @@ async def test_chat_event_stream_passes_history():
     async def fake_analyze(q):
         yield {"event": "done", "data": {"total_tokens": 0}}
 
-    mock_manager.analyze_stream = fake_analyze
+    mock_manager.analyze = fake_analyze
 
     with patch("server.services.stream.load_config"), \
          patch("server.services.stream.Manager", return_value=mock_manager):

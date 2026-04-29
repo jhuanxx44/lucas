@@ -44,7 +44,6 @@ class Manager:
         return content
 
     async def _dispatch(self, question: str) -> tuple[str, Task | str | dict]:
-        """分析用户意图，决定派发策略。返回 (action, Task或直接回复或compile计划)"""
         researchers_desc = "\n".join(
             f"- id: {r.id}, 名称: {r.name}, 擅长: {r.expertise}"
             for r in self.config.researchers
@@ -107,17 +106,11 @@ class Manager:
             researcher_tasks=researcher_tasks,
         )
 
-    async def _tool_use_loop(self, question: str, on_status=None, max_rounds: int = 5) -> str:
-        """让 Lucas 自主决定是否调用工具，循环直到给出最终回答"""
-        def status(msg):
-            if on_status:
-                on_status(msg)
-
+    async def _tool_use_loop(self, question: str, max_rounds: int = 5) -> str:
         wiki_context = _find_wiki_context(question) or "（暂无相关内容）"
         memory_context = self.memory.get_memory_context(question)
         tools_desc = get_tools_description()
 
-        status("🔍 检索相关记忆和文档...")
         pre_results = []
         recall_output = execute_tool("recall", {"keyword": question})
         if "未找到" not in recall_output:
@@ -154,7 +147,6 @@ class Manager:
             if result.get("action") == "tool":
                 tool_name = result.get("tool", "")
                 tool_args = result.get("args", {})
-                status(f"🔧 调用 {tool_name}({', '.join(f'{k}={v}' for k, v in tool_args.items())})")
                 tool_output = execute_tool(tool_name, tool_args)
                 if tool_results == "（预查无相关结果）":
                     tool_results = ""
@@ -165,71 +157,9 @@ class Manager:
 
         return "抱歉，经过多轮尝试仍未能完成回答。请尝试换个方式提问。"
 
-    async def analyze(self, question: str, on_status=None) -> ManagerReport:
+    async def analyze(self, question: str) -> AsyncGenerator[dict, None]:
         """
-        完整分析流程：派发 → 执行 → 汇总
-
-        Args:
-            question: 用户问题
-            on_status: 状态回调 fn(msg: str)，用于 CLI 显示进度
-        """
-        def status(msg):
-            if on_status:
-                on_status(msg)
-
-        status("正在分析问题，制定研究计划...")
-        action, dispatch_result = await self._dispatch(question)
-
-        if action == "direct":
-            status("正在思考...")
-            reply = await self._tool_use_loop(question, on_status=on_status)
-            self.memory.add_turn(question, "direct", reply)
-            return ManagerReport(
-                question=question,
-                synthesis=reply,
-            )
-
-        if action == "compile":
-            status("开始编译原始资料到 wiki...")
-            summary = await self.knowledge_service.compile_from_raw(dispatch_result, on_status=on_status)
-            self.memory.add_turn(question, "compile", summary)
-            return ManagerReport(
-                question=question,
-                synthesis=summary,
-            )
-
-        task = dispatch_result
-        names = [self.config.get_researcher(rid).name for rid in task.researcher_ids
-                 if self.config.get_researcher(rid)]
-        status(f"派发给: {', '.join(names)} | 模式: {task.mode}")
-        if task.instruction:
-            status(f"指令: {task.instruction}")
-
-        results = await self.research_service.run(task, on_status=on_status)
-
-        if len(results) > 1:
-            status("正在汇总分析结果...")
-            synthesis = await self.research_service.synthesize(question, results)
-        elif len(results) == 1:
-            synthesis = results[0].content
-        else:
-            synthesis = "没有研究员返回结果。"
-
-        total_tokens = sum(r.token_usage.total_tokens for r in results if r.token_usage)
-
-        report = ManagerReport(
-            question=question,
-            results=results,
-            synthesis=synthesis,
-            total_tokens=total_tokens,
-        )
-
-        await self.knowledge_service.persist_report(report, on_status=on_status)
-        return report
-
-    async def analyze_stream(self, question: str) -> AsyncGenerator[dict, None]:
-        """
-        流式分析流程，yield SSE event dicts。
+        分析流程，yield SSE event dicts。
 
         事件类型：
           status          — {"message": str}
@@ -274,7 +204,7 @@ class Manager:
         })
 
         results: list[ResearchResult] = []
-        async for evt in self.research_service.run_stream(task):
+        async for evt in self.research_service.run(task):
             if evt["event"] == "_results":
                 results = evt["data"]["results"]
                 continue
