@@ -41,3 +41,32 @@ export interface ChatMessage {
   researchers?: ResearcherState[];
   synthesis?: string;
 }
+
+export interface RawReport {
+  name: string;
+  dir: string;
+  files: string[];
+}
+
+export interface RawCompany {
+  name: string;
+  reports: RawReport[];
+}
+
+export interface RawIndustry {
+  name: string;
+  companies: RawCompany[];
+  reports: RawReport[];
+}
+
+export interface RawTree {
+  industries: RawIndustry[];
+  sources: { name: string; path: string }[];
+}
+
+export interface WikiTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  children?: WikiTreeNode[];
+}

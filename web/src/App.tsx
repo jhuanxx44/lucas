@@ -2,11 +2,12 @@ import { useState, useCallback } from "react";
 import { TopBar } from "@/components/TopBar";
 import { ResizableDivider } from "@/components/ResizableDivider";
 import { WikiSidebar } from "@/components/WikiSidebar";
+import { RawSidebar } from "@/components/RawSidebar";
 import { WikiContent } from "@/components/WikiContent";
 import { ChatPanel } from "@/components/ChatPanel";
 import { WikiNavigationContext } from "@/hooks/useWikiNavigation";
 import { ThemeContext, useThemeProvider } from "@/hooks/useTheme";
-import { fetchWikiIndex, searchWiki } from "@/lib/api";
+import { fetchWikiIndex, searchWiki, rawPdfUrl } from "@/lib/api";
 
 export default function App() {
   const themeCtx = useThemeProvider();
@@ -15,6 +16,7 @@ export default function App() {
   const [rightWidth, setRightWidth] = useState(520);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
+  const [sidebarTab, setSidebarTab] = useState<"wiki" | "raw">("wiki");
 
   const handleLeftResize = useCallback((delta: number) => {
     setLeftWidth((w) => Math.max(180, Math.min(400, w + delta)));
@@ -67,14 +69,38 @@ export default function App() {
             onSearch={handleSearch}
           />
           <div className="flex flex-1 overflow-hidden">
-            <div style={{ width: leftWidth }} className="shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 p-3">
-              <WikiSidebar refreshKey={sidebarKey} />
+            <div style={{ width: leftWidth }} className="shrink-0 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+              <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                <button
+                  onClick={() => setSidebarTab("wiki")}
+                  className={`flex-1 text-xs py-2 font-medium transition-colors ${sidebarTab === "wiki" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
+                >
+                  Wiki
+                </button>
+                <button
+                  onClick={() => setSidebarTab("raw")}
+                  className={`flex-1 text-xs py-2 font-medium transition-colors ${sidebarTab === "raw" ? "text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
+                >
+                  原始资料
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3">
+                {sidebarTab === "wiki" ? <WikiSidebar refreshKey={sidebarKey} /> : <RawSidebar />}
+              </div>
             </div>
             {currentPath && (
               <>
                 <ResizableDivider onResize={handleLeftResize} />
                 <div className="flex-1 overflow-y-auto p-4">
-                  <WikiContent />
+                  {currentPath.startsWith("__raw_pdf__/") ? (
+                    <iframe
+                      src={rawPdfUrl(currentPath.replace("__raw_pdf__/", ""))}
+                      className="w-full h-full rounded border border-zinc-200 dark:border-zinc-700"
+                      title="PDF Preview"
+                    />
+                  ) : (
+                    <WikiContent />
+                  )}
                 </div>
                 <ResizableDivider onResize={handleRightResize} />
               </>
