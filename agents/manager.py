@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import os
+import time
+import uuid
 from typing import AsyncGenerator
 
 from agents.config import AgentsConfig
@@ -34,6 +36,9 @@ def _cleanup_download_tmp(tmp_path: str):
 
 class Manager:
     _PENDING_PATH = os.path.join(_MEMORY_DIR, "_pending_ingest.json")
+    _PENDING_DIR = os.path.join(_MEMORY_DIR, "pending_ingest")
+    _PENDING_ACTION_PREFIX = "__ingest_confirm__:"
+    _PENDING_TTL_SECONDS = 24 * 60 * 60
 
     def __init__(self, config: AgentsConfig):
         self.config = config
@@ -56,7 +61,85 @@ class Manager:
                 content = content[end + 5:]
         return content
 
+    def _cleanup_pending_ingest(self):
+        if not os.path.isdir(self._PENDING_DIR):
+            return
+        cutoff = time.time() - self._PENDING_TTL_SECONDS
+        for name in os.listdir(self._PENDING_DIR):
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(self._PENDING_DIR, name)
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                logger.warning("清理过期 pending ingest 失败 %s: %s", path, e)
+
+    def _pending_path(self, pending_id: str) -> str:
+        safe_id = os.path.basename(pending_id)
+        if safe_id != pending_id or not safe_id.endswith(".json"):
+            safe_id = f"{safe_id}.json"
+        return os.path.join(self._PENDING_DIR, safe_id)
+
+    def _save_pending_ingest(self, pending: dict) -> str:
+        self._cleanup_pending_ingest()
+        os.makedirs(self._PENDING_DIR, exist_ok=True)
+        pending_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        pending["pending_id"] = pending_id
+        with open(self._pending_path(pending_id), "w", encoding="utf-8") as f:
+            json.dump(pending, f, ensure_ascii=False)
+        return pending_id
+
+    def _parse_pending_action(self, question: str) -> dict | None:
+        if not question.startswith(self._PENDING_ACTION_PREFIX):
+            return None
+        rest = question[len(self._PENDING_ACTION_PREFIX):]
+        pending_id, sep, industry = rest.partition(":")
+        if not sep or not pending_id or not industry:
+            return None
+        return {"pending_id": pending_id, "industry": industry}
+
+    def _load_pending_ingest(self, pending_id: str = "") -> tuple[dict | None, str]:
+        self._cleanup_pending_ingest()
+
+        if pending_id:
+            path = self._pending_path(pending_id)
+            if not os.path.isfile(path):
+                return None, "missing"
+            with open(path, "r", encoding="utf-8") as f:
+                pending = json.load(f)
+            os.remove(path)
+            return pending, "ok"
+
+        if os.path.isfile(self._PENDING_PATH):
+            with open(self._PENDING_PATH, "r", encoding="utf-8") as f:
+                pending = json.load(f)
+            os.remove(self._PENDING_PATH)
+            return pending, "ok"
+
+        pending_files = []
+        if os.path.isdir(self._PENDING_DIR):
+            pending_files = [
+                name for name in os.listdir(self._PENDING_DIR)
+                if name.endswith(".json") and os.path.isfile(os.path.join(self._PENDING_DIR, name))
+            ]
+        if len(pending_files) == 1:
+            pending_id = pending_files[0][:-5]
+            return self._load_pending_ingest(pending_id)
+        if len(pending_files) > 1:
+            return None, "ambiguous"
+        return None, "missing"
+
+    def _pending_action_value(self, pending_id: str, industry: str) -> str:
+        return f"{self._PENDING_ACTION_PREFIX}{pending_id}:{industry}"
+
     async def _dispatch(self, question: str) -> tuple[str, Task | str | dict]:
+        pending_action = self._parse_pending_action(question)
+        if pending_action:
+            return "ingest_confirm", pending_action
+
         researchers_desc = "\n".join(
             f"- id: {r.id}, 名称: {r.name}, 擅长: {r.expertise}"
             for r in self.config.researchers
@@ -103,6 +186,7 @@ class Manager:
 
         if plan.get("action") == "ingest_confirm":
             return "ingest_confirm", {
+                "pending_id": plan.get("pending_id", ""),
                 "industry": plan.get("industry", ""),
             }
 
@@ -270,18 +354,20 @@ class Manager:
                         "company": company,
                         "alternatives": classification["alternatives"],
                     }
-                    os.makedirs(os.path.dirname(self._PENDING_PATH), exist_ok=True)
-                    with open(self._PENDING_PATH, "w", encoding="utf-8") as f:
-                        json.dump(pending, f, ensure_ascii=False)
+                    pending_id = self._save_pending_ingest(pending)
 
                     alts = classification["alternatives"]
                     alt_text = "、".join(a["industry"] for a in alts)
                     yield _evt("synthesis_chunk", {
                         "text": f"材料已抓取，但行业归属不确定。\n\n系统建议归入 **{industry}**，但也可能属于 {alt_text}。\n\n请选择归类方式：",
                     })
-                    actions = [{"label": industry, "value": f"归类到{industry}"}]
+                    actions = [{"label": industry, "value": self._pending_action_value(pending_id, industry)}]
                     for alt in alts:
-                        actions.append({"label": alt["industry"], "value": f"归类到{alt['industry']}"})
+                        alt_industry = alt["industry"]
+                        actions.append({
+                            "label": alt_industry,
+                            "value": self._pending_action_value(pending_id, alt_industry),
+                        })
                     yield _evt("actions", {"actions": actions})
                     yield _evt("done", {"total_tokens": 0})
                     return
@@ -314,14 +400,15 @@ class Manager:
             return
 
         if action == "ingest_confirm":
-            if not os.path.isfile(self._PENDING_PATH):
-                yield _evt("synthesis_chunk", {"text": "没有待确认的收录任务。"})
+            pending, pending_status = self._load_pending_ingest(dispatch_result.get("pending_id", ""))
+            if pending_status == "ambiguous":
+                yield _evt("synthesis_chunk", {"text": "存在多个待确认的收录任务，请点击对应材料下方的归类按钮。"})
                 yield _evt("done", {"total_tokens": 0})
                 return
-
-            with open(self._PENDING_PATH, "r", encoding="utf-8") as f:
-                pending = json.load(f)
-            os.remove(self._PENDING_PATH)
+            if pending is None:
+                yield _evt("synthesis_chunk", {"text": "待确认的收录任务不存在或已过期。"})
+                yield _evt("done", {"total_tokens": 0})
+                return
 
             chosen_industry = dispatch_result.get("industry", "") or pending["industry"]
             yield _evt("status", {"message": f"确认归类到 {chosen_industry}，正在收录..."})
