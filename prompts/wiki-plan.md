@@ -9,6 +9,9 @@ llm-weight: medium
 ## 现有 wiki 页面
 {existing_pages}
 
+## 已有公司分类
+{company_categories}
+
 ## 可用页面类型
 - company: wiki/companies/{{代码}}-{{简称}}.md（公司档案）
 - industry: wiki/industries/{{行业名}}.md（行业概览）
@@ -26,3 +29,5 @@ llm-weight: medium
 - 只列出本次分析确实涉及且有新信息可补充的页面
 - 如果分析内容太泛、没有具体可落地的信息，返回空数组 []
 - 不要创建信息量不足的页面
+- 公司页面必须归入已有分类中最匹配的类别；只有确实不属于任何已有分类时才新建分类
+- 同一公司不得出现在多个分类下

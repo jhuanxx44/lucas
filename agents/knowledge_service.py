@@ -2,6 +2,8 @@ import glob
 import json
 import logging
 import os
+import re
+import shutil
 from datetime import date
 
 from agents.models import ManagerReport
@@ -261,14 +263,43 @@ class KnowledgeService:
         with open(index_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-    def _list_wiki_pages(self) -> str:
-        pages = []
-        for md_path in glob.glob(os.path.join(_WIKI_DIR, "**", "*.md"), recursive=True):
-            rel = os.path.relpath(md_path, _WIKI_DIR)
-            if rel in ("index.md", "glossary.md") or rel.startswith("reports/"):
+    def _list_company_categories(self) -> str:
+        companies_dir = os.path.join(_WIKI_DIR, "companies")
+        if not os.path.isdir(companies_dir):
+            return "（暂无）"
+        lines = []
+        for cat in sorted(os.listdir(companies_dir)):
+            cat_path = os.path.join(companies_dir, cat)
+            if not os.path.isdir(cat_path) or cat.startswith("."):
                 continue
-            pages.append(f"- {rel}")
-        return "\n".join(pages) if pages else "（暂无）"
+            names = sorted(
+                f.replace(".md", "") for f in os.listdir(cat_path) if f.endswith(".md")
+            )
+            if names:
+                lines.append(f"- {cat}（{len(names)}家）：{', '.join(names)}")
+        return "\n".join(lines) if lines else "（暂无）"
+
+    def _list_wiki_pages(self) -> str:
+        lines = []
+        companies_dir = os.path.join(_WIKI_DIR, "companies")
+        if os.path.isdir(companies_dir):
+            for cat in sorted(os.listdir(companies_dir)):
+                cat_path = os.path.join(companies_dir, cat)
+                if not os.path.isdir(cat_path) or cat.startswith("."):
+                    continue
+                for fname in sorted(os.listdir(cat_path)):
+                    if fname.endswith(".md"):
+                        lines.append(f"- companies/{cat}/{fname}")
+
+        for subdir in ("industries", "concepts"):
+            base = os.path.join(_WIKI_DIR, subdir)
+            if not os.path.isdir(base):
+                continue
+            for fname in sorted(os.listdir(base)):
+                if fname.endswith(".md"):
+                    lines.append(f"- {subdir}/{fname}")
+
+        return "\n".join(lines) if lines else "（暂无）"
 
     def _load_template(self, page_type: str) -> str:
         type_to_template = {
@@ -286,6 +317,11 @@ class KnowledgeService:
         except FileNotFoundError:
             return ""
 
+    def _find_existing_company(self, name: str) -> str | None:
+        pattern = os.path.join(_WIKI_DIR, "companies", "*", f"{name}.md")
+        matches = glob.glob(pattern)
+        return matches[0] if matches else None
+
     def _page_path(self, page_type: str, name: str, industry: str = "") -> str:
         type_to_dir = {
             "company": "companies",
@@ -293,14 +329,45 @@ class KnowledgeService:
             "concept": "concepts",
         }
         subdir = type_to_dir.get(page_type, page_type)
-        if page_type == "company" and industry:
-            return os.path.join(_WIKI_DIR, subdir, industry, f"{name}.md")
+        if page_type == "company":
+            existing = self._find_existing_company(name)
+            if existing:
+                return existing
+            if industry:
+                return os.path.join(_WIKI_DIR, subdir, industry, f"{name}.md")
         return os.path.join(_WIKI_DIR, subdir, f"{name}.md")
+
+    def _validate_wiki_content(self, new_content: str, old_content: str = "") -> str | None:
+        """校验 LLM 产出的 wiki 页面。返回 None 表示通过，返回 str 表示拒绝原因。"""
+        if not new_content.startswith("---"):
+            return "缺少 frontmatter（不以 --- 开头）"
+        match = re.match(r"^---\n(.+?)\n---", new_content, re.DOTALL)
+        if not match:
+            return "frontmatter 未闭合"
+        fm = match.group(1)
+        for field in ("title", "type", "updated"):
+            if not re.search(rf"^{field}\s*:", fm, re.MULTILINE):
+                return f"frontmatter 缺少必要字段: {field}"
+
+        if old_content and old_content.startswith("---"):
+            old_sections = set(re.findall(r"^## (.+)$", old_content, re.MULTILINE))
+            new_sections = set(re.findall(r"^## (.+)$", new_content, re.MULTILINE))
+            lost = old_sections - new_sections
+            if lost:
+                logger.warning("wiki 更新丢失了以下段落: %s", ", ".join(sorted(lost)))
+
+        return None
+
+    @staticmethod
+    def _backup_file(path: str):
+        if os.path.isfile(path):
+            shutil.copy2(path, path + ".bak")
 
     async def _plan_wiki_updates(self, report: ManagerReport) -> list[dict]:
         prompt = self._load_prompt("wiki-plan").format(
             synthesis=report.synthesis,
             existing_pages=self._list_wiki_pages(),
+            company_categories=self._list_company_categories(),
         )
         text, _ = await self.client.chat(
             prompt=prompt,
@@ -376,6 +443,19 @@ class KnowledgeService:
                 new_content = await self._compile_wiki_page(plan, report)
                 industry = report.industry or "未分类"
                 page_path = self._page_path(page_type, name, industry=industry)
+
+                old_content = ""
+                if os.path.isfile(page_path):
+                    with open(page_path, "r", encoding="utf-8") as f:
+                        old_content = f.read()
+
+                error = self._validate_wiki_content(new_content, old_content)
+                if error:
+                    logger.warning("wiki 内容校验失败 %s/%s: %s", page_type, name, error)
+                    status(f"  ✗ {page_type}/{name}: 校验失败 — {error}")
+                    continue
+
+                self._backup_file(page_path)
                 os.makedirs(os.path.dirname(page_path), exist_ok=True)
                 with open(page_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
@@ -496,6 +576,7 @@ class KnowledgeService:
                 raw_path=rel_path,
                 raw_content=raw_content[:8000],
                 existing_pages=self._list_wiki_pages(),
+                company_categories=self._list_company_categories(),
             )
             text, _ = await self.client.chat(
                 prompt=classify_prompt,
@@ -518,9 +599,12 @@ class KnowledgeService:
                 if not page_type or not name:
                     continue
 
-                # 从 raw 路径提取行业: raw/{行业}/...
+                # 从 raw 路径提取行业: raw/{行业}/... 或 raw/sources/{行业}/...
                 parts = rel_path.split("/")
-                raw_industry = parts[1] if len(parts) > 2 else "未分类"
+                if len(parts) > 2 and parts[1] == "sources":
+                    raw_industry = parts[2] if len(parts) > 3 else "未分类"
+                else:
+                    raw_industry = parts[1] if len(parts) > 2 else "未分类"
 
                 template = self._load_template(page_type)
                 page_path = self._page_path(page_type, name, industry=raw_industry)
@@ -552,6 +636,14 @@ class KnowledgeService:
                 status(f"  {'创建' if action == 'create' else '更新'} {page_type}/{name}...")
                 try:
                     new_content, _ = await self.client.chat(prompt=compile_prompt, temperature=0.3)
+
+                    error = self._validate_wiki_content(new_content, current_content if action == "update" else "")
+                    if error:
+                        logger.warning("编译内容校验失败 %s/%s: %s", page_type, name, error)
+                        status(f"  ✗ {page_type}/{name}: 校验失败 — {error}")
+                        continue
+
+                    self._backup_file(page_path)
                     os.makedirs(os.path.dirname(page_path), exist_ok=True)
                     with open(page_path, "w", encoding="utf-8") as f:
                         f.write(new_content)
@@ -581,3 +673,80 @@ class KnowledgeService:
         else:
             summary = f"处理了 {len(raw_files)} 个文件，但没有生成新的 wiki 页面（可能信息量不足）。"
         return summary
+
+    async def classify_source(self, content: str) -> dict:
+        """用 LLM 对材料做轻量分类，返回 {title, industry, company, confidence, alternatives}。"""
+        prompt = self._load_prompt("source-classify").format(
+            content=content[:2000],
+        )
+        text, _ = await self.client.chat(
+            prompt=prompt,
+            response_mime_type="application/json",
+            temperature=0.1,
+        )
+        result = extract_json(text)
+        if result is None:
+            return {"title": "未命名材料", "industry": "未分类", "company": "", "confidence": "high", "alternatives": []}
+        return {
+            "title": result.get("title", "未命名材料"),
+            "industry": result.get("industry", "未分类"),
+            "company": result.get("company", ""),
+            "confidence": result.get("confidence", "high"),
+            "alternatives": result.get("alternatives", []),
+        }
+
+    async def ingest_source(
+        self,
+        content: str,
+        title: str,
+        industry: str,
+        url: str = "",
+        company: str = "",
+        on_status=None,
+    ) -> dict:
+        """
+        存储已确认的材料并编译进 wiki。
+        返回 {"path", "industry", "company", "title", "compiled_pages"}.
+        """
+        def status(msg):
+            if on_status:
+                on_status(msg)
+
+        today = date.today().isoformat()
+        slug = self._make_slug(title)
+
+        if company:
+            dest_dir = os.path.join(_RAW_DIR, "sources", industry, company)
+        else:
+            dest_dir = os.path.join(_RAW_DIR, "sources", industry)
+        os.makedirs(dest_dir, exist_ok=True)
+
+        filename = f"{today}_{slug}.md"
+        file_path = os.path.join(dest_dir, filename)
+
+        if not content.startswith("---\n"):
+            frontmatter = f"---\nsource: {url or 'user-input'}\ntitle: {title}\ndate: {today}\ntype: {'url' if url else 'text'}\nindustry: {industry}\ncompany: {company}\n---\n\n"
+            content = frontmatter + content
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        rel_path = os.path.relpath(file_path, _PROJECT_ROOT)
+        status(f"已保存: {rel_path}")
+
+        status("正在编译到 wiki...")
+        compile_plan = {"scope": "specific", "sources": [rel_path]}
+        compile_summary = await self.compile_from_raw(compile_plan, on_status=on_status)
+
+        compiled_pages = []
+        for line in compile_summary.split("\n"):
+            if line.startswith("- "):
+                compiled_pages.append(line[2:])
+
+        return {
+            "path": rel_path,
+            "industry": industry,
+            "company": company,
+            "title": title,
+            "compiled_pages": compiled_pages,
+        }

@@ -73,3 +73,99 @@ export async function wikiMove(src: string, dst: string): Promise<void> {
     throw new Error(data.detail || `move failed: ${res.status}`);
   }
 }
+
+export interface FetchSourceResult {
+  content: string;
+  url: string;
+  content_type: string;
+}
+
+export async function fetchSource(url: string): Promise<FetchSourceResult> {
+  const res = await fetch(`${BASE}/wiki/fetch-source`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `抓取失败: ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface ClassifyAlternative {
+  industry: string;
+  reason: string;
+}
+
+export interface ClassifyResult {
+  title: string;
+  industry: string;
+  company: string;
+  confidence: "high" | "low";
+  alternatives: ClassifyAlternative[];
+}
+
+export async function classifySource(content: string): Promise<ClassifyResult> {
+  const res = await fetch(`${BASE}/wiki/classify-source`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `分类失败: ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface IngestSourceParams {
+  content: string;
+  url?: string;
+  title: string;
+  industry: string;
+  company?: string;
+}
+
+export interface IngestEvent {
+  event: string;
+  data: Record<string, unknown>;
+}
+
+export async function ingestSource(
+  params: IngestSourceParams,
+  onEvent: (evt: IngestEvent) => void,
+): Promise<void> {
+  const res = await fetch(`${BASE}/wiki/ingest-source`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `收录失败: ${res.status}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    let currentEvent = "";
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        currentEvent = line.slice(7);
+      } else if (line.startsWith("data: ") && currentEvent) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          onEvent({ event: currentEvent, data });
+        } catch { /* skip malformed */ }
+        currentEvent = "";
+      }
+    }
+  }
+}

@@ -42,7 +42,6 @@ def _extract_html_text(html: str) -> str:
     html = re.sub(r'<[^>]+>', '\n', html)
     html = re.sub(r'\n{3,}', '\n\n', html)
     text = html.strip()
-    # PLACEHOLDER_APPEND
     if len(text) < 50:
         return ""
     return text
@@ -69,6 +68,8 @@ async def _download_one(
     if "application/pdf" in content_type:
         pdf_path = os.path.join(dest_dir, f"{today}_{slug}.pdf")
         md_path = os.path.join(dest_dir, f"{today}_{slug}.md")
+        if os.path.exists(md_path):
+            return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
         if os.path.exists(pdf_path):
             return {"title": title, "url": url, "path": os.path.relpath(pdf_path, _PROJECT_ROOT)}
         os.makedirs(dest_dir, exist_ok=True)
@@ -80,6 +81,7 @@ async def _download_one(
                 md_content = f"---\nsource: {url}\ntitle: {title}\ndate: {today}\ntype: pdf\n---\n\n{text}\n"
                 with open(md_path, "w", encoding="utf-8") as f:
                     f.write(md_content)
+                return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
         except Exception as e:
             logger.warning("PDF 文本提取失败 %s: %s", url, e)
         return {"title": title, "url": url, "path": os.path.relpath(pdf_path, _PROJECT_ROOT)}
@@ -98,6 +100,15 @@ async def _download_one(
         return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
 
     return None
+
+
+async def download_single_url(url: str, dest_dir: str, title: str = "") -> Optional[dict]:
+    """下载单个 URL 到指定目录，返回 {"title", "url", "path"} 或 None。"""
+    today = date.today().isoformat()
+    async with httpx.AsyncClient(
+        headers={"User-Agent": "Mozilla/5.0 (compatible; LucasBot/1.0)"},
+    ) as client:
+        return await _download_one(client, url, title, dest_dir, today)
 
 
 async def collect_sources(

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, FileText, FolderOpen, Building2, Factory } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, FolderOpen, Building2, Factory, Plus } from "lucide-react";
 import { fetchRawTree } from "@/lib/api";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
+import { SourceUploadDialog } from "./SourceUploadDialog";
 import type { RawTree, RawIndustry, RawCompany, RawReport } from "@/types";
 
 function FileItem({ name, path }: { name: string; path: string }) {
@@ -103,19 +104,29 @@ export function RawSidebar() {
   const [tree, setTree] = useState<RawTree | null>(null);
   const [loading, setLoading] = useState(true);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
-  useEffect(() => {
+  const loadTree = () => {
     fetchRawTree()
       .then(setTree)
       .catch(() => setTree(null))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadTree(); }, []);
 
   if (loading) return <div className="text-xs text-zinc-400 dark:text-zinc-500 p-2">加载中...</div>;
   if (!tree) return <div className="text-xs text-red-500 p-2">加载失败</div>;
 
   return (
     <div className="space-y-1">
+      <button
+        onClick={() => setUploadOpen(true)}
+        className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 w-full py-1 px-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors mb-1"
+      >
+        <Plus size={13} />
+        <span>收录材料</span>
+      </button>
       {tree.industries.map((ind) => (
         <IndustryItem key={ind.name} industry={ind} />
       ))}
@@ -138,6 +149,11 @@ export function RawSidebar() {
           )}
         </div>
       )}
+      <SourceUploadDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onDone={() => { setUploadOpen(false); loadTree(); }}
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import os
 import shutil
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from server.services.wiki_parser import parse_wiki_index, parse_wiki_page, search_wiki
 
@@ -94,6 +94,145 @@ def _parse_report_dir(path: str, rel_dir: str) -> dict:
 @router.get("/raw-tree")
 def get_raw_tree():
     return _build_raw_tree()
+
+
+class FetchSourceRequest(BaseModel):
+    url: str
+
+
+@router.post("/fetch-source")
+async def fetch_source(req: FetchSourceRequest):
+    """抓取 URL 内容，返回提取的文本（不存储）。"""
+    if not req.url.strip():
+        raise HTTPException(status_code=400, detail="url 不能为空")
+
+    from utils.source_collector import _extract_html_text, _extract_pdf_text
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": "Mozilla/5.0 (compatible; LucasBot/1.0)"},
+        ) as client:
+            resp = await client.get(req.url, follow_redirects=True, timeout=30.0)
+            resp.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"抓取失败: {e}")
+
+    content_type = resp.headers.get("content-type", "").lower()
+
+    if "application/pdf" in content_type:
+        try:
+            text = _extract_pdf_text(resp.content)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"PDF 解析失败: {e}")
+    elif "text/html" in content_type:
+        text = _extract_html_text(resp.text)
+    else:
+        raise HTTPException(status_code=422, detail=f"不支持的内容类型: {content_type}")
+
+    if not text or len(text) < 50:
+        raise HTTPException(status_code=422, detail="提取的内容过短或为空")
+
+    return {"content": text, "url": req.url, "content_type": content_type}
+
+
+class ClassifySourceRequest(BaseModel):
+    content: str
+
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+_PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
+_MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
+
+
+def _create_knowledge_service():
+    from agents.config import load_config
+    from agents.knowledge_service import KnowledgeService
+    from agents.memory import ManagerMemory
+    from utils.llm_client import create_client
+
+    config = load_config()
+    client = create_client(
+        model=config.manager.model,
+        system_prompt=config.manager.system_prompt,
+        enable_thinking=False,
+    )
+    memory = ManagerMemory(_MEMORY_DIR)
+
+    def _load_prompt(name: str) -> str:
+        path = os.path.join(_PROMPTS_DIR, f"{name}.md")
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if content.startswith("---\n"):
+            end = content.find("\n---\n", 4)
+            if end != -1:
+                content = content[end + 5:]
+        return content
+
+    return KnowledgeService(client, memory, _load_prompt)
+
+
+@router.post("/classify-source")
+async def classify_source(req: ClassifySourceRequest):
+    """对材料内容做分类，返回 {title, industry, company}。"""
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="content 不能为空")
+
+    ks = _create_knowledge_service()
+    result = await ks.classify_source(req.content)
+    return result
+
+
+class IngestSourceRequest(BaseModel):
+    content: str
+    url: str = ""
+    title: str
+    industry: str
+    company: str = ""
+
+
+@router.post("/ingest-source")
+async def ingest_source(req: IngestSourceRequest):
+    """存储已确认的材料并编译进 wiki（SSE 流式返回进度）。"""
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="content 不能为空")
+    if not req.title.strip():
+        raise HTTPException(status_code=400, detail="title 不能为空")
+    if not req.industry.strip():
+        raise HTTPException(status_code=400, detail="industry 不能为空")
+
+    async def _stream():
+        ks = _create_knowledge_service()
+
+        events = []
+
+        def on_status(msg):
+            events.append(("status", {"message": msg}))
+
+        try:
+            result = await ks.ingest_source(
+                content=req.content,
+                url=req.url,
+                title=req.title,
+                industry=req.industry,
+                company=req.company,
+                on_status=on_status,
+            )
+            events.append(("saved", {"path": result["path"]}))
+            events.append(("compiled", {"pages": result["compiled_pages"]}))
+            events.append(("done", result))
+        except Exception as e:
+            logger.exception("ingest-source error")
+            events.append(("error", {"message": str(e)}))
+
+        for event_type, data in events:
+            yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 @router.get("/raw/{path:path}")
