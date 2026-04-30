@@ -25,7 +25,7 @@ def test_wiki_page_returns_content(monkeypatch):
     monkeypatch.setattr(wiki_mod, "WIKI_DIR", wiki_dir)
     app = create_app()
     client = TestClient(app)
-    resp = client.get("/api/wiki/companies/300750-宁德时代.md")
+    resp = client.get("/api/wiki/companies/新能源/300750-宁德时代.md")
     assert resp.status_code == 200
     data = resp.json()
     assert "frontmatter" in data

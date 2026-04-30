@@ -8,23 +8,52 @@ _SECTION_RE = re.compile(r'^##\s+(.+)$', re.MULTILINE)
 
 
 def parse_wiki_index(wiki_dir: str) -> dict:
-    index_path = os.path.join(wiki_dir, "index.md")
-    with open(index_path, "r", encoding="utf-8") as f:
-        text = f.read()
     sections = []
-    parts = _SECTION_RE.split(text)
-    for i in range(1, len(parts), 2):
-        title = parts[i].strip()
-        body = parts[i + 1] if i + 1 < len(parts) else ""
+
+    def _scan_grouped(subdir: str, label: str, name_transform=None):
+        base = os.path.join(wiki_dir, subdir)
+        if not os.path.isdir(base):
+            return
+        for entry in sorted(os.listdir(base)):
+            entry_path = os.path.join(base, entry)
+            if os.path.isdir(entry_path):
+                items = []
+                for root, _, files in os.walk(entry_path):
+                    for fname in sorted(files):
+                        if not fname.endswith(".md"):
+                            continue
+                        rel = os.path.relpath(os.path.join(root, fname), os.path.join(wiki_dir))
+                        name = name_transform(fname) if name_transform else fname.replace(".md", "")
+                        items.append({"name": name, "path": rel})
+                if items:
+                    sections.append({"title": f"{label} · {entry}", "items": items})
+
+    def _scan_flat(subdir: str, label: str):
+        base = os.path.join(wiki_dir, subdir)
+        if not os.path.isdir(base):
+            return
         items = []
-        for m in _LINK_RE.finditer(body):
-            name, path, desc = m.group(1), m.group(2), m.group(3)
-            item = {"name": name, "path": path}
-            if desc:
-                item["description"] = desc.strip()
-            items.append(item)
+        for fname in sorted(os.listdir(base)):
+            if not fname.endswith(".md"):
+                continue
+            items.append({"name": fname.replace(".md", ""), "path": f"{subdir}/{fname}"})
         if items:
-            sections.append({"title": title, "items": items})
+            sections.append({"title": label, "items": items})
+
+    def _report_name(fname):
+        name = fname.replace(".md", "")
+        return name.split("_", 1)[1] if "_" in name else name
+
+    _scan_grouped("companies", "公司档案")
+    _scan_flat("industries", "行业概览")
+    _scan_flat("concepts", "概念/主题")
+
+    glossary = os.path.join(wiki_dir, "glossary.md")
+    if os.path.isfile(glossary):
+        sections.append({"title": "术语表", "items": [{"name": "A股术语表", "path": "glossary.md"}]})
+
+    _scan_grouped("reports", "分析报告", name_transform=_report_name)
+
     return {"sections": sections}
 
 

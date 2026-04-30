@@ -3,28 +3,24 @@ from server.services.wiki_parser import parse_wiki_index, parse_wiki_page, searc
 
 
 def test_parse_wiki_index_extracts_sections(tmp_path):
-    index_md = tmp_path / "index.md"
-    index_md.write_text("""# Lucas A股股市 Wiki 索引
+    # 创建目录结构（parse_wiki_index 现在扫描目录而非解析 index.md）
+    companies = tmp_path / "companies" / "新能源"
+    companies.mkdir(parents=True)
+    (companies / "300750-宁德时代.md").write_text("---\ntitle: 宁德时代\n---\n", encoding="utf-8")
+    (companies / "002463-沪电股份.md").write_text("---\ntitle: 沪电股份\n---\n", encoding="utf-8")
+    industries = tmp_path / "industries"
+    industries.mkdir()
+    (industries / "PCB.md").write_text("---\ntitle: PCB\n---\n", encoding="utf-8")
+    reports = tmp_path / "reports" / "电子"
+    reports.mkdir(parents=True)
+    (reports / "2026-04-20_研究下东山精密.md").write_text("---\ntitle: test\n---\n", encoding="utf-8")
 
-## 公司档案
-- [300750-宁德时代](companies/300750-宁德时代.md) — 动力电池全球龙头
-- [002463-沪电股份](companies/002463-沪电股份.md)
-
-## 行业概览
-- [PCB](industries/PCB.md)
-
-## 概念/主题
-（暂无，等待编译）
-
-## 分析报告
-- [研究下东山精密](reports/2026-04-20_研究下东山精密.md)
-""", encoding="utf-8")
     result = parse_wiki_index(str(tmp_path))
     assert len(result["sections"]) >= 3
-    company_section = next(s for s in result["sections"] if s["title"] == "公司档案")
+    company_section = next(s for s in result["sections"] if "公司档案" in s["title"])
     assert len(company_section["items"]) == 2
-    assert company_section["items"][0]["name"] == "300750-宁德时代"
-    assert company_section["items"][0]["path"] == "companies/300750-宁德时代.md"
+    assert company_section["items"][0]["name"] == "002463-沪电股份"
+    assert company_section["items"][0]["path"] == "companies/新能源/002463-沪电股份.md"
 
 
 def test_parse_wiki_page_with_frontmatter(tmp_path):
