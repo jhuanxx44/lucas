@@ -22,6 +22,8 @@ _MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
 
 
 class Manager:
+    _PENDING_PATH = os.path.join(_MEMORY_DIR, "_pending_ingest.json")
+
     def __init__(self, config: AgentsConfig):
         self.config = config
         self.memory = ManagerMemory(_MEMORY_DIR)
@@ -78,6 +80,19 @@ class Manager:
             return "compile", {
                 "sources": plan.get("sources", []),
                 "scope": plan.get("scope", "all"),
+            }
+
+        if plan.get("action") == "ingest":
+            return "ingest", {
+                "url": plan.get("url", ""),
+                "title": plan.get("title", ""),
+                "industry": plan.get("industry", ""),
+                "company": plan.get("company", ""),
+            }
+
+        if plan.get("action") == "ingest_confirm":
+            return "ingest_confirm", {
+                "industry": plan.get("industry", ""),
             }
 
         valid_ids = set(self.config.list_researcher_ids())
@@ -194,6 +209,146 @@ class Manager:
             yield _evt("done", {"total_tokens": 0})
             return
 
+        if action == "ingest":
+            yield _evt("status", {"message": "正在收录外部材料..."})
+            status_msgs = []
+
+            def _on_status(msg):
+                status_msgs.append(msg)
+
+            try:
+                ingest_url = dispatch_result.get("url", "")
+                ingest_content = ""
+
+                if ingest_url:
+                    from utils.source_collector import download_single_url
+                    tmp_dir = os.path.join(_PROJECT_ROOT, "raw", "sources", "_tmp")
+                    dl_result = await download_single_url(ingest_url, tmp_dir, dispatch_result.get("title", ""))
+                    if dl_result is None:
+                        yield _evt("synthesis_chunk", {"text": f"无法抓取 URL: {ingest_url}"})
+                        yield _evt("done", {"total_tokens": 0})
+                        return
+                    tmp_path = os.path.join(_PROJECT_ROOT, dl_result["path"])
+                    with open(tmp_path, "r", encoding="utf-8") as f:
+                        ingest_content = f.read()
+                    os.remove(tmp_path)
+                    tmp_parent = os.path.dirname(tmp_path)
+                    if os.path.isdir(tmp_parent) and not os.listdir(tmp_parent):
+                        os.rmdir(tmp_parent)
+
+                if not ingest_content.strip():
+                    yield _evt("synthesis_chunk", {"text": "抓取的内容为空，无法收录。"})
+                    yield _evt("done", {"total_tokens": 0})
+                    return
+
+                yield _evt("status", {"message": "正在分类..."})
+                title = dispatch_result.get("title", "")
+                industry = dispatch_result.get("industry", "")
+                company = dispatch_result.get("company", "")
+
+                classification = None
+                if not title or not industry:
+                    classification = await self.knowledge_service.classify_source(ingest_content)
+                    title = title or classification["title"]
+                    industry = industry or classification["industry"]
+                    company = company or classification["company"]
+
+                if classification and classification.get("confidence") == "low" and classification.get("alternatives"):
+                    pending = {
+                        "content": ingest_content,
+                        "url": ingest_url,
+                        "title": title,
+                        "industry": industry,
+                        "company": company,
+                        "alternatives": classification["alternatives"],
+                    }
+                    os.makedirs(os.path.dirname(self._PENDING_PATH), exist_ok=True)
+                    with open(self._PENDING_PATH, "w", encoding="utf-8") as f:
+                        json.dump(pending, f, ensure_ascii=False)
+
+                    alts = classification["alternatives"]
+                    alt_text = "、".join(a["industry"] for a in alts)
+                    yield _evt("synthesis_chunk", {
+                        "text": f"材料已抓取，但行业归属不确定。\n\n系统建议归入 **{industry}**，但也可能属于 {alt_text}。\n\n请选择归类方式：",
+                    })
+                    actions = [{"label": industry, "value": f"归类到{industry}"}]
+                    for alt in alts:
+                        actions.append({"label": alt["industry"], "value": f"归类到{alt['industry']}"})
+                    yield _evt("actions", {"actions": actions})
+                    yield _evt("done", {"total_tokens": 0})
+                    return
+
+                yield _evt("status", {"message": f"分类: {industry}/{company or '行业级'} — {title}"})
+
+                result = await self.knowledge_service.ingest_source(
+                    content=ingest_content,
+                    title=title,
+                    industry=industry,
+                    url=ingest_url,
+                    company=company,
+                    on_status=_on_status,
+                )
+                for msg in status_msgs:
+                    yield _evt("status", {"message": msg})
+                summary = (
+                    f"已收录材料到 `{result['path']}`\n\n"
+                    f"- 行业: {result['industry']}\n"
+                    f"- 公司: {result['company'] or '(行业级)'}\n"
+                    f"- 标题: {result['title']}\n"
+                )
+                if result["compiled_pages"]:
+                    summary += f"\n已编译到 wiki:\n" + "\n".join(f"- {p}" for p in result["compiled_pages"])
+                self.memory.add_turn(question, "ingest", summary)
+                yield _evt("synthesis_chunk", {"text": summary})
+            except Exception as e:
+                yield _evt("synthesis_chunk", {"text": f"收录失败: {e}"})
+            yield _evt("done", {"total_tokens": 0})
+            return
+
+        if action == "ingest_confirm":
+            if not os.path.isfile(self._PENDING_PATH):
+                yield _evt("synthesis_chunk", {"text": "没有待确认的收录任务。"})
+                yield _evt("done", {"total_tokens": 0})
+                return
+
+            with open(self._PENDING_PATH, "r", encoding="utf-8") as f:
+                pending = json.load(f)
+            os.remove(self._PENDING_PATH)
+
+            chosen_industry = dispatch_result.get("industry", "") or pending["industry"]
+            yield _evt("status", {"message": f"确认归类到 {chosen_industry}，正在收录..."})
+
+            status_msgs = []
+
+            def _on_confirm_status(msg):
+                status_msgs.append(msg)
+
+            try:
+                result = await self.knowledge_service.ingest_source(
+                    content=pending["content"],
+                    title=pending["title"],
+                    industry=chosen_industry,
+                    url=pending.get("url", ""),
+                    company=pending.get("company", ""),
+                    on_status=_on_confirm_status,
+                )
+                for msg in status_msgs:
+                    yield _evt("status", {"message": msg})
+                summary = (
+                    f"已收录材料到 `{result['path']}`\n\n"
+                    f"- 行业: {result['industry']}\n"
+                    f"- 公司: {result['company'] or '(行业级)'}\n"
+                    f"- 标题: {result['title']}\n"
+                )
+                if result["compiled_pages"]:
+                    summary += f"\n已编译到 wiki:\n" + "\n".join(f"- {p}" for p in result["compiled_pages"])
+                self.memory.add_turn(question, "ingest_confirm", summary)
+                yield _evt("synthesis_chunk", {"text": summary})
+            except Exception as e:
+                yield _evt("synthesis_chunk", {"text": f"收录失败: {e}"})
+            yield _evt("done", {"total_tokens": 0})
+            return
+
         task: Task = dispatch_result
         researcher_configs = [
             rc for rid in task.researcher_ids
@@ -233,13 +388,9 @@ class Manager:
 
         yield _evt("synthesis_chunk", {"text": synthesis})
 
-        def _emit_status(msg):
-            self._pending_status.append(msg)
-
-        self._pending_status = []
-        await self.knowledge_service.persist_report(report, on_status=_emit_status)
-        for msg in self._pending_status:
+        pending_status = []
+        await self.knowledge_service.persist_report(report, on_status=lambda msg: pending_status.append(msg))
+        for msg in pending_status:
             yield _evt("status", {"message": msg})
-        del self._pending_status
 
         yield _evt("done", {"total_tokens": total_tokens})

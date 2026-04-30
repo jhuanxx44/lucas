@@ -124,7 +124,7 @@ export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) 
         )}
 
         {state.messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
         ))}
 
         {state.isLoading && activeResearchers.length > 0 && (

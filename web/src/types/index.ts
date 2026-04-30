@@ -34,12 +34,18 @@ export interface ResearcherState {
   text: string;
 }
 
+export interface ChatAction {
+  label: string;
+  value: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   researchers?: ResearcherState[];
   synthesis?: string;
+  actions?: ChatAction[];
 }
 
 export interface RawReport {

@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ResearcherState } from "@/types";
+import type { ChatMessage, ResearcherState, ChatAction } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -11,6 +11,7 @@ interface ChatState {
   messages: ChatMessage[];
   researchers: Map<string, ResearcherState>;
   synthesis: string;
+  actions: ChatAction[];
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -22,6 +23,7 @@ type Action =
   | { type: "RESEARCHER_CHUNK"; id: string; text: string }
   | { type: "RESEARCHER_DONE"; id: string }
   | { type: "SYNTHESIS_CHUNK"; text: string }
+  | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "DONE" }
   | { type: "ERROR"; message: string };
 
@@ -33,6 +35,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         messages: [...state.messages, { id: nextId(), role: "user", content: action.question }],
         researchers: new Map(),
         synthesis: "",
+        actions: [],
         isLoading: true,
         phase: "dispatching",
       };
@@ -57,6 +60,8 @@ function reducer(state: ChatState, action: Action): ChatState {
     }
     case "SYNTHESIS_CHUNK":
       return { ...state, synthesis: state.synthesis + action.text, phase: "synthesizing" };
+    case "ACTIONS":
+      return { ...state, actions: action.actions };
     case "DONE": {
       const assistantMsg: ChatMessage = {
         id: nextId(),
@@ -64,16 +69,18 @@ function reducer(state: ChatState, action: Action): ChatState {
         content: state.synthesis,
         researchers: Array.from(state.researchers.values()),
         synthesis: state.synthesis,
+        actions: state.actions.length > 0 ? state.actions : undefined,
       };
       return {
         ...state,
         messages: [...state.messages, assistantMsg],
+        actions: [],
         isLoading: false,
         phase: "idle",
       };
     }
     case "ERROR":
-      return { ...state, isLoading: false, phase: "idle", synthesis: `错误: ${action.message}` };
+      return { ...state, isLoading: false, phase: "idle", actions: [], synthesis: `错误: ${action.message}` };
     default:
       return state;
   }
@@ -83,6 +90,7 @@ const initialState: ChatState = {
   messages: [],
   researchers: new Map(),
   synthesis: "",
+  actions: [],
   isLoading: false,
   phase: "idle",
 };
@@ -136,6 +144,9 @@ export function useChat(onResearchTarget?: (target: string) => void, onDone?: ()
                 break;
               case "synthesis_chunk":
                 dispatch({ type: "SYNTHESIS_CHUNK", text: d.text });
+                break;
+              case "actions":
+                dispatch({ type: "ACTIONS", actions: (data as { actions: ChatAction[] }).actions });
                 break;
               case "done":
                 dispatch({ type: "DONE" });
