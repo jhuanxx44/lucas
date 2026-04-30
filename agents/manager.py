@@ -104,6 +104,8 @@ class Manager:
             mode=plan.get("mode", "parallel"),
             context=context,
             researcher_tasks=researcher_tasks,
+            industry=plan.get("industry", ""),
+            companies=plan.get("companies", []),
         )
 
     async def _tool_use_loop(self, question: str, max_rounds: int = 5) -> str:
@@ -225,6 +227,8 @@ class Manager:
             results=results,
             synthesis=synthesis,
             total_tokens=total_tokens,
+            industry=task.industry,
+            companies=task.companies,
         )
 
         yield _evt("synthesis_chunk", {"text": synthesis})

@@ -6,11 +6,13 @@ from datetime import date
 
 from agents.models import ManagerReport
 from utils.json_extract import extract_json
+from utils.source_collector import collect_sources
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
+_RAW_DIR = os.path.join(_PROJECT_ROOT, "raw")
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
 
@@ -34,7 +36,26 @@ class KnowledgeService:
         status("正在生成报告标题...")
         report.title = await self.generate_title(report.question, report.synthesis)
         status("正在归档分析结果...")
-        self.archive(report)
+        report_dir = self.archive(report)
+
+        all_urls = report.unique_urls()
+        if all_urls:
+            collected = await collect_sources(
+                all_urls, report.industry, report.companies, on_status=status,
+            )
+            if collected and report_dir:
+                meta_path = os.path.join(report_dir, "meta.json")
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                    meta["collected_sources"] = [
+                        {"title": c["title"], "url": c["url"], "path": c["path"]}
+                        for c in collected
+                    ]
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        json.dump(meta, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    logger.warning("回写 collected_sources 到 meta.json 失败: %s", e)
 
         status("正在整理 wiki 知识库...")
         await self.update_wiki(report, on_status=on_status)
@@ -100,24 +121,29 @@ class KnowledgeService:
         except Exception as e:
             logger.warning("提取用户偏好失败: %s", e)
 
-    def archive(self, report: ManagerReport):
+    def archive(self, report: ManagerReport) -> str:
+        """归档报告，返回 report_dir 路径。"""
         today = date.today().isoformat()
         title = report.title or report.question[:40]
         slug = self._make_slug(title)
+        industry = report.industry or "未分类"
+        companies = report.companies or []
 
-        raw_dir = os.path.join(_PROJECT_ROOT, "raw", "reports", today)
-        os.makedirs(raw_dir, exist_ok=True)
+        # 目录结构：有公司放公司下，无公司放行业下
+        if companies:
+            report_dir = os.path.join(_RAW_DIR, industry, companies[0], f"{today}_{slug}")
+        else:
+            report_dir = os.path.join(_RAW_DIR, industry, f"{today}_{slug}")
+        os.makedirs(report_dir, exist_ok=True)
+
+        # 写各研究员报告
         for r in report.results:
-            filename = f"{r.researcher_id}_{slug}.md"
-            path = os.path.join(raw_dir, filename)
-
             body = r.content
             if r.source_urls and "## 参考资料" not in body:
                 urls_section = "\n\n## 参考资料\n" + "\n".join(
                     f"- [{u['title']}]({u['url']})" for u in r.source_urls
                 )
                 body += urls_section
-
             if r.verification and r.verification.issues:
                 body += r.verification.to_markdown()
 
@@ -131,29 +157,43 @@ class KnowledgeService:
                 f"---\n\n"
                 f"{body}\n"
             )
+            path = os.path.join(report_dir, f"{r.researcher_id}.md")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-        wiki_dir = os.path.join(_PROJECT_ROOT, "wiki", "reports")
+        # 写 meta.json
+        all_urls = report.unique_urls()
+
+        meta = {
+            "question": report.question,
+            "title": title,
+            "date": today,
+            "industry": industry,
+            "companies": companies,
+            "researchers": [
+                {"id": r.researcher_id, "name": r.researcher_name, "model": r.model}
+                for r in report.results
+            ],
+            "source_urls": all_urls,
+        }
+        with open(os.path.join(report_dir, "meta.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
+        # wiki 综合报告
+        report_rel = os.path.relpath(report_dir, _PROJECT_ROOT)
+        wiki_dir = os.path.join(_WIKI_DIR, "reports", industry)
         os.makedirs(wiki_dir, exist_ok=True)
         wiki_filename = f"{today}_{slug}.md"
         wiki_path = os.path.join(wiki_dir, wiki_filename)
 
         sources = "\n".join(
-            f"  - raw/reports/{today}/{r.researcher_id}_{slug}.md"
+            f"  - {report_rel}/{r.researcher_id}.md"
             for r in report.results
         )
         researchers_list = ", ".join(
             f"{r.researcher_name}({r.model})" for r in report.results
         )
 
-        all_urls = []
-        seen_urls = set()
-        for r in report.results:
-            for u in r.source_urls:
-                if u["url"] not in seen_urls:
-                    seen_urls.add(u["url"])
-                    all_urls.append(u)
         ref_section = ""
         if all_urls:
             ref_section = (
@@ -195,12 +235,13 @@ class KnowledgeService:
         with open(wiki_path, "w", encoding="utf-8") as f:
             f.write(wiki_content)
 
-        self._update_index(wiki_filename, title)
-        logger.info("归档完成: raw/reports/%s/ + wiki/reports/%s", today, wiki_filename)
+        self._update_index(wiki_filename, title, industry)
+        logger.info("归档完成: %s + wiki/reports/%s/%s", report_rel, industry, wiki_filename)
+        return report_dir
 
-    def _update_index(self, wiki_filename: str, question: str):
+    def _update_index(self, wiki_filename: str, question: str, industry: str):
         index_path = os.path.join(_PROJECT_ROOT, "wiki", "index.md")
-        entry = f"- [{question}](reports/{wiki_filename})"
+        entry = f"- [{question}](reports/{industry}/{wiki_filename})"
 
         try:
             with open(index_path, "r", encoding="utf-8") as f:
@@ -211,7 +252,7 @@ class KnowledgeService:
         if wiki_filename in content:
             return
 
-        section_header = "## 分析报告"
+        section_header = f"## 分析报告 · {industry}"
         if section_header not in content:
             content = content.rstrip() + f"\n\n{section_header}\n{entry}\n"
         else:
@@ -245,13 +286,15 @@ class KnowledgeService:
         except FileNotFoundError:
             return ""
 
-    def _page_path(self, page_type: str, name: str) -> str:
+    def _page_path(self, page_type: str, name: str, industry: str = "") -> str:
         type_to_dir = {
             "company": "companies",
             "industry": "industries",
             "concept": "concepts",
         }
         subdir = type_to_dir.get(page_type, page_type)
+        if page_type == "company" and industry:
+            return os.path.join(_WIKI_DIR, subdir, industry, f"{name}.md")
         return os.path.join(_WIKI_DIR, subdir, f"{name}.md")
 
     async def _plan_wiki_updates(self, report: ManagerReport) -> list[dict]:
@@ -276,7 +319,7 @@ class KnowledgeService:
         action = page_plan.get("action", "update")
 
         template = self._load_template(page_type)
-        page_path = self._page_path(page_type, name)
+        page_path = self._page_path(page_type, name, industry=report.industry)
 
         current_content = ""
         if action == "update":
@@ -292,11 +335,17 @@ class KnowledgeService:
         else:
             task_desc = f"增量更新 {page_type} 页面：{name}。原因：{page_plan.get('reason', '')}"
 
+        all_urls = report.unique_urls()
+        source_urls_text = "\n".join(
+            f"- [{u['title']}]({u['url']})" for u in all_urls
+        ) if all_urls else "（无外部来源）"
+
         today = date.today().isoformat()
         prompt = self._load_prompt("wiki-compile").format(
             template=template,
             current_content=current_content,
             synthesis=report.synthesis,
+            source_urls=source_urls_text,
             task_desc=task_desc,
             today=today,
         )
@@ -325,20 +374,24 @@ class KnowledgeService:
             status(f"  {'创建' if action == 'create' else '更新'} {page_type}/{name}...")
             try:
                 new_content = await self._compile_wiki_page(plan, report)
-                page_path = self._page_path(page_type, name)
+                industry = report.industry or "未分类"
+                page_path = self._page_path(page_type, name, industry=industry)
                 os.makedirs(os.path.dirname(page_path), exist_ok=True)
                 with open(page_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
 
                 type_to_section = {
-                    "company": "## 公司档案",
+                    "company": f"## 公司档案 · {industry}",
                     "industry": "## 行业概览",
                     "concept": "## 概念/主题",
                 }
                 section = type_to_section.get(page_type)
                 if section:
                     type_to_dir = {"company": "companies", "industry": "industries", "concept": "concepts"}
-                    rel_path = f"{type_to_dir[page_type]}/{name}.md"
+                    if page_type == "company":
+                        rel_path = f"{type_to_dir[page_type]}/{industry}/{name}.md"
+                    else:
+                        rel_path = f"{type_to_dir[page_type]}/{name}.md"
                     self._update_wiki_index(section, rel_path, name)
 
                 status(f"  ✓ {page_type}/{name}")
@@ -392,8 +445,6 @@ class KnowledgeService:
         return compiled
 
     def _find_raw_files(self, compile_plan: dict) -> list[str]:
-        raw_dir = os.path.join(_PROJECT_ROOT, "raw")
-
         if compile_plan.get("scope") == "specific" and compile_plan.get("sources"):
             paths = []
             for src in compile_plan["sources"]:
@@ -403,11 +454,15 @@ class KnowledgeService:
             return paths
 
         compiled = self._find_compiled_sources()
+        meta_dirs = set()
+        for meta_path in glob.glob(os.path.join(_RAW_DIR, "**", "meta.json"), recursive=True):
+            meta_dirs.add(os.path.dirname(meta_path))
+
         paths = []
-        for md_path in sorted(glob.glob(os.path.join(raw_dir, "**", "*.md"), recursive=True)):
-            rel = os.path.relpath(md_path, _PROJECT_ROOT)
-            if rel.startswith("raw/reports/"):
+        for md_path in sorted(glob.glob(os.path.join(_RAW_DIR, "**", "*.md"), recursive=True)):
+            if any(md_path.startswith(d + os.sep) or os.path.dirname(md_path) == d for d in meta_dirs):
                 continue
+            rel = os.path.relpath(md_path, _PROJECT_ROOT)
             if rel in compiled:
                 continue
             paths.append(md_path)
@@ -463,8 +518,12 @@ class KnowledgeService:
                 if not page_type or not name:
                     continue
 
+                # 从 raw 路径提取行业: raw/{行业}/...
+                parts = rel_path.split("/")
+                raw_industry = parts[1] if len(parts) > 2 else "未分类"
+
                 template = self._load_template(page_type)
-                page_path = self._page_path(page_type, name)
+                page_path = self._page_path(page_type, name, industry=raw_industry)
 
                 current_content = ""
                 if action == "update":
@@ -498,14 +557,17 @@ class KnowledgeService:
                         f.write(new_content)
 
                     type_to_section = {
-                        "company": "## 公司档案",
+                        "company": f"## 公司档案 · {raw_industry}",
                         "industry": "## 行业概览",
                         "concept": "## 概念/主题",
                     }
                     section = type_to_section.get(page_type)
                     if section:
                         type_to_dir = {"company": "companies", "industry": "industries", "concept": "concepts"}
-                        wiki_rel = f"{type_to_dir[page_type]}/{name}.md"
+                        if page_type == "company":
+                            wiki_rel = f"{type_to_dir[page_type]}/{raw_industry}/{name}.md"
+                        else:
+                            wiki_rel = f"{type_to_dir[page_type]}/{name}.md"
                         self._update_wiki_index(section, wiki_rel, name)
 
                     compiled_pages.append(f"{action}: {page_type}/{name}")

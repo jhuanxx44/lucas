@@ -31,7 +31,7 @@ function parseResearcherLabel(path: string, researchersStr: string | null): stri
 
 export function RawReportPanel({ sources, researchers }: RawReportPanelProps) {
   const paths = Array.isArray(sources)
-    ? (sources as string[]).filter((s) => typeof s === "string" && s.startsWith("raw/reports/"))
+    ? (sources as string[]).filter((s) => typeof s === "string" && s.startsWith("raw/") && !s.startsWith("raw/sources/"))
     : [];
 
   const [reports, setReports] = useState<ReportState[]>(() =>

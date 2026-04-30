@@ -20,6 +20,8 @@ class Task:
     researcher_ids: list[str] = field(default_factory=list)
     mode: str = "parallel"
     researcher_tasks: dict[str, ResearcherTask] = field(default_factory=dict)
+    industry: str = ""
+    companies: list[str] = field(default_factory=list)
 
     def get_researcher_task(self, researcher_id: str) -> ResearcherTask | None:
         return self.researcher_tasks.get(researcher_id)
@@ -90,3 +92,15 @@ class ManagerReport:
     synthesis: str = ""
     total_tokens: int = 0
     title: str = ""
+    industry: str = ""
+    companies: list[str] = field(default_factory=list)
+
+    def unique_urls(self) -> list[dict]:
+        seen: set[str] = set()
+        urls: list[dict] = []
+        for r in self.results:
+            for u in r.source_urls:
+                if u["url"] not in seen:
+                    seen.add(u["url"])
+                    urls.append(u)
+        return urls

@@ -25,6 +25,8 @@ llm-weight: medium
 2. 如果需要研究员进行新的研究分析（知识库没有相关内容，或用户明确要求最新数据/深度分析），返回：
 {{
   "action": "research",
+  "industry": "申万一级行业分类（如：电子、新能源、医药生物、计算机、汽车等）",
+  "companies": ["涉及的公司简称列表，如 宁德时代、比亚迪。行业级分析无具体公司时为空数组"],
   "researcher_ids": ["要派发的研究员id列表"],
   "mode": "parallel 或 serial",
   "tasks": {{

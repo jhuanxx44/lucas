@@ -12,6 +12,9 @@ llm-weight: heavy
 ## 本次分析报告
 {synthesis}
 
+## 参考资料（研究员引用的外部来源）
+{source_urls}
+
 ## 任务
 {task_desc}
 
@@ -23,4 +26,5 @@ llm-weight: heavy
 - 如果新旧信息矛盾，保留两者并标注时间
 - 更新 frontmatter 的 updated 日期为 {today}
 - 在 sources 中追加本次分析来源
+- 在页面末尾的参考资料部分，引用上方提供的外部来源链接（去重，只保留与本页面相关的）
 - 严格遵循编译模板的格式
