@@ -88,9 +88,9 @@ export default function App() {
                 {sidebarTab === "wiki" ? <WikiSidebar refreshKey={sidebarKey} /> : <RawSidebar />}
               </div>
             </div>
+            <ResizableDivider onResize={handleLeftResize} />
             {currentPath && (
               <>
-                <ResizableDivider onResize={handleLeftResize} />
                 <div className="flex-1 overflow-y-auto p-4">
                   {currentPath.startsWith("__raw_pdf__/") ? (
                     <iframe

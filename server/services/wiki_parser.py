@@ -71,7 +71,10 @@ def parse_wiki_page(file_path: str) -> dict:
     if text.startswith("---"):
         parts = text.split("---", 2)
         if len(parts) >= 3:
-            frontmatter = yaml.safe_load(parts[1]) or {}
+            try:
+                frontmatter = yaml.safe_load(parts[1]) or {}
+            except yaml.YAMLError:
+                frontmatter = {}
             content = parts[2].strip()
     wiki_links = _WIKI_LINK_RE.findall(content)
     return {

@@ -42,7 +42,7 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
       role="separator"
       aria-orientation="vertical"
       tabIndex={0}
-      className="w-1 bg-zinc-200 dark:bg-zinc-800 hover:bg-indigo-500 focus:bg-indigo-500 cursor-col-resize transition-colors shrink-0 outline-none"
+      className="w-px bg-zinc-200 dark:bg-zinc-800 hover:bg-indigo-500 focus:bg-indigo-500 cursor-col-resize transition-colors shrink-0 outline-none"
       onMouseDown={onMouseDown}
       onKeyDown={onKeyDown}
     />

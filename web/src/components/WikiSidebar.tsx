@@ -128,61 +128,17 @@ function SubSection({
   onRefresh: () => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [mkdirMode, setMkdirMode] = useState(false);
-  const [newDirName, setNewDirName] = useState("");
-  const [mkdirError, setMkdirError] = useState("");
-
-  const sectionDir = section.items[0]?.path.split("/").slice(0, -1).join("/") || "";
-
-  const handleMkdir = async () => {
-    if (!newDirName.trim()) return;
-    setMkdirError("");
-    try {
-      await wikiMkdir(`${sectionDir}/${newDirName.trim()}`);
-      setMkdirMode(false);
-      setNewDirName("");
-      onRefresh();
-    } catch (e) {
-      setMkdirError(e instanceof Error ? e.message : "创建失败");
-    }
-  };
 
   return (
     <div>
-      <div className="flex items-center group">
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 flex-1"
-        >
-          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {label}
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">{section.items.length}</span>
-        </button>
-        <button
-          onClick={() => setMkdirMode(true)}
-          className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-0.5 transition-opacity"
-          title="新建子目录"
-        >
-          <FolderPlus size={12} />
-        </button>
-      </div>
-      {mkdirMode && (
-        <div className="ml-4 mt-1">
-          <div className="flex items-center gap-1">
-            <input
-              autoFocus
-              value={newDirName}
-              onChange={(e) => setNewDirName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleMkdir(); if (e.key === "Escape") { setMkdirMode(false); setMkdirError(""); } }}
-              className="text-xs border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-transparent w-28 focus:outline-none focus:border-indigo-400"
-              placeholder="目录名"
-            />
-            <button onClick={handleMkdir} className="text-xs text-indigo-500 hover:text-indigo-600">确定</button>
-            <button onClick={() => { setMkdirMode(false); setMkdirError(""); }} className="text-xs text-zinc-400 hover:text-zinc-600">取消</button>
-          </div>
-          {mkdirError && <div className="text-xs text-red-500 mt-0.5">{mkdirError}</div>}
-        </div>
-      )}
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100"
+      >
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {label}
+        <span className="text-xs text-zinc-400 dark:text-zinc-500">{section.items.length}</span>
+      </button>
       {open && (
         <div className="ml-4 mt-1">
           <ItemList items={section.items} onRefresh={onRefresh} />
@@ -202,16 +158,60 @@ function SectionGroup({
   onRefresh: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [mkdirMode, setMkdirMode] = useState(false);
+  const [newDirName, setNewDirName] = useState("");
+  const [mkdirError, setMkdirError] = useState("");
+
+  const groupDir = subSections[0]?.section.items[0]?.path.split("/").slice(0, -2).join("/") || "";
+
+  const handleMkdir = async () => {
+    if (!newDirName.trim()) return;
+    setMkdirError("");
+    try {
+      await wikiMkdir(`${groupDir}/${newDirName.trim()}`);
+      setMkdirMode(false);
+      setNewDirName("");
+      onRefresh();
+    } catch (e) {
+      setMkdirError(e instanceof Error ? e.message : "创建失败");
+    }
+  };
 
   return (
     <div className="mb-3">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {title}
-      </button>
+      <div className="flex items-center group">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 flex-1"
+        >
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {title}
+        </button>
+        <button
+          onClick={() => setMkdirMode(true)}
+          className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 p-0.5 transition-opacity"
+          title="新建子目录"
+        >
+          <FolderPlus size={14} />
+        </button>
+      </div>
+      {mkdirMode && (
+        <div className="ml-5 mt-1">
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={newDirName}
+              onChange={(e) => setNewDirName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleMkdir(); if (e.key === "Escape") { setMkdirMode(false); setMkdirError(""); } }}
+              className="text-xs border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 bg-transparent w-28 focus:outline-none focus:border-indigo-400"
+              placeholder="目录名"
+            />
+            <button onClick={handleMkdir} className="text-xs text-indigo-500 hover:text-indigo-600">确定</button>
+            <button onClick={() => { setMkdirMode(false); setMkdirError(""); }} className="text-xs text-zinc-400 hover:text-zinc-600">取消</button>
+          </div>
+          {mkdirError && <div className="text-xs text-red-500 mt-0.5">{mkdirError}</div>}
+        </div>
+      )}
       {open && (
         <div className="ml-3 mt-1.5 space-y-1">
           {subSections.map((sub) => (
