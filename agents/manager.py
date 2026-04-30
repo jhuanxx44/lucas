@@ -12,7 +12,8 @@ from agents.memory import ManagerMemory
 from agents.researcher import _find_wiki_context
 from agents.research_service import ResearchService
 from agents.knowledge_service import KnowledgeService
-from agents.tools import get_tools_description, execute_tool
+from agents.tools import ToolKit
+from workspace import Workspace
 from utils.llm_client import create_client
 from utils.json_extract import extract_json
 
@@ -20,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
-_MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
 
 
 def _cleanup_download_tmp(tmp_path: str):
@@ -35,21 +35,22 @@ def _cleanup_download_tmp(tmp_path: str):
 
 
 class Manager:
-    _PENDING_PATH = os.path.join(_MEMORY_DIR, "_pending_ingest.json")
-    _PENDING_DIR = os.path.join(_MEMORY_DIR, "pending_ingest")
     _PENDING_ACTION_PREFIX = "__ingest_confirm__:"
     _PENDING_TTL_SECONDS = 24 * 60 * 60
 
-    def __init__(self, config: AgentsConfig):
+    def __init__(self, config: AgentsConfig, workspace: Workspace):
         self.config = config
-        self.memory = ManagerMemory(_MEMORY_DIR)
+        self._ws = workspace
+        self._pending_dir = os.path.join(workspace.memory_root, "pending_ingest")
+        self.memory = ManagerMemory(workspace.memory_root)
         self.client = create_client(
             model=config.manager.model,
             system_prompt=config.manager.system_prompt,
             enable_thinking=False,
         )
+        self._toolkit = ToolKit(workspace)
         self.research_service = ResearchService(config, self.client, self._load_prompt)
-        self.knowledge_service = KnowledgeService(self.client, self.memory, self._load_prompt)
+        self.knowledge_service = KnowledgeService(self.client, self.memory, self._load_prompt, workspace)
 
     def _load_prompt(self, name: str) -> str:
         path = os.path.join(_PROMPTS_DIR, f"{name}.md")
@@ -62,13 +63,13 @@ class Manager:
         return content
 
     def _cleanup_pending_ingest(self):
-        if not os.path.isdir(self._PENDING_DIR):
+        if not os.path.isdir(self._pending_dir):
             return
         cutoff = time.time() - self._PENDING_TTL_SECONDS
-        for name in os.listdir(self._PENDING_DIR):
+        for name in os.listdir(self._pending_dir):
             if not name.endswith(".json"):
                 continue
-            path = os.path.join(self._PENDING_DIR, name)
+            path = os.path.join(self._pending_dir, name)
             try:
                 if os.path.getmtime(path) < cutoff:
                     os.remove(path)
@@ -81,11 +82,11 @@ class Manager:
         safe_id = os.path.basename(pending_id)
         if safe_id != pending_id or not safe_id.endswith(".json"):
             safe_id = f"{safe_id}.json"
-        return os.path.join(self._PENDING_DIR, safe_id)
+        return os.path.join(self._pending_dir, safe_id)
 
     def _save_pending_ingest(self, pending: dict) -> str:
         self._cleanup_pending_ingest()
-        os.makedirs(self._PENDING_DIR, exist_ok=True)
+        os.makedirs(self._pending_dir, exist_ok=True)
         pending_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         pending["pending_id"] = pending_id
         with open(self._pending_path(pending_id), "w", encoding="utf-8") as f:
@@ -113,17 +114,18 @@ class Manager:
             os.remove(path)
             return pending, "ok"
 
-        if os.path.isfile(self._PENDING_PATH):
-            with open(self._PENDING_PATH, "r", encoding="utf-8") as f:
+        legacy_path = os.path.join(self._ws.memory_root, "_pending_ingest.json")
+        if os.path.isfile(legacy_path):
+            with open(legacy_path, "r", encoding="utf-8") as f:
                 pending = json.load(f)
-            os.remove(self._PENDING_PATH)
+            os.remove(legacy_path)
             return pending, "ok"
 
         pending_files = []
-        if os.path.isdir(self._PENDING_DIR):
+        if os.path.isdir(self._pending_dir):
             pending_files = [
-                name for name in os.listdir(self._PENDING_DIR)
-                if name.endswith(".json") and os.path.isfile(os.path.join(self._PENDING_DIR, name))
+                name for name in os.listdir(self._pending_dir)
+                if name.endswith(".json") and os.path.isfile(os.path.join(self._pending_dir, name))
             ]
         if len(pending_files) == 1:
             pending_id = pending_files[0][:-5]
@@ -144,7 +146,7 @@ class Manager:
             f"- id: {r.id}, 名称: {r.name}, 擅长: {r.expertise}"
             for r in self.config.researchers
         )
-        wiki_context = _find_wiki_context(question) or "（暂无相关内容）"
+        wiki_context = _find_wiki_context(question, self._ws.wiki_root) or "（暂无相关内容）"
         memory_context = self.memory.get_memory_context(question)
         prompt = self._load_prompt("dispatch").format(
             researchers_desc=researchers_desc,
@@ -219,15 +221,15 @@ class Manager:
         )
 
     async def _tool_use_loop(self, question: str, max_rounds: int = 5) -> str:
-        wiki_context = _find_wiki_context(question) or "（暂无相关内容）"
+        wiki_context = _find_wiki_context(question, self._ws.wiki_root) or "（暂无相关内容）"
         memory_context = self.memory.get_memory_context(question)
-        tools_desc = get_tools_description()
+        tools_desc = self._toolkit.get_tools_description()
 
         pre_results = []
-        recall_output = execute_tool("recall", {"keyword": question})
+        recall_output = self._toolkit.execute("recall", {"keyword": question})
         if "未找到" not in recall_output:
             pre_results.append(f"### 历史分析记录\n{recall_output}")
-        search_output = execute_tool("search_files", {"keyword": question, "scope": "all"})
+        search_output = self._toolkit.execute("search_files", {"keyword": question, "scope": "all"})
         if "未找到" not in search_output:
             pre_results.append(f"### 相关文件\n{search_output}")
 
@@ -259,7 +261,7 @@ class Manager:
             if result.get("action") == "tool":
                 tool_name = result.get("tool", "")
                 tool_args = result.get("args", {})
-                tool_output = execute_tool(tool_name, tool_args)
+                tool_output = self._toolkit.execute(tool_name, tool_args)
                 if tool_results == "（预查无相关结果）":
                     tool_results = ""
                 tool_results += f"\n### 工具调用 {round_num + 1}: {tool_name}\n参数: {json.dumps(tool_args, ensure_ascii=False)}\n结果:\n{tool_output}\n"
@@ -317,7 +319,7 @@ class Manager:
 
                 if ingest_url:
                     from utils.source_collector import download_single_url
-                    tmp_dir = os.path.join(_PROJECT_ROOT, "raw", "sources", "_tmp")
+                    tmp_dir = os.path.join(self._ws.raw_root, "sources", "_tmp")
                     dl_result = await download_single_url(ingest_url, tmp_dir, dispatch_result.get("title", ""))
                     if dl_result is None:
                         yield _evt("synthesis_chunk", {"text": f"无法抓取 URL: {ingest_url}"})

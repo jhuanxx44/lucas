@@ -1,4 +1,5 @@
 import json
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -25,7 +26,11 @@ def _service(response: str) -> KnowledgeService:
         "synthesis={synthesis}\n"
         "evidence={evidence_summary}\n"
     )
-    return KnowledgeService(FakeClient(response), memory=None, prompt_loader=lambda _name: prompt)
+    ws = MagicMock()
+    ws.wiki_root = "/tmp/test_wiki"
+    ws.raw_root = "/tmp/test_raw"
+    ws.root = "/tmp/test_workspace"
+    return KnowledgeService(FakeClient(response), memory=None, prompt_loader=lambda _name: prompt, workspace=ws)
 
 
 def test_build_evidence_from_sources_market_data_and_verification():

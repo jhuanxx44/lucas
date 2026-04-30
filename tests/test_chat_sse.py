@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 def test_chat_endpoint_returns_sse():
     """路由层：验证 SSE content-type 和基本事件格式"""
-    async def fake_stream(q, history=None):
+    async def fake_stream(q, history=None, user_id="default"):
         yield "event: status\ndata: {\"message\": \"testing\"}\n\n"
         yield "event: done\ndata: {\"total_tokens\": 0}\n\n"
 
@@ -43,6 +43,7 @@ async def test_chat_event_stream_passes_history():
     mock_manager.analyze = fake_analyze
 
     with patch("server.services.stream.load_config"), \
+         patch("server.services.stream.LocalWorkspace"), \
          patch("server.services.stream.Manager", return_value=mock_manager):
         from server.services.stream import chat_event_stream
         history = [
@@ -60,7 +61,8 @@ async def test_chat_event_stream_passes_history():
 @pytest.mark.asyncio
 async def test_chat_event_stream_catches_exception():
     """stream.py：验证异常被捕获并作为 error 事件返回"""
-    with patch("server.services.stream.load_config", side_effect=RuntimeError("config broken")):
+    with patch("server.services.stream.load_config", side_effect=RuntimeError("config broken")), \
+         patch("server.services.stream.LocalWorkspace"):
         from server.services.stream import chat_event_stream
         events = []
         async for chunk in chat_event_stream("test"):

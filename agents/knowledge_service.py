@@ -14,18 +14,19 @@ from utils.source_collector import collect_sources
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-_WIKI_DIR = os.path.join(_PROJECT_ROOT, "wiki")
-_RAW_DIR = os.path.join(_PROJECT_ROOT, "raw")
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
 
 class KnowledgeService:
     """知识库服务：负责报告归档、wiki 更新、raw 编译和记忆持久化。"""
 
-    def __init__(self, client, memory, prompt_loader):
+    def __init__(self, client, memory, prompt_loader, workspace):
         self.client = client
         self.memory = memory
         self._load_prompt = prompt_loader
+        self._ws = workspace
+        self._wiki_dir = workspace.wiki_root
+        self._raw_dir = workspace.raw_root
 
     def _make_slug(self, question: str) -> str:
         slug = question.replace(" ", "_").replace("/", "_").replace("?", "").replace("？", "")
@@ -44,7 +45,10 @@ class KnowledgeService:
         all_urls = report.unique_urls()
         if all_urls:
             collected = await collect_sources(
-                all_urls, report.industry, report.companies, on_status=status,
+                all_urls, report.industry, report.companies,
+                sources_dir=os.path.join(self._raw_dir, "sources"),
+                relpath_base=self._ws.root,
+                on_status=status,
             )
             if collected and report_dir:
                 meta_path = os.path.join(report_dir, "meta.json")
@@ -305,9 +309,9 @@ class KnowledgeService:
 
         # 目录结构：有公司放公司下，无公司放行业下
         if companies:
-            report_dir = os.path.join(_RAW_DIR, industry, companies[0], f"{today}_{slug}")
+            report_dir = os.path.join(self._raw_dir, industry, companies[0], f"{today}_{slug}")
         else:
-            report_dir = os.path.join(_RAW_DIR, industry, f"{today}_{slug}")
+            report_dir = os.path.join(self._raw_dir, industry, f"{today}_{slug}")
         os.makedirs(report_dir, exist_ok=True)
 
         # 写各研究员报告
@@ -354,8 +358,8 @@ class KnowledgeService:
             json.dump(meta, f, ensure_ascii=False, indent=2)
 
         # wiki 综合报告
-        report_rel = os.path.relpath(report_dir, _PROJECT_ROOT)
-        wiki_dir = os.path.join(_WIKI_DIR, "reports", industry)
+        report_rel = os.path.relpath(report_dir, self._ws.root)
+        wiki_dir = os.path.join(self._wiki_dir, "reports", industry)
         os.makedirs(wiki_dir, exist_ok=True)
         wiki_filename = f"{today}_{slug}.md"
         wiki_path = os.path.join(wiki_dir, wiki_filename)
@@ -414,7 +418,7 @@ class KnowledgeService:
         return report_dir
 
     def _update_index(self, wiki_filename: str, question: str, industry: str):
-        index_path = os.path.join(_PROJECT_ROOT, "wiki", "index.md")
+        index_path = os.path.join(self._wiki_dir, "index.md")
         entry = f"- [{question}](reports/{industry}/{wiki_filename})"
 
         try:
@@ -436,7 +440,7 @@ class KnowledgeService:
             f.write(content)
 
     def _list_company_categories(self) -> str:
-        companies_dir = os.path.join(_WIKI_DIR, "companies")
+        companies_dir = os.path.join(self._wiki_dir, "companies")
         if not os.path.isdir(companies_dir):
             return "（暂无）"
         lines = []
@@ -453,7 +457,7 @@ class KnowledgeService:
 
     def _list_wiki_pages(self) -> str:
         lines = []
-        companies_dir = os.path.join(_WIKI_DIR, "companies")
+        companies_dir = os.path.join(self._wiki_dir, "companies")
         if os.path.isdir(companies_dir):
             for cat in sorted(os.listdir(companies_dir)):
                 cat_path = os.path.join(companies_dir, cat)
@@ -464,7 +468,7 @@ class KnowledgeService:
                         lines.append(f"- companies/{cat}/{fname}")
 
         for subdir in ("industries", "concepts"):
-            base = os.path.join(_WIKI_DIR, subdir)
+            base = os.path.join(self._wiki_dir, subdir)
             if not os.path.isdir(base):
                 continue
             for fname in sorted(os.listdir(base)):
@@ -490,7 +494,7 @@ class KnowledgeService:
             return ""
 
     def _find_existing_company(self, name: str) -> str | None:
-        pattern = os.path.join(_WIKI_DIR, "companies", "*", f"{name}.md")
+        pattern = os.path.join(self._wiki_dir, "companies", "*", f"{name}.md")
         matches = glob.glob(pattern)
         return matches[0] if matches else None
 
@@ -506,8 +510,8 @@ class KnowledgeService:
             if existing:
                 return existing
             if industry:
-                return os.path.join(_WIKI_DIR, subdir, industry, f"{name}.md")
-        return os.path.join(_WIKI_DIR, subdir, f"{name}.md")
+                return os.path.join(self._wiki_dir, subdir, industry, f"{name}.md")
+        return os.path.join(self._wiki_dir, subdir, f"{name}.md")
 
     def _validate_wiki_content(self, new_content: str, old_content: str = "") -> str | None:
         """校验 LLM 产出的 wiki 页面。返回 None 表示通过，返回 str 表示拒绝原因。"""
@@ -652,7 +656,7 @@ class KnowledgeService:
                 status(f"  ✗ {page_type}/{name}: {e}")
 
     def _update_wiki_index(self, section_header: str, rel_path: str, display_name: str):
-        index_path = os.path.join(_WIKI_DIR, "index.md")
+        index_path = os.path.join(self._wiki_dir, "index.md")
         try:
             with open(index_path, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -680,7 +684,7 @@ class KnowledgeService:
 
     def _find_compiled_sources(self) -> set[str]:
         compiled = set()
-        for md_path in glob.glob(os.path.join(_WIKI_DIR, "**", "*.md"), recursive=True):
+        for md_path in glob.glob(os.path.join(self._wiki_dir, "**", "*.md"), recursive=True):
             try:
                 with open(md_path, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -700,21 +704,21 @@ class KnowledgeService:
         if compile_plan.get("scope") == "specific" and compile_plan.get("sources"):
             paths = []
             for src in compile_plan["sources"]:
-                full = os.path.join(_PROJECT_ROOT, src)
+                full = os.path.join(self._ws.root, src)
                 if os.path.isfile(full):
                     paths.append(full)
             return paths
 
         compiled = self._find_compiled_sources()
         meta_dirs = set()
-        for meta_path in glob.glob(os.path.join(_RAW_DIR, "**", "meta.json"), recursive=True):
+        for meta_path in glob.glob(os.path.join(self._raw_dir, "**", "meta.json"), recursive=True):
             meta_dirs.add(os.path.dirname(meta_path))
 
         paths = []
-        for md_path in sorted(glob.glob(os.path.join(_RAW_DIR, "**", "*.md"), recursive=True)):
+        for md_path in sorted(glob.glob(os.path.join(self._raw_dir, "**", "*.md"), recursive=True)):
             if any(md_path.startswith(d + os.sep) or os.path.dirname(md_path) == d for d in meta_dirs):
                 continue
-            rel = os.path.relpath(md_path, _PROJECT_ROOT)
+            rel = os.path.relpath(md_path, self._ws.root)
             if rel in compiled:
                 continue
             paths.append(md_path)
@@ -734,7 +738,7 @@ class KnowledgeService:
         compiled_pages = []
 
         for raw_path in raw_files:
-            rel_path = os.path.relpath(raw_path, _PROJECT_ROOT)
+            rel_path = os.path.relpath(raw_path, self._ws.root)
             status(f"正在处理: {rel_path}")
 
             try:
@@ -888,9 +892,9 @@ class KnowledgeService:
         slug = self._make_slug(title)
 
         if company:
-            dest_dir = os.path.join(_RAW_DIR, "sources", industry, company)
+            dest_dir = os.path.join(self._raw_dir, "sources", industry, company)
         else:
-            dest_dir = os.path.join(_RAW_DIR, "sources", industry)
+            dest_dir = os.path.join(self._raw_dir, "sources", industry)
         os.makedirs(dest_dir, exist_ok=True)
 
         filename = f"{today}_{slug}.md"
@@ -903,7 +907,7 @@ class KnowledgeService:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        rel_path = os.path.relpath(file_path, _PROJECT_ROOT)
+        rel_path = os.path.relpath(file_path, self._ws.root)
         status(f"已保存: {rel_path}")
 
         status("正在编译到 wiki...")

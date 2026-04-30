@@ -3,15 +3,24 @@ import logging
 import os
 import shutil
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from server.services.wiki_parser import parse_wiki_index, parse_wiki_page, search_wiki
+from workspace import LocalWorkspace
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-WIKI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "wiki")
-RAW_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "raw")
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+_PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
+
+
+def _get_ws(request: Request) -> LocalWorkspace:
+    try:
+        return LocalWorkspace(request.state.user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid user id")
 
 
 def _safe_join(base: str, rel: str, allow_base: bool = False) -> str:
@@ -29,41 +38,43 @@ def _has_hidden_segment(rel: str) -> bool:
 
 
 @router.get("/index")
-def get_index():
-    return parse_wiki_index(WIKI_DIR)
+def get_index(request: Request):
+    ws = _get_ws(request)
+    return parse_wiki_index(ws.wiki_root)
 
 
 @router.get("/search")
-def get_search(q: str):
+def get_search(q: str, request: Request):
+    ws = _get_ws(request)
     logger.info("wiki search: %s", q)
-    return search_wiki(WIKI_DIR, q)
+    return search_wiki(ws.wiki_root, q)
 
 
 @router.get("/raw-report/{path:path}")
-def get_raw_report(path: str):
-    """兼容旧路由，重定向到通用 raw 文件路由。"""
-    file_path = _safe_join(RAW_DIR, path)
+def get_raw_report(path: str, request: Request):
+    ws = _get_ws(request)
+    file_path = _safe_join(ws.raw_root, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Report not found")
     return parse_wiki_page(file_path)
 
 
-def _build_raw_tree() -> dict:
+def _build_raw_tree(raw_dir: str) -> dict:
     industries = []
     sources = []
 
-    if not os.path.isdir(RAW_DIR):
+    if not os.path.isdir(raw_dir):
         return {"industries": industries, "sources": sources}
 
-    for entry in sorted(os.listdir(RAW_DIR)):
-        entry_path = os.path.join(RAW_DIR, entry)
+    for entry in sorted(os.listdir(raw_dir)):
+        entry_path = os.path.join(raw_dir, entry)
         if not os.path.isdir(entry_path):
             continue
 
         if entry == "sources":
             for root, _, files in os.walk(entry_path):
                 for fname in sorted(files):
-                    rel = os.path.relpath(os.path.join(root, fname), RAW_DIR)
+                    rel = os.path.relpath(os.path.join(root, fname), raw_dir)
                     sources.append({"name": fname, "path": rel})
             continue
 
@@ -104,8 +115,9 @@ def _parse_report_dir(path: str, rel_dir: str) -> dict:
 
 
 @router.get("/raw-tree")
-def get_raw_tree():
-    return _build_raw_tree()
+def get_raw_tree(request: Request):
+    ws = _get_ws(request)
+    return _build_raw_tree(ws.raw_root)
 
 
 class FetchSourceRequest(BaseModel):
@@ -114,7 +126,6 @@ class FetchSourceRequest(BaseModel):
 
 @router.post("/fetch-source")
 async def fetch_source(req: FetchSourceRequest):
-    """抓取 URL 内容，返回提取的文本（不存储）。"""
     if not req.url.strip():
         raise HTTPException(status_code=400, detail="url 不能为空")
 
@@ -152,12 +163,7 @@ class ClassifySourceRequest(BaseModel):
     content: str
 
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-_PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
-_MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
-
-
-def _create_knowledge_service():
+def _create_knowledge_service(workspace):
     from agents.config import load_config
     from agents.knowledge_service import KnowledgeService
     from agents.memory import ManagerMemory
@@ -169,7 +175,7 @@ def _create_knowledge_service():
         system_prompt=config.manager.system_prompt,
         enable_thinking=False,
     )
-    memory = ManagerMemory(_MEMORY_DIR)
+    memory = ManagerMemory(workspace.memory_root)
 
     def _load_prompt(name: str) -> str:
         path = os.path.join(_PROMPTS_DIR, f"{name}.md")
@@ -181,16 +187,16 @@ def _create_knowledge_service():
                 content = content[end + 5:]
         return content
 
-    return KnowledgeService(client, memory, _load_prompt)
+    return KnowledgeService(client, memory, _load_prompt, workspace)
 
 
 @router.post("/classify-source")
-async def classify_source(req: ClassifySourceRequest):
-    """对材料内容做分类，返回 {title, industry, company}。"""
+async def classify_source(req: ClassifySourceRequest, request: Request):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="content 不能为空")
 
-    ks = _create_knowledge_service()
+    ws = _get_ws(request)
+    ks = _create_knowledge_service(ws)
     result = await ks.classify_source(req.content)
     return result
 
@@ -204,8 +210,7 @@ class IngestSourceRequest(BaseModel):
 
 
 @router.post("/ingest-source")
-async def ingest_source(req: IngestSourceRequest):
-    """存储已确认的材料并编译进 wiki（SSE 流式返回进度）。"""
+async def ingest_source(req: IngestSourceRequest, request: Request):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="content 不能为空")
     if not req.title.strip():
@@ -213,8 +218,10 @@ async def ingest_source(req: IngestSourceRequest):
     if not req.industry.strip():
         raise HTTPException(status_code=400, detail="industry 不能为空")
 
+    ws = _get_ws(request)
+
     async def _stream():
-        ks = _create_knowledge_service()
+        ks = _create_knowledge_service(ws)
 
         events = []
 
@@ -248,8 +255,9 @@ async def ingest_source(req: IngestSourceRequest):
 
 
 @router.get("/raw/{path:path}")
-def get_raw_file(path: str):
-    file_path = _safe_join(RAW_DIR, path)
+def get_raw_file(path: str, request: Request):
+    ws = _get_ws(request)
+    file_path = _safe_join(ws.raw_root, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     if file_path.endswith(".pdf"):
@@ -262,14 +270,12 @@ def get_raw_file(path: str):
     raise HTTPException(status_code=404, detail="Unsupported file type")
 
 
-def _safe_wiki_path(rel: str) -> str:
-    return _safe_join(WIKI_DIR, rel, allow_base=True)
-
-
-def _build_wiki_tree() -> list[dict]:
+def _build_wiki_tree(wiki_dir: str) -> list[dict]:
     result = []
-    for entry in sorted(os.listdir(WIKI_DIR)):
-        entry_path = os.path.join(WIKI_DIR, entry)
+    if not os.path.isdir(wiki_dir):
+        return result
+    for entry in sorted(os.listdir(wiki_dir)):
+        entry_path = os.path.join(wiki_dir, entry)
         if entry.startswith("."):
             continue
         if os.path.isdir(entry_path):
@@ -294,8 +300,9 @@ def _tree_node(abs_path: str, rel_path: str) -> dict:
 
 
 @router.get("/tree")
-def get_wiki_tree():
-    return _build_wiki_tree()
+def get_wiki_tree(request: Request):
+    ws = _get_ws(request)
+    return _build_wiki_tree(ws.wiki_root)
 
 
 class MkdirRequest(BaseModel):
@@ -303,8 +310,9 @@ class MkdirRequest(BaseModel):
 
 
 @router.post("/mkdir")
-def wiki_mkdir(req: MkdirRequest):
-    target = _safe_wiki_path(req.path)
+def wiki_mkdir(req: MkdirRequest, request: Request):
+    ws = _get_ws(request)
+    target = _safe_join(ws.wiki_root, req.path, allow_base=True)
     if os.path.exists(target):
         raise HTTPException(status_code=409, detail="Already exists")
     os.makedirs(target)
@@ -317,9 +325,10 @@ class MoveRequest(BaseModel):
 
 
 @router.post("/move")
-def wiki_move(req: MoveRequest):
-    src = _safe_wiki_path(req.src)
-    dst = _safe_wiki_path(req.dst)
+def wiki_move(req: MoveRequest, request: Request):
+    ws = _get_ws(request)
+    src = _safe_join(ws.wiki_root, req.src, allow_base=True)
+    dst = _safe_join(ws.wiki_root, req.dst, allow_base=True)
     if _has_hidden_segment(req.src) or _has_hidden_segment(req.dst):
         raise HTTPException(status_code=400, detail="Hidden paths are not allowed")
     if not req.src.endswith(".md") or not req.dst.endswith(".md"):
@@ -334,8 +343,9 @@ def wiki_move(req: MoveRequest):
 
 
 @router.get("/{path:path}")
-def get_page(path: str):
-    file_path = _safe_join(WIKI_DIR, path)
+def get_page(path: str, request: Request):
+    ws = _get_ws(request)
+    file_path = _safe_join(ws.wiki_root, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Page not found")
     return parse_wiki_page(file_path)

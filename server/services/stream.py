@@ -4,14 +4,16 @@ from typing import AsyncGenerator
 
 from agents.config import load_config
 from agents.manager import Manager
+from workspace import LocalWorkspace
 
 logger = logging.getLogger(__name__)
 
 
-async def chat_event_stream(question: str, history: list[dict] | None = None) -> AsyncGenerator[str, None]:
+async def chat_event_stream(question: str, history: list[dict] | None = None, user_id: str = "default") -> AsyncGenerator[str, None]:
     try:
         config = load_config()
-        manager = Manager(config)
+        workspace = LocalWorkspace(user_id)
+        manager = Manager(config, workspace)
         if history:
             for turn in history[-10:]:
                 if turn.get("role") == "user" and turn.get("content"):

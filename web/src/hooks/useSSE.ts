@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { userHeaders } from "@/lib/userId";
 
 type SSEHandler = (event: string, data: unknown) => void;
 
@@ -12,7 +13,7 @@ export function useSSE() {
     async (question: string, history: SSEMessage[], onEvent: SSEHandler, signal?: AbortSignal) => {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...userHeaders() },
         body: JSON.stringify({ question, history }),
         signal,
       });

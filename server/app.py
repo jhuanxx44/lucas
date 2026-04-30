@@ -20,6 +20,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    from server.middleware import UserContextMiddleware
+    app.add_middleware(UserContextMiddleware)
     from server.routers import wiki, chat
     app.include_router(wiki.router, prefix="/api/wiki")
     app.include_router(chat.router, prefix="/api")

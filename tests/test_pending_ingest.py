@@ -1,5 +1,6 @@
 import os
 import time
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -8,8 +9,10 @@ from agents.manager import Manager
 
 def _manager(tmp_path, monkeypatch):
     manager = object.__new__(Manager)
-    monkeypatch.setattr(manager, "_PENDING_DIR", str(tmp_path / "pending_ingest"))
-    monkeypatch.setattr(manager, "_PENDING_PATH", str(tmp_path / "_pending_ingest.json"))
+    manager._pending_dir = str(tmp_path / "pending_ingest")
+    ws_mock = MagicMock()
+    ws_mock.memory_root = str(tmp_path)
+    manager._ws = ws_mock
     return manager
 
 

@@ -12,8 +12,6 @@ from utils.stock_data import get_stock_data
 
 logger = logging.getLogger(__name__)
 
-WIKI_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "wiki")
-
 _MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^\s\)]+)\)')
 
 
@@ -28,10 +26,10 @@ def _extract_urls_from_search(search_text: str) -> list[dict]:
     return urls
 
 
-def _find_wiki_context(question: str) -> str:
+def _find_wiki_context(question: str, wiki_dir: str) -> str:
     """从 wiki/ 中找到可能相关的页面内容作为上下文"""
     context_parts = []
-    for md_path in glob.glob(os.path.join(WIKI_DIR, "**", "*.md"), recursive=True):
+    for md_path in glob.glob(os.path.join(wiki_dir, "**", "*.md"), recursive=True):
         if "index.md" in md_path or "glossary.md" in md_path:
             continue
         try:

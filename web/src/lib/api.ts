@@ -1,35 +1,36 @@
 import type { WikiIndex, WikiPage, SearchResult, RawTree, WikiTreeNode } from "@/types";
+import { userHeaders } from "./userId";
 
 const BASE = "/api";
 
 export async function fetchWikiIndex(): Promise<WikiIndex> {
-  const res = await fetch(`${BASE}/wiki/index`);
+  const res = await fetch(`${BASE}/wiki/index`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch wiki index: ${res.status}`);
   return res.json();
 }
 
 export async function fetchWikiPage(path: string): Promise<WikiPage> {
   const safePath = path.split("/").map(encodeURIComponent).join("/");
-  const res = await fetch(`${BASE}/wiki/${safePath}`);
+  const res = await fetch(`${BASE}/wiki/${safePath}`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch wiki page: ${res.status}`);
   return res.json();
 }
 
 export async function searchWiki(query: string): Promise<SearchResult[]> {
-  const res = await fetch(`${BASE}/wiki/search?q=${encodeURIComponent(query)}`);
+  const res = await fetch(`${BASE}/wiki/search?q=${encodeURIComponent(query)}`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
   return res.json();
 }
 
 export async function fetchRawTree(): Promise<RawTree> {
-  const res = await fetch(`${BASE}/wiki/raw-tree`);
+  const res = await fetch(`${BASE}/wiki/raw-tree`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch raw tree: ${res.status}`);
   return res.json();
 }
 
 export async function fetchRawFile(path: string): Promise<WikiPage> {
   const safePath = path.split("/").map(encodeURIComponent).join("/");
-  const res = await fetch(`${BASE}/wiki/raw/${safePath}`);
+  const res = await fetch(`${BASE}/wiki/raw/${safePath}`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch raw file: ${res.status}`);
   return res.json();
 }
@@ -45,7 +46,7 @@ export async function fetchRawReport(rawPath: string): Promise<WikiPage> {
 }
 
 export async function fetchWikiTree(): Promise<WikiTreeNode[]> {
-  const res = await fetch(`${BASE}/wiki/tree`);
+  const res = await fetch(`${BASE}/wiki/tree`, { headers: userHeaders() });
   if (!res.ok) throw new Error(`Failed to fetch wiki tree: ${res.status}`);
   return res.json();
 }
@@ -53,7 +54,7 @@ export async function fetchWikiTree(): Promise<WikiTreeNode[]> {
 export async function wikiMkdir(path: string): Promise<void> {
   const res = await fetch(`${BASE}/wiki/mkdir`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...userHeaders() },
     body: JSON.stringify({ path }),
   });
   if (!res.ok) {
@@ -65,7 +66,7 @@ export async function wikiMkdir(path: string): Promise<void> {
 export async function wikiMove(src: string, dst: string): Promise<void> {
   const res = await fetch(`${BASE}/wiki/move`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...userHeaders() },
     body: JSON.stringify({ src, dst }),
   });
   if (!res.ok) {
@@ -83,7 +84,7 @@ export interface FetchSourceResult {
 export async function fetchSource(url: string): Promise<FetchSourceResult> {
   const res = await fetch(`${BASE}/wiki/fetch-source`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...userHeaders() },
     body: JSON.stringify({ url }),
   });
   if (!res.ok) {
@@ -109,7 +110,7 @@ export interface ClassifyResult {
 export async function classifySource(content: string): Promise<ClassifyResult> {
   const res = await fetch(`${BASE}/wiki/classify-source`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...userHeaders() },
     body: JSON.stringify({ content }),
   });
   if (!res.ok) {
@@ -138,7 +139,7 @@ export async function ingestSource(
 ): Promise<void> {
   const res = await fetch(`${BASE}/wiki/ingest-source`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...userHeaders() },
     body: JSON.stringify(params),
   });
   if (!res.ok) {

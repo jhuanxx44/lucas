@@ -53,8 +53,10 @@ async def _download_one(
     title: str,
     dest_dir: str,
     today: str,
+    relpath_base: str | None = None,
 ) -> Optional[dict]:
     """下载单个 URL，返回 {"title", "url", "path"} 或 None。"""
+    base = relpath_base or _PROJECT_ROOT
     slug = _make_slug(title)
     try:
         resp = await client.get(url, follow_redirects=True, timeout=30.0)
@@ -69,9 +71,9 @@ async def _download_one(
         pdf_path = os.path.join(dest_dir, f"{today}_{slug}.pdf")
         md_path = os.path.join(dest_dir, f"{today}_{slug}.md")
         if os.path.exists(md_path):
-            return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
+            return {"title": title, "url": url, "path": os.path.relpath(md_path, base)}
         if os.path.exists(pdf_path):
-            return {"title": title, "url": url, "path": os.path.relpath(pdf_path, _PROJECT_ROOT)}
+            return {"title": title, "url": url, "path": os.path.relpath(pdf_path, base)}
         os.makedirs(dest_dir, exist_ok=True)
         with open(pdf_path, "wb") as f:
             f.write(resp.content)
@@ -81,15 +83,15 @@ async def _download_one(
                 md_content = f"---\nsource: {url}\ntitle: {title}\ndate: {today}\ntype: pdf\n---\n\n{text}\n"
                 with open(md_path, "w", encoding="utf-8") as f:
                     f.write(md_content)
-                return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
+                return {"title": title, "url": url, "path": os.path.relpath(md_path, base)}
         except Exception as e:
             logger.warning("PDF 文本提取失败 %s: %s", url, e)
-        return {"title": title, "url": url, "path": os.path.relpath(pdf_path, _PROJECT_ROOT)}
+        return {"title": title, "url": url, "path": os.path.relpath(pdf_path, base)}
 
     if "text/html" in content_type:
         md_path = os.path.join(dest_dir, f"{today}_{slug}.md")
         if os.path.exists(md_path):
-            return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
+            return {"title": title, "url": url, "path": os.path.relpath(md_path, base)}
         text = _extract_html_text(resp.text)
         if not text:
             return None
@@ -97,7 +99,7 @@ async def _download_one(
         md_content = f"---\nsource: {url}\ntitle: {title}\ndate: {today}\ntype: html\n---\n\n{text}\n"
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
-        return {"title": title, "url": url, "path": os.path.relpath(md_path, _PROJECT_ROOT)}
+        return {"title": title, "url": url, "path": os.path.relpath(md_path, base)}
 
     return None
 
@@ -115,20 +117,23 @@ async def collect_sources(
     source_urls: list[dict],
     industry: str,
     companies: list[str],
+    sources_dir: str | None = None,
+    relpath_base: str | None = None,
     on_status: Optional[Callable] = None,
 ) -> list[dict]:
     """
-    下载 source_urls 中的资源到 raw/sources/{行业}/{公司}/。
+    下载 source_urls 中的资源到 sources_dir/{行业}/{公司}/。
     返回成功保存的文件列表 [{"title", "url", "path"}]。
     """
     if not source_urls:
         return []
 
+    base_dir = sources_dir or _SOURCES_DIR
     industry = industry or "未分类"
     if companies:
-        dest_dir = os.path.join(_SOURCES_DIR, industry, companies[0])
+        dest_dir = os.path.join(base_dir, industry, companies[0])
     else:
-        dest_dir = os.path.join(_SOURCES_DIR, industry)
+        dest_dir = os.path.join(base_dir, industry)
 
     today = date.today().isoformat()
     sem = asyncio.Semaphore(3)
@@ -147,6 +152,7 @@ async def collect_sources(
             async with sem:
                 result = await _download_one(
                     client, item["url"], item.get("title", ""), dest_dir, today,
+                    relpath_base=relpath_base,
                 )
                 if result:
                     collected.append(result)
