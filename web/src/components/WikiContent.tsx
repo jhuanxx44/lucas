@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Minus, Plus } from "lucide-react";
-import { fetchWikiPage, searchWiki } from "@/lib/api";
+import { fetchWikiPage, fetchRawFile, searchWiki } from "@/lib/api";
 import { processWikiLinks } from "@/lib/markdown";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
 import { RawReportPanel } from "@/components/RawReportPanel";
@@ -20,7 +20,11 @@ export function WikiContent() {
   useEffect(() => {
     if (!currentPath) return;
     setLoading(true);
-    fetchWikiPage(currentPath)
+    const isRaw = currentPath.startsWith("__raw__/");
+    const fetcher = isRaw
+      ? fetchRawFile(currentPath.replace("__raw__/", ""))
+      : fetchWikiPage(currentPath);
+    fetcher
       .then(setPage)
       .catch(() => setPage(null))
       .finally(() => setLoading(false));
