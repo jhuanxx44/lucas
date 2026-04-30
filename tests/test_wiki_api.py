@@ -76,3 +76,37 @@ def test_wiki_path_traversal_blocked(monkeypatch):
     with pytest.raises(HTTPException) as exc_info:
         wiki_mod.get_page("../../etc/passwd")
     assert exc_info.value.status_code == 403
+
+
+def test_raw_file_rejects_base_and_traversal(monkeypatch):
+    import os
+    from fastapi import HTTPException
+    import server.routers.wiki as wiki_mod
+
+    raw_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "raw")
+    monkeypatch.setattr(wiki_mod, "RAW_DIR", raw_dir)
+
+    with pytest.raises(HTTPException) as exc_info:
+        wiki_mod.get_raw_file("")
+    assert exc_info.value.status_code == 403
+
+    with pytest.raises(HTTPException) as exc_info:
+        wiki_mod.get_raw_file("../../requirements.txt")
+    assert exc_info.value.status_code == 403
+
+
+def test_wiki_move_rejects_non_markdown_and_hidden_paths(monkeypatch, tmp_path):
+    from fastapi import HTTPException
+    import server.routers.wiki as wiki_mod
+
+    monkeypatch.setattr(wiki_mod, "WIKI_DIR", str(tmp_path))
+    src = tmp_path / "source.md"
+    src.write_text("# Source", encoding="utf-8")
+
+    with pytest.raises(HTTPException) as exc_info:
+        wiki_mod.wiki_move(wiki_mod.MoveRequest(src="source.md", dst="target.json"))
+    assert exc_info.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc_info:
+        wiki_mod.wiki_move(wiki_mod.MoveRequest(src="source.md", dst=".hidden/target.md"))
+    assert exc_info.value.status_code == 400

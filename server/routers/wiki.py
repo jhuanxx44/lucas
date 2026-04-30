@@ -14,6 +14,20 @@ WIKI_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__
 RAW_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "raw")
 
 
+def _safe_join(base: str, rel: str, allow_base: bool = False) -> str:
+    base_abs = os.path.abspath(base)
+    full = os.path.abspath(os.path.normpath(os.path.join(base_abs, rel)))
+    if os.path.commonpath([base_abs, full]) != base_abs:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not allow_base and full == base_abs:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return full
+
+
+def _has_hidden_segment(rel: str) -> bool:
+    return any(part.startswith(".") for part in rel.replace("\\", "/").split("/") if part)
+
+
 @router.get("/index")
 def get_index():
     return parse_wiki_index(WIKI_DIR)
@@ -28,9 +42,7 @@ def get_search(q: str):
 @router.get("/raw-report/{path:path}")
 def get_raw_report(path: str):
     """兼容旧路由，重定向到通用 raw 文件路由。"""
-    file_path = os.path.normpath(os.path.join(RAW_DIR, path))
-    if not file_path.startswith(RAW_DIR + os.sep):
-        raise HTTPException(status_code=403, detail="Access denied")
+    file_path = _safe_join(RAW_DIR, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Report not found")
     return parse_wiki_page(file_path)
@@ -237,9 +249,7 @@ async def ingest_source(req: IngestSourceRequest):
 
 @router.get("/raw/{path:path}")
 def get_raw_file(path: str):
-    file_path = os.path.normpath(os.path.join(RAW_DIR, path))
-    if not file_path.startswith(RAW_DIR + os.sep):
-        raise HTTPException(status_code=403, detail="Access denied")
+    file_path = _safe_join(RAW_DIR, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     if file_path.endswith(".pdf"):
@@ -253,10 +263,7 @@ def get_raw_file(path: str):
 
 
 def _safe_wiki_path(rel: str) -> str:
-    full = os.path.normpath(os.path.join(WIKI_DIR, rel))
-    if not full.startswith(WIKI_DIR + os.sep) and full != WIKI_DIR:
-        raise HTTPException(status_code=403, detail="Access denied")
-    return full
+    return _safe_join(WIKI_DIR, rel, allow_base=True)
 
 
 def _build_wiki_tree() -> list[dict]:
@@ -313,6 +320,10 @@ class MoveRequest(BaseModel):
 def wiki_move(req: MoveRequest):
     src = _safe_wiki_path(req.src)
     dst = _safe_wiki_path(req.dst)
+    if _has_hidden_segment(req.src) or _has_hidden_segment(req.dst):
+        raise HTTPException(status_code=400, detail="Hidden paths are not allowed")
+    if not req.src.endswith(".md") or not req.dst.endswith(".md"):
+        raise HTTPException(status_code=400, detail="Only markdown pages can be moved")
     if not os.path.isfile(src):
         raise HTTPException(status_code=404, detail="Source not found")
     if os.path.exists(dst):
@@ -324,9 +335,7 @@ def wiki_move(req: MoveRequest):
 
 @router.get("/{path:path}")
 def get_page(path: str):
-    file_path = os.path.normpath(os.path.join(WIKI_DIR, path))
-    if not file_path.startswith(WIKI_DIR + os.sep):
-        raise HTTPException(status_code=403, detail="Access denied")
+    file_path = _safe_join(WIKI_DIR, path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Page not found")
     return parse_wiki_page(file_path)

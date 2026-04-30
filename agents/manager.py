@@ -21,6 +21,17 @@ _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 _MEMORY_DIR = os.path.join(_PROJECT_ROOT, "memory")
 
 
+def _cleanup_download_tmp(tmp_path: str):
+    stem, _ = os.path.splitext(tmp_path)
+    for ext in (".md", ".pdf"):
+        candidate = stem + ext
+        if os.path.isfile(candidate):
+            os.remove(candidate)
+    tmp_parent = os.path.dirname(tmp_path)
+    if os.path.isdir(tmp_parent) and not os.listdir(tmp_parent):
+        os.rmdir(tmp_parent)
+
+
 class Manager:
     _PENDING_PATH = os.path.join(_MEMORY_DIR, "_pending_ingest.json")
 
@@ -231,10 +242,7 @@ class Manager:
                     tmp_path = os.path.join(_PROJECT_ROOT, dl_result["path"])
                     with open(tmp_path, "r", encoding="utf-8") as f:
                         ingest_content = f.read()
-                    os.remove(tmp_path)
-                    tmp_parent = os.path.dirname(tmp_path)
-                    if os.path.isdir(tmp_parent) and not os.listdir(tmp_parent):
-                        os.rmdir(tmp_parent)
+                    _cleanup_download_tmp(tmp_path)
 
                 if not ingest_content.strip():
                     yield _evt("synthesis_chunk", {"text": "抓取的内容为空，无法收录。"})
