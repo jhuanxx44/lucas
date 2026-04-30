@@ -73,6 +73,33 @@ class VerificationResult:
 
 
 @dataclass
+class Evidence:
+    id: str
+    source_id: str
+    kind: str  # "source" | "metric" | "verification_issue"
+    subject: str
+    text: str
+    path_or_url: str = ""
+    snippet: str = ""
+    value: float | None = None
+    unit: str = ""
+    as_of: str = ""
+    reliability: str = "medium"
+    verification_status: str = "unverified"
+    issues: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Claim:
+    id: str
+    type: str  # "fact" | "interpretation" | "forecast" | "risk" | "assumption"
+    text: str
+    evidence_ids: list[str] = field(default_factory=list)
+    confidence: str = "medium"
+    assumptions: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ResearchResult:
     researcher_id: str
     researcher_name: str

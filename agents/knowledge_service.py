@@ -4,9 +4,10 @@ import logging
 import os
 import re
 import shutil
+from dataclasses import asdict
 from datetime import date
 
-from agents.models import ManagerReport
+from agents.models import Claim, Evidence, ManagerReport
 from utils.json_extract import extract_json
 from utils.source_collector import collect_sources
 
@@ -58,6 +59,12 @@ class KnowledgeService:
                         json.dump(meta, f, ensure_ascii=False, indent=2)
                 except Exception as e:
                     logger.warning("回写 collected_sources 到 meta.json 失败: %s", e)
+
+        status("正在生成证据和结论索引...")
+        try:
+            await self.write_sidecars(report, report_dir)
+        except Exception as e:
+            logger.warning("生成 sidecar 失败: %s", e)
 
         status("正在整理 wiki 知识库...")
         await self.update_wiki(report, on_status=on_status)
@@ -122,6 +129,171 @@ class KnowledgeService:
                 self.memory.save_preferences(data)
         except Exception as e:
             logger.warning("提取用户偏好失败: %s", e)
+
+    def build_evidence(self, report: ManagerReport) -> list[Evidence]:
+        evidence: list[Evidence] = []
+
+        def next_id() -> str:
+            return f"ev_{len(evidence) + 1:03d}"
+
+        for r in report.results:
+            issue_messages = []
+            if r.verification:
+                issue_messages = [i.message for i in r.verification.issues]
+
+            for idx, source in enumerate(r.source_urls, start=1):
+                url = source.get("url", "")
+                title = source.get("title", "") or url
+                issues = [m for m in issue_messages if url and url in m]
+                if issues:
+                    status = "warning"
+                elif r.verification:
+                    status = "verified"
+                else:
+                    status = "unverified"
+                evidence.append(Evidence(
+                    id=next_id(),
+                    source_id=f"{r.researcher_id}:source:{idx}",
+                    kind="source",
+                    subject=title,
+                    text=title,
+                    path_or_url=url,
+                    snippet=title,
+                    reliability="medium",
+                    verification_status=status,
+                    issues=issues,
+                ))
+
+            if r.market_data.strip():
+                issues = [
+                    i.message for i in (r.verification.issues if r.verification else [])
+                    if i.dimension == "data_crosscheck"
+                ]
+                if any("严重偏差" in issue for issue in issues):
+                    status = "error"
+                elif issues:
+                    status = "warning"
+                elif r.verification:
+                    status = "verified"
+                else:
+                    status = "unverified"
+                evidence.append(Evidence(
+                    id=next_id(),
+                    source_id=f"{r.researcher_id}:market_data",
+                    kind="metric",
+                    subject=f"{r.researcher_name} 市场数据",
+                    text=r.market_data,
+                    snippet=r.market_data[:500],
+                    reliability="high",
+                    verification_status=status,
+                    issues=issues,
+                ))
+
+            if r.verification:
+                for idx, issue in enumerate(r.verification.issues, start=1):
+                    evidence.append(Evidence(
+                        id=next_id(),
+                        source_id=f"{r.researcher_id}:verification:{idx}",
+                        kind="verification_issue",
+                        subject=issue.dimension,
+                        text=issue.message,
+                        reliability="medium",
+                        verification_status=issue.severity,
+                        issues=[issue.message],
+                    ))
+
+        return evidence
+
+    async def extract_claims(self, report: ManagerReport, evidence: list[Evidence]) -> tuple[str, list[Claim], str]:
+        evidence_summary = "\n".join(
+            f"- {e.id} [{e.kind}/{e.verification_status}] {e.subject}: {e.snippet or e.text[:200]}"
+            for e in evidence[:30]
+        ) or "（暂无 evidence）"
+
+        prompt = self._load_prompt("claim-extract").format(
+            question=report.question,
+            synthesis=report.synthesis[:6000],
+            evidence_summary=evidence_summary,
+        )
+        text, _ = await self.client.chat(
+            prompt=prompt,
+            response_mime_type="application/json",
+            temperature=0.1,
+        )
+        data = extract_json(text)
+        if data is None:
+            return "error", [], "claim-extract JSON 解析失败"
+
+        raw_claims = data if isinstance(data, list) else data.get("claims", [])
+        if not isinstance(raw_claims, list):
+            return "error", [], "claim-extract 返回格式不是 claims 列表"
+
+        evidence_ids = {e.id for e in evidence}
+        claims = []
+        for idx, raw in enumerate(raw_claims[:20], start=1):
+            if not isinstance(raw, dict):
+                continue
+            text = str(raw.get("text", "")).strip()
+            if not text:
+                continue
+            raw_evidence_ids = raw.get("evidence_ids", [])
+            if not isinstance(raw_evidence_ids, list):
+                raw_evidence_ids = []
+            linked_ids = [
+                eid for eid in raw_evidence_ids
+                if isinstance(eid, str) and eid in evidence_ids
+            ]
+            confidence = raw.get("confidence", "medium")
+            if confidence not in ("high", "medium", "low", "unverified"):
+                confidence = "medium"
+            if not linked_ids and confidence != "unverified":
+                confidence = "low"
+            claim_type = raw.get("type", "interpretation")
+            if claim_type not in ("fact", "interpretation", "forecast", "risk", "assumption"):
+                claim_type = "interpretation"
+            assumptions = raw.get("assumptions", [])
+            if not isinstance(assumptions, list):
+                assumptions = []
+            claims.append(Claim(
+                id=f"cl_{idx:03d}",
+                type=claim_type,
+                text=text,
+                evidence_ids=linked_ids,
+                confidence=confidence,
+                assumptions=[str(a) for a in assumptions],
+            ))
+
+        status = "ok" if claims else "empty"
+        return status, claims, ""
+
+    async def write_sidecars(self, report: ManagerReport, report_dir: str):
+        evidence = self.build_evidence(report)
+        evidence_payload = {
+            "version": 1,
+            "status": "ok",
+            "evidence": [asdict(e) for e in evidence],
+        }
+        with open(os.path.join(report_dir, "evidence.json"), "w", encoding="utf-8") as f:
+            json.dump(evidence_payload, f, ensure_ascii=False, indent=2)
+
+        claims_status = "error"
+        claims: list[Claim] = []
+        error = ""
+        try:
+            claims_status, claims, error = await self.extract_claims(report, evidence)
+        except Exception as e:
+            logger.warning("提取 claims 失败: %s", e)
+            error = str(e)
+
+        claims_payload = {
+            "version": 1,
+            "status": claims_status,
+            "claims": [asdict(c) for c in claims],
+        }
+        if error:
+            claims_payload["error"] = error
+        with open(os.path.join(report_dir, "claims.json"), "w", encoding="utf-8") as f:
+            json.dump(claims_payload, f, ensure_ascii=False, indent=2)
 
     def archive(self, report: ManagerReport) -> str:
         """归档报告，返回 report_dir 路径。"""
