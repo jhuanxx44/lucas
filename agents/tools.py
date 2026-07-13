@@ -9,6 +9,7 @@ import json
 import os
 
 from workspace import Workspace
+from agents.researcher import _parse_wiki_index
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
@@ -114,8 +115,20 @@ class ToolKit:
         if scope in ("all",):
             search_dirs.append(self._ws.memory_root)
 
-        matches = []
         keyword_lower = keyword.lower()
+        index_matches: list[str] = []
+        glob_matches: list[str] = []
+
+        # ── wiki scope: 优先查 index.md 条目 ──
+        if scope in ("wiki", "all"):
+            index_path = os.path.join(self._ws.wiki_root, "index.md")
+            for entry in _parse_wiki_index(index_path):
+                search_text = f"{entry['name']} {entry['section']}"
+                if keyword_lower in search_text.lower():
+                    index_matches.append(
+                        f"📄 wiki/{entry['path']} [{entry['section']}] [索引匹配]"
+                    )
+
         for d in search_dirs:
             for md_path in glob.glob(os.path.join(d, "**", "*"), recursive=True):
                 if not os.path.isfile(md_path):
@@ -125,7 +138,7 @@ class ToolKit:
                 if keyword_lower in rel.lower():
                     size = os.path.getsize(md_path)
                     size_str = f"{size / 1024:.1f}KB" if size > 1024 else f"{size}B"
-                    matches.append(f"📄 {rel} ({size_str}) [文件名匹配]")
+                    glob_matches.append(f"📄 {rel} ({size_str}) [文件名匹配]")
                     continue
 
                 try:
@@ -150,11 +163,13 @@ class ToolKit:
                         if len(snippet) > 200:
                             snippet = snippet[:200] + "..."
                         snippets.append(f"  L{idx+1}: {snippet}")
-                    matches.append(f"📄 {rel} ({size_str}) [内容匹配, {len(hit_lines)}处]\n" + "\n".join(snippets))
+                    glob_matches.append(f"📄 {rel} ({size_str}) [内容匹配, {len(hit_lines)}处]\n" + "\n".join(snippets))
 
-        if not matches:
+        # index 匹配排在前，glob 匹配在后
+        all_matches = index_matches + glob_matches
+        if not all_matches:
             return f"未找到包含 '{keyword}' 的文件"
-        return f"找到 {len(matches)} 个匹配:\n\n" + "\n\n".join(matches[:15])
+        return f"找到 {len(all_matches)} 个匹配:\n\n" + "\n\n".join(all_matches[:15])
 
     def recall(self, keyword: str, max_results: int = 5) -> str:
         conclusions_path = os.path.join(self._ws.memory_root, "conclusions.jsonl")

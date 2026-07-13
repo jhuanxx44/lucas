@@ -4,6 +4,9 @@ import glob
 import logging
 from typing import AsyncGenerator
 
+import jieba
+import jieba.posseg as pseg
+
 from agents.config import ResearcherConfig
 from agents.models import Task, ResearchResult
 from utils.llm_client import create_client
@@ -13,6 +16,22 @@ from utils.stock_data import get_stock_data
 logger = logging.getLogger(__name__)
 
 _MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^\s\)]+)\)')
+
+# ── 中文停用词 ──
+_STOP_WORDS = frozenset({
+    "的", "了", "是", "在", "我", "你", "他", "她", "它", "们",
+    "这", "那", "吗", "呢", "吧", "啊", "哦", "嗯",
+    "和", "与", "或", "但", "而", "及", "向", "对", "以", "被", "把", "从", "到",
+    "让", "请", "帮", "用", "给", "为",
+    "因为", "所以", "如果", "虽然", "可以", "应该", "需要",
+    "已经", "正在", "将要",
+    "也", "都", "就", "才", "又", "再", "还",
+    "很", "非常", "最", "更", "越",
+    "不", "没", "没有",
+    "什么", "怎么", "怎样", "如何", "为什么", "哪里", "哪个",
+    "一个", "一下", "一些", "这个", "那个", "这种", "那种",
+    "分析", "调研", "看看", "研究", "查询", "请问", "帮忙",
+})
 
 
 def _extract_urls_from_search(search_text: str) -> list[dict]:
@@ -26,27 +45,138 @@ def _extract_urls_from_search(search_text: str) -> list[dict]:
     return urls
 
 
-def _find_wiki_context(question: str, wiki_dir: str) -> str:
-    """从 wiki/ 中找到可能相关的页面内容作为上下文"""
-    context_parts = []
-    for md_path in glob.glob(os.path.join(wiki_dir, "**", "*.md"), recursive=True):
-        if "index.md" in md_path or "glossary.md" in md_path:
+def _extract_keywords(question: str) -> list[str]:
+    """用 jieba 分词 + 词性过滤提取关键词，同时保留原始 question 中的连续中文片段。"""
+    keywords = []
+    # 英文/数字 token（股票代码等）
+    for token in re.findall(r"[A-Za-z0-9]+", question):
+        if len(token) >= 1:
+            keywords.append(token.lower())
+    # jieba 分词 + 词性过滤：名词、动词、地名、机构名
+    for word, flag in pseg.cut(question):
+        if len(word) < 2:
             continue
+        if word in _STOP_WORDS:
+            continue
+        if flag.startswith(("n", "v", "ns", "nt", "nz")):
+            keywords.append(word)
+    # fallback: 提取所有连续中文字段（长度 2-8），防止 jieba 将股票简称等专有名词切碎
+    for chunk in re.findall(r"[一-鿿]{2,8}", question):
+        if chunk not in _STOP_WORDS and len(chunk) >= 2:
+            keywords.append(chunk)
+    # 去重保序
+    seen = set()
+    deduped = []
+    for kw in keywords:
+        if kw not in seen:
+            seen.add(kw)
+            deduped.append(kw)
+    return deduped
+
+
+def _parse_wiki_index(index_path: str) -> list[dict]:
+    """解析 index.md 的 # Section → - [name](path) 结构。
+
+    返回: [{"section": "公司 · 电子", "name": "沪电股份", "path": "companies/电子/沪电股份.md"}, ...]
+    """
+    entries = []
+    current_section = ""
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("## "):
+                    current_section = line[3:].strip()
+                elif line.startswith("- [") and "](" in line:
+                    m = re.match(r"- \[(.+?)\]\((.+?)\)", line)
+                    if m:
+                        entries.append({
+                            "section": current_section,
+                            "name": m.group(1).strip(),
+                            "path": m.group(2).strip(),
+                        })
+    except (FileNotFoundError, PermissionError):
+        pass
+    return entries
+
+
+def _find_wiki_context(question: str, wiki_dir: str) -> str:
+    """从 wiki/ 中找到可能相关的页面内容作为上下文。
+
+    策略：
+    1. 优先用关键词匹配 index.md 条目（条目名 + 分类名）
+    2. fallback 到 glob 遍历 .md 文件，按关键词命中数评分
+    3. 返回 top 3 页面，每页截断至 3000 字符
+    """
+    keywords = _extract_keywords(question)
+    if not keywords:
+        return ""
+
+    # ── Step 1: 优先匹配 index.md ──
+    index_path = os.path.join(wiki_dir, "index.md")
+    index_entries = _parse_wiki_index(index_path)
+    index_hits: list[tuple[int, dict]] = []
+    for entry in index_entries:
+        score = 0
+        search_text = f"{entry['name']} {entry['section']}"
+        for kw in keywords:
+            if kw in search_text:
+                score += 1
+        if score > 0:
+            index_hits.append((score, entry))
+    index_hits.sort(key=lambda x: x[0], reverse=True)
+
+    context_parts = []
+    seen_paths = set()
+    for _, entry in index_hits[:3]:
+        page_path = os.path.join(wiki_dir, entry["path"])
+        norm = os.path.normpath(page_path)
+        if norm in seen_paths:
+            continue
+        seen_paths.add(norm)
         try:
-            with open(md_path, "r", encoding="utf-8") as f:
+            with open(norm, "r", encoding="utf-8") as f:
                 content = f.read()
-            # 简单匹配：文件名或内容中包含问题关键词
-            basename = os.path.basename(md_path)
-            # 取问题中的关键词（去掉常见停用词）
-            for char in question:
-                if char in basename or char in content[:500]:
-                    context_parts.append(f"--- {basename} ---\n{content[:2000]}")
-                    break
+            context_parts.append(f"--- {entry['name']} ({entry['section']}) ---\n{content[:3000]}")
         except Exception:
             continue
+
+    # ── Step 2: glob fallback ──
+    if len(context_parts) < 3:
+        scored = []
+        for md_path in glob.glob(os.path.join(wiki_dir, "**", "*.md"), recursive=True):
+            if "index.md" in md_path or "glossary.md" in md_path:
+                continue
+            norm = os.path.normpath(md_path)
+            if norm in seen_paths:
+                continue
+            try:
+                with open(norm, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            basename = os.path.basename(md_path)
+            name_no_ext = basename.replace(".md", "")
+            # 评分：文件名命中 × 3，内容前 2000 字符命中 × 1
+            score = 0
+            for kw in keywords:
+                if kw in name_no_ext:
+                    score += 3
+                if kw in content[:2000]:
+                    score += 1
+            if score > 0:
+                scored.append((score, basename, content))
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        remaining = 3 - len(context_parts)
+        for _, basename, content in scored[:remaining]:
+            context_parts.append(f"--- {basename} ---\n{content[:3000]}")
+
     if not context_parts:
         return ""
-    return "\n\n".join(context_parts[:3])
+    return "\n\n".join(context_parts)
 
 
 async def _build_prompt(config: ResearcherConfig, task: Task, prior_results=None) -> str:
