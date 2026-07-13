@@ -28,7 +28,7 @@ def _ws_mock(wiki_root=None, raw_root=None):
 def test_wiki_index_returns_sections():
     ws = _ws_mock()
     client = _make_client(ws)
-    resp = client.get("/api/wiki/index", headers={"X-User-Id": "test"})
+    resp = client.get("/api/wiki/index")
     assert resp.status_code == 200
     data = resp.json()
     assert "sections" in data
@@ -37,14 +37,14 @@ def test_wiki_index_returns_sections():
 def test_wiki_page_not_found():
     ws = _ws_mock()
     client = _make_client(ws)
-    resp = client.get("/api/wiki/nonexistent.md", headers={"X-User-Id": "test"})
+    resp = client.get("/api/wiki/nonexistent.md")
     assert resp.status_code == 404
 
 
 def test_wiki_search():
     ws = _ws_mock()
     client = _make_client(ws)
-    resp = client.get("/api/wiki/search?q=电池", headers={"X-User-Id": "test"})
+    resp = client.get("/api/wiki/search?q=电池")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
@@ -53,7 +53,7 @@ def test_wiki_search():
 def test_wiki_path_traversal_blocked():
     ws = _ws_mock()
     client = _make_client(ws)
-    resp = client.get("/api/wiki/%2e%2e/requirements.txt", headers={"X-User-Id": "test"})
+    resp = client.get("/api/wiki/%2e%2e/requirements.txt")
     assert resp.status_code in (403, 404)
 
 

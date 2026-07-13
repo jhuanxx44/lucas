@@ -1,18 +1,10 @@
-"""
-用户工作区：所有用户数据访问的唯一入口。
-
-当前实现: LocalWorkspace (本地文件系统)
-未来实现: 可替换为 RDS+OSS 后端，业务层不感知。
-"""
+"""本地工作区：所有用户数据访问的唯一入口。"""
 import os
-import re
 from abc import ABC, abstractmethod
-
-_USER_ID_RE = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 
 
 class Workspace(ABC):
-    """用户工作区抽象。每个用户一个独立实例。"""
+    """工作区抽象，保留后续替换存储后端的边界。"""
 
     @property
     @abstractmethod
@@ -32,23 +24,14 @@ class Workspace(ABC):
 
 
 _PROJECT_ROOT = os.path.dirname(__file__)
-_WORKSPACES_BASE = os.path.join(_PROJECT_ROOT, "workspaces")
 
 
 class LocalWorkspace(Workspace):
-    """本地文件系统实现。目录: workspaces/{user_id}/{wiki,raw,memory}/"""
+    """单用户本地文件系统实现，使用项目根目录下的数据。"""
 
-    _initialized_users: set[str] = set()
-
-    def __init__(self, user_id: str):
-        if not _USER_ID_RE.match(user_id or ""):
-            raise ValueError(f"invalid user_id: {user_id!r}")
-        self._user_id = user_id
-        self._root = os.path.join(_WORKSPACES_BASE, user_id)
-        if user_id not in self._initialized_users:
-            for sub in ("wiki", "raw", "memory"):
-                os.makedirs(os.path.join(self._root, sub), exist_ok=True)
-            self._initialized_users.add(user_id)
+    def __init__(self, user_id: str = "default"):
+        self._user_id = "default"
+        self._root = _PROJECT_ROOT
 
     @property
     def user_id(self) -> str:

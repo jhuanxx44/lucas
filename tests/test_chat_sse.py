@@ -30,6 +30,26 @@ def test_chat_question_max_length():
     assert resp.status_code == 422
 
 
+def test_chat_ignores_user_id_header():
+    """单用户模式下，客户端请求头不能切换工作区。"""
+    async def fake_stream(q, history=None, user_id="default"):
+        assert user_id == "default"
+        yield "event: done\ndata: {\"total_tokens\": 0}\n\n"
+
+    with patch("server.routers.chat.chat_event_stream") as mock:
+        mock.side_effect = fake_stream
+        from server.app import create_app
+        app = create_app()
+        client = TestClient(app)
+        resp = client.post(
+            "/api/chat",
+            headers={"X-User-Id": "another-user"},
+            json={"question": "test"},
+        )
+
+        assert resp.status_code == 200
+
+
 @pytest.mark.asyncio
 async def test_chat_event_stream_passes_history():
     """stream.py：验证 history 被注入到 Manager memory"""
