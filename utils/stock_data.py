@@ -4,6 +4,7 @@
 数据源可替换：实现 StockDataProvider 接口即可。
 """
 import re
+import os
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -219,6 +220,147 @@ class AKShareProvider(StockDataProvider):
             return []
 
 
+# ── 通达信 MCP 实现 ───────────────────────────────────
+
+class TDXMCPProvider(StockDataProvider):
+    """使用 tdx-mcp 提供 quote/kline，其他数据回退到现有 provider。"""
+
+    def __init__(self, fallback: Optional[StockDataProvider] = None):
+        self.fallback = fallback or AKShareProvider()
+
+    def _market(self, code: str) -> int:
+        """tdx-mcp 市场代码：0=深圳，1=上海，2=北交所。"""
+        if code.startswith("6"):
+            return 1
+        if code.startswith(("4", "8")):
+            return 2
+        return 0
+
+    def _period(self, period: str) -> int:
+        mapping = {
+            "1m": 7,
+            "5m": 0,
+            "15m": 1,
+            "30m": 2,
+            "60m": 3,
+            "daily": 4,
+            "day": 4,
+            "weekly": 5,
+            "week": 5,
+            "monthly": 6,
+            "month": 6,
+        }
+        return mapping.get(period, 4)
+
+    def _load_server(self):
+        try:
+            import mcpServer
+            return mcpServer
+        except Exception as e:
+            logger.warning("tdx-mcp 不可用，回退到 AKShare/Tencent: %s", e)
+            return None
+
+    def _price_scale(self, kline_close: float, quote_close: float) -> float:
+        """tdx-mcp K线价格常见为报价的10倍，这里自动归一。"""
+        if kline_close <= 0 or quote_close <= 0:
+            return 1.0
+        ratio = kline_close / quote_close
+        for scale in (100.0, 10.0):
+            if 0.8 * scale <= ratio <= 1.2 * scale:
+                return scale
+        if ratio > 5:
+            return 10.0
+        return 1.0
+
+    async def get_quote(self, code: str) -> Optional[QuoteData]:
+        server = self._load_server()
+        if server is None:
+            return await self.fallback.get_quote(code)
+
+        market = self._market(code)
+        try:
+            info = await asyncio.to_thread(server.symbol_info, market, code)
+            price = float(info.get("close", 0) or 0)
+            pre_close = float(info.get("pre_close", 0) or 0)
+            amount = float(info.get("amount", 0) or 0)
+            change_pct = round((price / pre_close - 1) * 100, 2) if pre_close > 0 else 0.0
+            return QuoteData(
+                code=code,
+                name=str(info.get("name", "")),
+                price=price,
+                change_pct=change_pct,
+                volume=float(info.get("vol", 0) or 0),
+                turnover=amount,
+                extra={
+                    "数据源": "tdx-mcp",
+                    "今开": round(float(info.get("open", 0) or 0), 3),
+                    "最高": round(float(info.get("high", 0) or 0), 3),
+                    "最低": round(float(info.get("low", 0) or 0), 3),
+                    "昨收": round(pre_close, 3),
+                    "均价": round(float(info.get("avg", 0) or 0), 3),
+                    "换手率": f"{float(info.get('turnover', 0) or 0):.2f}%",
+                    "时间": str(info.get("time", "")),
+                },
+            )
+        except Exception as e:
+            logger.warning("tdx-mcp get_quote 失败 %s: %s", code, e)
+            return await self.fallback.get_quote(code)
+
+    async def get_kline(self, code: str, period: str = "daily", count: int = 30) -> list[KlineBar]:
+        server = self._load_server()
+        if server is None:
+            return await self.fallback.get_kline(code, period, count)
+
+        market = self._market(code)
+        try:
+            rows = await asyncio.to_thread(
+                server.stock_kline,
+                market,
+                code,
+                self._period(period),
+                0,
+                count,
+                1,
+                "qfq",
+            )
+            if not rows:
+                return []
+
+            scale = 1.0
+            try:
+                quote = await asyncio.to_thread(server.symbol_info, market, code)
+                scale = self._price_scale(float(rows[-1].get("close", 0) or 0), float(quote.get("close", 0) or 0))
+            except Exception:
+                scale = 10.0 if float(rows[-1].get("close", 0) or 0) > 1000 else 1.0
+
+            bars = []
+            for r in rows[-count:]:
+                open_price = float(r.get("open", 0) or 0) / scale
+                close_price = float(r.get("close", 0) or 0) / scale
+                bars.append(KlineBar(
+                    date=str(r.get("datetime", ""))[:10],
+                    open=round(open_price, 3),
+                    close=round(close_price, 3),
+                    high=round(float(r.get("high", 0) or 0) / scale, 3),
+                    low=round(float(r.get("low", 0) or 0) / scale, 3),
+                    volume=float(r.get("vol", 0) or 0),
+                    change_pct=round((close_price / open_price - 1) * 100, 2) if open_price > 0 else 0.0,
+                ))
+            return bars
+        except Exception as e:
+            logger.warning("tdx-mcp get_kline 失败 %s: %s", code, e)
+            return await self.fallback.get_kline(code, period, count)
+
+    async def get_financials(self, code: str) -> list[FinancialRow]:
+        return await self.fallback.get_financials(code)
+
+    async def get_north_flow(self, count: int = 10) -> list[FlowRecord]:
+        return await self.fallback.get_north_flow(count)
+
+    async def get_sector_flow(self, top_n: int = 15) -> list[FlowRecord]:
+        return await self.fallback.get_sector_flow(top_n)
+
+
 # ── 格式化工具 ──────────────────────────────────────
 
 def format_kline(code: str, bars: list[KlineBar]) -> str:
@@ -331,7 +473,11 @@ _default_provider: Optional[StockDataProvider] = None
 def get_provider() -> StockDataProvider:
     global _default_provider
     if _default_provider is None:
-        _default_provider = AKShareProvider()
+        provider = os.getenv("STOCK_DATA_PROVIDER", "akshare").lower()
+        if provider in {"tdx", "tdx-mcp", "tdx_mcp"}:
+            _default_provider = TDXMCPProvider()
+        else:
+            _default_provider = AKShareProvider()
     return _default_provider
 
 
