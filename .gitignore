@@ -15,3 +15,5 @@ raw/
 ingested/
 reports/
 workspaces/
+runs/
+.firecrawl/

@@ -1,3 +1,75 @@
+# Current Task Plan: Review Lucas against open-source agent harnesses
+
+## Goal
+Deeply review Lucas's learning-by-building roadmap against selected open-source agent harness and evaluation projects, then make evidence-backed, minimal updates to the roadmap and Eval MVP without changing product code or `raw/`.
+
+## Current Phase
+Complete
+
+## Phases
+
+### Phase 1: Scope & Baseline Audit
+- [x] Inventory current roadmap, Eval MVP, implementation progress, and unresolved design assumptions
+- [x] Define comparison questions and evidence standards
+- **Status:** complete
+
+### Phase 2: Open-source Research
+- [x] Select primary and supporting references using explicit criteria
+- [x] Pin reviewed revisions and inspect official code, tests, and documentation
+- [x] Record findings after every two research operations
+- **Status:** complete
+
+### Phase 3: Comparative Review
+- [x] Compare loop, state, tools, context, termination, reliability, trace, eval, and sandbox boundaries
+- [x] Classify decisions as keep, adjust, defer, remove, or experiment
+- **Status:** complete
+
+### Phase 4: Planning Updates
+- [x] Write a concise source-backed design review
+- [x] Update the learning roadmap and Eval MVP only where conclusions require it
+- [x] Preserve existing user edits and avoid implementation changes
+- **Status:** complete
+
+### Phase 5: Verification
+- [x] Check cross-document terminology, phase order, links, and contradictions
+- [x] Review diff scope and confirm `raw/` is untouched
+- **Status:** complete
+
+### Phase 6: Delivery
+- [x] Summarize material changes, unresolved experiments, and the next execution slice
+- **Status:** complete
+
+## Success Criteria
+1. Every material roadmap change is supported by source evidence, a Lucas failure mode, or an explicit experiment need.
+2. The review distinguishes Agent Harness from Evaluation Harness and avoids copying an entire framework.
+3. The optimized plan says what not to build yet, not only what to add.
+4. Phase 0 has a concrete, minimal route to a credible single-agent baseline.
+5. Existing product code, user edits, and `raw/` remain untouched.
+
+## Review Questions
+1. Is Lucas's proposed single-agent baseline minimal and behaviorally well-defined?
+2. What is the smallest useful Agent/Environment/Model/Tool contract?
+3. Which termination, budget, error, and retry semantics must exist before planning?
+4. What trace is needed from the first baseline rather than retrofitted later?
+5. Is the Eval MVP's Task/Trial/Grader/Workspace split sufficient and trustworthy?
+6. Which roadmap phases are ordered by learning dependency, and which are merely feature inventory?
+
+## Constraints
+- Do not modify or delete `raw/`.
+- Do not change product code in this task.
+- Preserve the existing modified `docs/agent-harness-eval-mvp.md` content and all unrelated worktree changes.
+- Use prompts for model behavior; use code for execution semantics and reliability.
+
+## Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|
+| Adding the review document failed because Markdown backticks terminated a JavaScript template literal | 1 | Switch to a line-array patch builder that does not interpolate Markdown |
+| Large roadmap replacement produced an invalid `NaN` patch line in the JavaScript wrapper | 1 | Split the roadmap update into small independently verified patches |
+| Combined Phase 9/directory patch did not match the current roadmap context | 1 | Read the exact section and apply two focused patches |
+| A verification `rg` pattern with Markdown backticks triggered shell command substitution | 1 | Record the harmless failure and use single-quoted patterns for subsequent scans |
+
+---
+
 # Task Plan: Replace raw-material navigation with persistent chat sessions
 
 ## Goal

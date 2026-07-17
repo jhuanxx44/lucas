@@ -1,3 +1,72 @@
+# Current Progress: Open-source review of the Lucas harness roadmap
+
+## Session: 2026-07-17
+
+### Phase 1: Scope & Baseline Audit
+- **Status:** complete
+- Read the required planning and web-research skill instructions.
+- Recovered and preserved the completed planning records from the earlier session-history task.
+- Confirmed this task is documentation/research only; product code and `raw/` are out of scope.
+- Detected existing user modifications in `docs/agent-harness-eval-mvp.md` and established an incremental-edit constraint.
+- Read the current roadmap and Eval MVP, then compared their phase ordering, schemas, and directory conventions.
+- Inspected current implementation scope and confirmed PR 0 tests pass (`6 passed`).
+- Recorded the primary inconsistencies and evidence standard in `findings.md`.
+
+### Phase 2: Open-source Research
+- **Status:** complete
+- Next: select references using explicit criteria, pin revisions, and inspect code/tests/docs.
+- Ran two official-source discovery searches for minimal agent loops and evaluation frameworks.
+- Recorded selection criteria and rejected search rank/popularity as the decision rule.
+- Ran targeted discovery for OpenHands and PydanticAI and fixed a four-project, role-specific reference set.
+- Cloned shallow official repositories under `/tmp/lucas-harness-review`, recorded exact revisions, and mapped relevant source/test areas.
+- Read mini-swe-agent's core protocols, default loop, environment, exception hierarchy, trajectory tests, limit tests, and provider finish-reason tests.
+- Recorded both transferable boundaries and coding-specific designs Lucas should reject.
+- Located and read Inspect AI's Task, Sample, TaskState, EvalSample, and EvalLog definitions, focusing on execution/scoring/log separation and limit persistence.
+- Read Inspect's Solver/Generate and Scorer protocols, sandbox contract, limit/cleanup paths, approval tests, and sample-limit tests.
+- Recorded where Inspect validates Lucas's boundaries and where its default timeout retry is too permissive for Lucas.
+- Read PydanticAI usage limits, exception/retry types, tool retry/timeout tests, and Pydantic Evals definition/execution/report APIs.
+- Derived a four-part retry taxonomy to remove ambiguity from the Lucas roadmap.
+- Incorporated the user's pinned local Codex clone and read its repository instructions before source inspection.
+- Read Codex's turn loop, step/tool context, tool router, and protocol message/output types.
+- Replaced OpenHands broad study with Codex as the main production-boundary check.
+- Resolved the full Codex commit and read its retry/fallback, tool registry/runtime, cancellation, and multi-projection output paths.
+- Read Codex rollout/rollout-trace file maps, trace-writer invariants, and focused end-to-end tool/error integration tests.
+- Derived early trace durability, deterministic loop integration-test, and post-error cleanup requirements for Lucas.
+
+### Phase 3: Comparative Review
+- **Status:** complete
+- Re-read the plan and accumulated findings before making architectural decisions.
+- Classified conclusions into keep, adjust, defer, remove, and experiment.
+- Defined a future reference-lookup policy so open-source research stays question-driven.
+
+### Phase 4: Planning Updates
+- **Status:** complete
+- Added `docs/agent-harness-open-source-review.md` with pinned sources, evidence, adoption/rejection decisions, and future lookup policy.
+- Reworked the roadmap around a minimal loop plus optional policies, moved the reliability floor into Phase 0, split Planner from Validator/Revision, made task growth failure-driven, and replaced the fixed 288-run program with staged pairwise experiments.
+- Updated Eval MVP with the shared iterative runtime boundary, strict versioned schemas, StepContext, retry taxonomy, trace/artifact durability, deterministic loop integration tests, and error cleanup requirements.
+- Preserved concurrent implementation work that appeared under `eval_harness/`, `evals/`, and `tests/test_eval_harness.py` without editing it.
+- First add-file patch failed before writing because Markdown backticks conflicted with the JavaScript wrapper; recorded the error and changed patch construction strategy.
+- First large roadmap replacement failed before writing due an invalid generated patch line; split the change by section.
+- Combined Phase 9/directory patch failed before writing due stale context; inspected the exact current section and split it.
+
+### Phase 5: Verification
+- **Status:** complete
+- Initial terminology scan found and corrected stale 20—30 task wording, multi-agent phase mapping, retry event names, CLI ownership, and replay artifact wording.
+- `git diff --check` passed before the final consistency edits.
+- Final fence/diff scan passed, but one backtick-bearing `rg` pattern was interpreted by the shell; no file was changed, and later scans use single quotes.
+- Verified all reviewed source paths exist at the pinned local clones.
+- Verified Markdown code fences are balanced and stale hard commitments/old directory vocabulary are absent.
+- Re-ran `tests/test_agent_mode.py`: 6 passed.
+- Confirmed `git status -- raw` is empty.
+
+### Phase 6: Delivery
+- **Status:** complete
+- Completed the source-backed review, optimized roadmap, and Eval MVP.
+- Preserved all concurrent worktree changes, including `eval_harness/`, `evals/`, `tests/test_eval_harness.py`, `.gitignore`, `AGENTS.md`, and `pytest.ini`.
+- No product code was modified by this research/documentation task.
+
+---
+
 # Progress Log
 
 ## Session: 2026-07-17

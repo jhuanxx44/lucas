@@ -1,0 +1,164 @@
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+@dataclass(frozen=True)
+class RunLimits:
+    max_steps: int
+    timeout_seconds: float
+    max_cost_usd: float = 0.0
+
+
+@dataclass(frozen=True)
+class TaskSpec:
+    id: str
+    title: str
+    instruction: str
+    fixture: str
+    allowed_tools: list[str]
+    limits: RunLimits
+    outcome_graders: list[dict]
+    safety_graders: list[dict]
+    process_graders: list[dict]
+    tags: list[str]
+    task_dir: Path = field(repr=False, compare=False)
+
+    @property
+    def fixture_dir(self) -> Path:
+        return _child_path(self.task_dir, self.fixture)
+
+    @property
+    def reference_dir(self) -> Path:
+        return self.task_dir / "reference"
+
+
+@dataclass(frozen=True)
+class Trial:
+    run_id: str
+    task_id: str
+    agent_variant: str
+    trial_index: int
+    workspace: str
+    started_at: str
+
+
+@dataclass
+class AgentResult:
+    answer: Any = None
+    finish_reason: str = "completed"
+    error: str = ""
+
+
+@dataclass
+class GradeResult:
+    success: bool
+    outcome_passed: bool
+    safety_passed: bool
+    process_passed: bool
+    checks_passed: int
+    checks_total: int
+    checks: list[dict]
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TraceEvent:
+    sequence: int
+    run_id: str
+    timestamp: str
+    event: str
+    data: dict
+
+
+def load_task(task_path: str | Path) -> TaskSpec:
+    path = Path(task_path).resolve()
+    if path.is_dir():
+        path = path / "task.yaml"
+    if not path.is_file():
+        raise ValueError(f"task.yaml not found: {path}")
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("task.yaml must contain a mapping")
+
+    required = {"id", "title", "instruction", "fixture", "allowed_tools", "limits", "graders"}
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ValueError(f"task.yaml missing fields: {', '.join(missing)}")
+
+    limits_raw = raw["limits"]
+    graders = raw["graders"]
+    if not isinstance(limits_raw, dict) or not isinstance(graders, dict):
+        raise ValueError("limits and graders must be mappings")
+
+    limits = RunLimits(
+        max_steps=_positive_int(limits_raw.get("max_steps"), "limits.max_steps"),
+        timeout_seconds=_positive_number(
+            limits_raw.get("timeout_seconds"), "limits.timeout_seconds"
+        ),
+        max_cost_usd=float(limits_raw.get("max_cost_usd", 0.0)),
+    )
+    task = TaskSpec(
+        id=str(raw["id"]),
+        title=str(raw["title"]),
+        instruction=str(raw["instruction"]),
+        fixture=str(raw["fixture"]),
+        allowed_tools=_string_list(raw["allowed_tools"], "allowed_tools"),
+        limits=limits,
+        outcome_graders=_grader_list(graders.get("outcome", []), "outcome"),
+        safety_graders=_grader_list(graders.get("safety", []), "safety"),
+        process_graders=_grader_list(graders.get("process", []), "process"),
+        tags=_string_list(raw.get("tags", []), "tags"),
+        task_dir=path.parent,
+    )
+    if not task.fixture_dir.is_dir():
+        raise ValueError(f"fixture directory not found: {task.fixture_dir}")
+    if not task.reference_dir.is_dir():
+        raise ValueError(f"reference directory not found: {task.reference_dir}")
+    _reject_symlinks(task.fixture_dir)
+    _reject_symlinks(task.reference_dir)
+    return task
+
+
+def _child_path(parent: Path, child: str) -> Path:
+    candidate = (parent / child).resolve()
+    if candidate != parent and parent not in candidate.parents:
+        raise ValueError(f"path escapes task directory: {child}")
+    return candidate
+
+
+def _positive_int(value: Any, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
+def _positive_number(value: Any, name: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{name} must be a positive number")
+    return float(value)
+
+
+def _string_list(value: Any, name: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"{name} must be a list of strings")
+    return value
+
+
+def _grader_list(value: Any, name: str) -> list[dict]:
+    if not isinstance(value, list) or any(
+        not isinstance(item, dict) or not isinstance(item.get("type"), str)
+        for item in value
+    ):
+        raise ValueError(f"graders.{name} must be a list of grader mappings")
+    return value
+
+
+def _reject_symlinks(root: Path):
+    if any(path.is_symlink() for path in root.rglob("*")):
+        raise ValueError(f"symlinks are not allowed in task data: {root}")

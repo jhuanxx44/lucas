@@ -15,13 +15,13 @@ Lucas 的长期价值不只是完成某个具体业务，而是作为一个可�
   -> 记录结论并决定下一次迭代
 ```
 
-最终希望形成的 Agent 主循环是：
+第一阶段先把最小主循环做稳：
 
 ```text
-plan -> execute -> validate -> revise -> finish
+model -> tool -> observation -> model -> ... -> finish
 ```
 
-其中 `revise` 可以回到 `plan` 或 `execute`，但必须受最大步数、最大修订次数、超时和成本预算约束。
+显式 Planner、Validator、Revision、Context policy 都作为这个主循环上的可选实验。只有 eval 证明有收益，才进入保留架构；最终是否形成 `plan -> execute -> validate -> revise -> finish`，由实验结果决定，而不是路线图预设。
 
 ## 2. 非目标
 
@@ -39,15 +39,15 @@ plan -> execute -> validate -> revise -> finish
 
 路线图完成后，Lucas Harness 应具备：
 
-1. 显式的 `plan -> execute -> validate -> revise -> finish` 状态机。
+1. 一个边界清晰、可取消、受预算约束的最小 Agent loop，以及可插拔的 Planner、Validator、Context policy 实验。
 2. 文件读取、文件写入/patch、代码搜索、受限 Shell/Test，以及至少一个 MCP Server。
 3. 基于预算的 Context 选择，以及至少一次可追踪的摘要压缩。
-4. run/tool/model timeout、条件化 retry、最大步数、工具错误恢复和可比较重跑。
-5. 20—30 个固定任务及自动验收器。
-6. success rate、steps、latency、cost、retry、context size 等指标。
+4. run/tool/model timeout、取消、四类 retry/correction/revision、最大步数、工具错误恢复和可比较重跑。
+5. 经过 reference 校验、按失败案例增长并分为 smoke、capability、regression、holdout 的固定任务集。
+6. success rate、steps、latency、cost、provider retry、tool retry、model correction、revision、context size 等指标。
 7. prompt、context、tool call、错误、validation、revision 和产物 trace。
 8. 无后端依赖的本地 HTML replay。
-9. baseline、planner、planner-validator、planner-validator-context-compression 的可重复对比。
+9. baseline、planner、planner-validator、context-selection、context-compression 等逐项可归因对比。
 10. 每次机制升级都有实验结论，而不只是代码提交。
 
 ## 4. 设计原则
@@ -89,14 +89,20 @@ plan -> execute -> validate -> revise -> finish
 建议把通用 Harness 与现有 Lucas 业务能力分开：
 
 ```text
-harness/              通用运行时
-benchmarks/           固定任务、fixture、grader
+harness/              Agent Harness 通用运行时
+evals/harness/        Evaluation Harness 运行、隔离、判卷和汇总
+evals/tasks/          固定 task、fixture、reference
+evals/suites/         固定 suite
 prompts/harness/      Harness prompt
 agents/               现有 Lucas 业务 Agent
 server/ + web/        产品入口与 replay 入口
 ```
 
 现有 Lucas Manager 后续作为 Harness 的一个 adapter/consumer，而不是继续把所有机制写进 `Manager`。
+
+### 4.6 标杆按问题查，不按框架抄
+
+开源参考的角色固定为：mini-swe-agent 看最小骨架，Codex 看生产边界，Inspect AI 看 Eval 边界，PydanticAI 看 schema、usage limit 和模型修正语义。只有出现具体设计问题或失败案例时才定向查看固定 commit；详细结论见 `docs/agent-harness-open-source-review.md`。
 
 ## 5. 现阶段 Agent Harness 能力基线
 
@@ -153,15 +159,15 @@ plan -> execute -> validate -> revise -> finish
 | Context 管理 | L2 | 不同来源有固定截断；Wiki 有 top-k 召回 | 没有统一 token budget、选择记录、去重、压缩和 provenance | Phase 4 |
 | 短期 Memory | L2 | 能注入最近对话；会话消息可持久化 | Manager 每次请求重建；摘要只是 200 字截断，没有重要性策略 | Phase 4、9 |
 | 长期 Memory | L2 | 偏好与历史结论落盘，可跨请求使用 | 子串召回、覆盖式偏好、无时间衰减和写入决策 | 后续扩展，不阻塞核心 Harness |
-| 多 Agent 编排 | L3 | 动态选人、并行、串行、并发限制、单研究员错误隔离 | 只能表达 parallel/serial，不能动态产生步骤或一般 DAG | Phase 2、9 |
+| 多 Agent 编排 | L3 | 动态选人、并行、串行、并发限制、单研究员错误隔离 | 尚未与 single 在同一 runtime、工具、预算和 grader 下比较 | Phase 8、9 |
 | Validation | L2 | URL、部分数字和输出置信度有事后校验 | 校验覆盖窄；不基于任务 success criteria；不触发修正 | Phase 2 |
 | Revision / Reflection | L1 | synthesis 会比较分歧，工具参数可由下一轮模型自行调整 | 没有显式 revision decision、失败归因、重复失败防护 | Phase 2、3 |
-| Timeout / Retry | L2 | 部分 HTTP 有 timeout；Gemini 非流式调用有局部 retry | 没有 run/model/tool 统一策略；流式调用、工具和写操作处理不一致 | Phase 3 |
+| Timeout / Retry | L2 | 部分 HTTP 有 timeout；Gemini 非流式调用有局部 retry | 没有 baseline 可靠性地板；四类 retry/correction/revision 语义混杂 | Phase 0、3 |
 | 错误恢复 | L2 | 单研究员失败不拖垮其他研究员；工具异常转为文本；待确认任务可恢复 | 错误未分类；没有 transient/permanent/denied 语义和任务 checkpoint | Phase 1、3 |
 | 可重复运行 | L1 | 本地单用户、文件状态直观 | 没有 run manifest、fixture 隔离、版本/hash、rerun 命令 | Phase 0、3 |
 | 自动评估 | L1 | 有单元/API 测试 | 没有固定 Agent task、grader、suite 和 holdout | Phase 0、6 |
 | Metrics | L1 | 非流式 LLM 能提取 token/latency；报告有 total_tokens 字段 | 流式研究 token 为 0；没有 steps、retry、context、分层 latency 指标 | Phase 0、7 |
-| Trace | L1 | 有日志、SSE 状态事件、报告/sidecar 产物 | 没有 run_id、结构化事件序列、prompt/tool/context 关联 | Phase 0、7 |
+| Trace | L1 | 有日志、SSE 状态事件、报告/sidecar 产物 | 没有 versioned append-only run trace、artifact 引用和 prompt/tool/context 关联 | Phase 0；Phase 7 只做增强与 replay |
 | Replay | L0 | 无 | 无法离线还原一次执行为何成功或失败 | Phase 7 |
 | Human-in-the-loop | L2 | 材料分类支持 pending、TTL、用户选择后恢复 | 是业务专用实现，没有通用 pause/resume 协议 | Phase 3、9 |
 | 模型抽象 | L3 | Gemini 与 OpenAI-compatible 统一接口，多 provider 配置 | retry、usage、stream 行为不一致；无 provider fallback | Phase 3 |
@@ -404,7 +410,7 @@ Direct loop 适合作为 Phase 0 的 `baseline` 行为参考，但不建议直�
 - 前端仍有 1 个 React lint error。
 - `tests/test_llm_connectivity.py` 是手动连通性脚本，不属于稳定自动 benchmark。
 
-缺少 20—30 个固定 Agent 任务、自动 grader、suite、variant 和成功率报告。因此现有测试能证明函数/API 没明显回归，不能衡量 Agent 是否更会完成任务。
+缺少分层、固定版本的 Agent tasks、自动 grader、suite、variant 和成功率报告。因此现有测试能证明函数/API 没明显回归，不能衡量 Agent 是否更会完成任务。
 
 ### 5.11 可直接复用的资产
 
@@ -429,84 +435,66 @@ Direct loop 适合作为 Phase 0 的 `baseline` 行为参考，但不建议直�
 按依赖关系，最短路径不是先升级 Memory 或多 Agent，而是：
 
 ```text
-现有 Direct Tool Loop
-  -> 冻结为 baseline
-  -> 抽出 ToolSpec / ToolResult
-  -> 增加 RunState 与 TraceRecorder
-  -> 显式 Plan / Validation / Revision
-  -> 加统一 timeout / retry / budgets
-  -> 再做 Context selection / compression
+产品 single|multi 执行边界（PR 0）
+  -> Eval 考场、Oracle、严格 TaskSpec 与 grader
+  -> 共享最小 AgentRunner + ModelAdapter + Environment/ToolRuntime
+  -> 可靠性地板 + versioned TraceRecorder
+  -> smoke-v1 与 business-capability-v1 baseline
+  -> 冻结 baseline 与失败分类
+  -> 扩展 Tool contract / safety
+  -> Planner 单变量实验
+  -> Validator + Revision 单变量实验
+  -> Context selection，再单独实验 compression
   -> 接 MCP
-  -> 扩充到 24 个任务并做 variant 对比
+  -> 按失败案例扩充 capability/regression/holdout
 ```
 
-原因是：没有 run、trace 和 grader 时，Memory、Context 或 Planner 的改动都无法证明是否真的带来改善。
+原因是：没有 run、trace 和 grader 时，Memory、Context 或 Planner 的改动都无法证明是否改善；没有 timeout、取消、输出上限和清理时，baseline 本身也不可信。
 
 ## 6. 目标架构
 
 ```text
-TaskSpec
-  |
-  v
-AgentRunner ------------------------------------+
-  |                                             |
-  +-> Planner                                   |
-  |     -> Plan / Step                          |
-  |                                             |
-  +-> ContextManager                            |
-  |     -> select / budget / compress           |
-  |                                             |
-  +-> ToolRuntime                               |
-  |     -> native tools                         |
-  |     -> MCP adapter                          |
-  |     -> policy / timeout / retry             |
-  |                                             |
-  +-> Validator                                 |
-  |     -> pass / revise / fail                 |
-  |                                             |
-  +-> TraceRecorder -> JSONL -> HTML Replay     |
-  |                                             |
-  +-> MetricsCollector -> RunResult ------------+
-                              |
-                              v
-                         Auto Grader
+Evaluation Harness
+  TaskSpec / fixture / reference
+      -> EvalRunner -> AgentAdapter ----------------------------+
+                                                               |
+Agent Harness                                                  |
+  AgentRunner                                                  |
+      -> immutable StepContext                                 |
+      -> ModelAdapter                                          |
+      -> Environment / ToolRuntime                             |
+      -> TraceSink + artifact store                            |
+      -> RunResult --------------------------------------------+
+                                                               |
+Optional experimental policies                                |
+  Planner | Validator/Revision | Context selection/compression |
+                                                               v
+                                                external Graders -> Report
 ```
+
+`AgentAdapter` 是 Eval Harness 调用被测 Agent 的边界，不承担模型格式、工具执行和预算。Planner、Validator 和 ContextManager 不进入 baseline 的必选依赖；它们通过配置组合在同一个 Runner 上实验。
 
 ### 6.1 核心状态机
 
-```text
-INIT
-  -> PLAN
-  -> EXECUTE_STEP
-  -> VALIDATE
-       -> PASS -> FINISH
-       -> REVISE_PLAN -> EXECUTE_STEP
-       -> REVISE_OUTPUT -> EXECUTE_STEP
-       -> TERMINAL_FAIL
+Baseline 第一版：
 
-任意状态
-  -> timeout / budget / max_steps / cancelled
-  -> TERMINAL_FAIL
+```text
+INIT -> MODEL_CALL -> TOOL_CALL -> MODEL_CALL -> ... -> FINISH
+任意状态 -> timeout / budget / max_turns / cancelled / fatal_error -> TERMINAL
 ```
 
-建议第一版使用普通 Python `Enum + dataclass`，不要引入工作流框架。
+Planner variant 可以在 `MODEL_CALL` 前产生或更新 Plan；Validator variant 可以在候选 finish 后返回 pass/revise/fail。二者不得改变 baseline 的 timeout、tool、trace 和 terminal 语义。
 
-核心对象控制在以下几个：
+Phase 0 核心对象只包含：
 
 ```python
 RunState
-Plan
-PlanStep
-ContextItem
-ToolSpec
-ToolCall
-ToolResult
-ValidationResult
+StepContext
 RunResult
 TraceEvent
 ```
 
-不要在第一版增加复杂的 message bus、blackboard、agent graph 等对象。
+`RunState` 只保存 messages、step/model call/correction counters、usage、deadline/cancellation 和 terminal result。`StepContext` 固定一次模型请求看到的 context、tool specs 和预算快照。Plan、ContextItem、ValidationResult 到对应实验再加入。不要在第一版增加 message bus、blackboard、agent graph。
 
 ## 7. 分阶段路线图
 
@@ -523,16 +511,21 @@ TraceEvent
 
 ### 最小实现
 
-1. 新增独立 `harness/` 包和 CLI：
+Phase 0 按 `docs/agent-harness-eval-mvp.md` 的 PR 0—4 实施，MVP 术语与目录以该文档为准。
+
+1. 在 `evals/` 下建立 `harness/`、`tasks/`、`suites/` 和 CLI：
 
    ```bash
-   python -m harness run benchmarks/tasks/fs_read.yaml --variant baseline
+   python -m evals.harness run-suite evals/suites/smoke.yaml \
+     --agent lucas-single --trials 3
    ```
 
-2. 定义 `TaskSpec`、`RunConfig`、`RunResult`。
-3. Baseline 采用最小 ReAct：模型直接选择工具或 finish，不生成显式 plan，不做独立 validation，不压缩 context。
-4. 每个 run 写入 manifest、最终答案、产物列表和最小 JSONL trace。
-5. 先建立 6 个 smoke tasks，不等完整 benchmark 才开始运行。
+2. 定义严格、拒绝未知字段且带 version 的 `TaskSpec/RunLimits/Trial/AgentResult/GradeResult`。
+3. 抽出产品与 Eval 共用的最小 `AgentRunner/ModelAdapter/Environment/TraceSink`；当前 `SingleAgentService` 的一次性 research call 只是 PR 0 边界，不等于最终 baseline loop。
+4. Baseline 采用最小 tool loop，不生成显式 plan，不做独立 validation，不压缩 context。
+5. 加入可靠性地板：max model turns/corrections、run/model/tool/subprocess timeout、cancellation、输出上限、进程清理和结构化 finish reason。
+6. Trace 从第一轮使用 versioned append-only JSONL；大 payload 先写 artifact，再写 hash/path 引用。
+7. 先用 deterministic FakeModel 做 loop integration test，再运行 6 个 smoke 和 6 个 business capability tasks。
 
 ### Baseline 固定项
 
@@ -540,23 +533,24 @@ TraceEvent
 - temperature 固定为 0 或 provider 可用的最低值。
 - 相同的 system prompt、工具集合、任务 fixture。
 - 相同 max steps、timeout 和 context budget。
-- 保存 prompt hash、Git commit/dirty 状态和依赖版本。
+- 相同 provider/model retry 配置；model correction 与 provider retry 分别计数。
+- 保存 prompt hash、Git commit/dirty 状态、依赖版本、TaskSpec/grader/trace schema version。
 
 ### 验收
 
-- 6 个 smoke tasks 可以单独或批量运行。
+- 6 个 smoke tasks 与 6 个 business capability tasks 可以分开运行和汇总。
 - 每个 run 都有唯一目录和机器可读结果。
-- 失败任务也能留下完整 finish reason。
+- 失败、timeout 或 cancellation 也能留下唯一 terminal event、完整 finish reason，并释放运行状态与子进程。
 - 同一任务连续运行 3 次，不会污染 fixture 或其他 run。
+- deterministic loop integration test 能验证 tool call id/observation 会进入下一次模型请求。
 
 ### 阶段产物
 
-- `harness/cli.py`
-- `harness/models.py`
-- `harness/runner.py`
-- `benchmarks/tasks/`
+- `evals/harness/`
+- `evals/suites/` 与 `evals/tasks/`
+- 共用的最小 `harness/runner.py`、ModelAdapter、Environment/ToolRuntime 与 TraceSink
 - `runs/<run_id>/manifest.json`
-- Baseline 首份实验记录
+- smoke 与 business capability 两份 baseline 记录
 
 ---
 
@@ -598,17 +592,20 @@ version
 
 ### ToolResult
 
-禁止只返回任意字符串。统一返回：
+禁止只返回任意字符串。统一状态与三种输出视图：
 
 ```text
 status: ok | invalid_input | denied | timeout | transient_error | permanent_error
-content
-structured
+structured / raw_artifact: 完整结构化结果或 artifact 引用
+observation: 有硬上限，返回模型
+trace_preview: 脱敏且有硬上限
 error_code
 duration_ms
 truncated
 artifacts
 ```
+
+artifact 必须先持久化，再让 trace 或 observation 引用其 hash/path。工具策略、trace 和执行器接收同一个 `StepContext`，不得依赖可变全局状态。
 
 ### 安全要求
 
@@ -631,13 +628,13 @@ artifacts
 
 ---
 
-## Phase 2：显式 Plan—Execute—Validate—Revise Loop
+## Phase 2：Planner 单变量实验
 
 ### 学习问题
 
 - 显式 plan 是否减少无效步骤？
-- validator 能否提高成功率，还是只增加成本？
-- revision 应修改计划、工具参数，还是最终答案？
+- 它是否只帮助多步骤任务，却让简单任务过度规划？
+- plan 的哪部分信息真正被 Executor 使用？
 
 ### Planner
 
@@ -667,62 +664,41 @@ Planner 输出稳定 JSON：
 - 工具选择仍由 LLM 决定，但受该 step 的 allowed tools 限制。
 - 完成一步后更新结构化状态，不把所有历史重新拼成自由文本。
 
-### Validator
+### 实验边界
 
-Validator 分两层：
-
-1. 确定性 validator：文件存在、内容断言、测试结果、禁止变更、schema。
-2. LLM validator：只用于开放式任务，判断是否满足 success criteria。
-
-确定性 validator 优先。`prompts/harness/validator.md` 建议标记 `llm-weight: medium`。
-
-统一输出：
-
-```json
-{
-  "status": "pass|revise|fail",
-  "failed_criteria": [],
-  "reason": "...",
-  "revision_scope": "plan|step|answer",
-  "suggested_revision": "..."
-}
-```
-
-### Revision Policy
-
-- `invalid_input`：允许修正参数，不消耗 plan revision 配额。
-- `transient_error`：按 retry policy 处理。
-- `permanent_error`：回到 planner 选择替代路径。
-- validation `revise`：最多 2 次修订。
-- 相同工具、相同参数、相同错误不得连续重复。
-- revision 必须记录“上一方案为什么失败、这次改了什么”。
-
-### 终止条件
-
-- validator pass。
-- max steps。
-- max revisions。
-- run timeout。
-- token/cost budget。
-- 没有可执行步骤。
-- 用户取消。
+- `baseline` 与 `planner` 复用同一 Runner、ModelAdapter、ToolRuntime、可靠性限制和 grader。
+- planner 只新增一次显式计划及其后续更新；候选 finish 仍按 baseline 规则结束，不调用独立 Validator。
+- success criteria 来自用户任务或 Planner 输出，但不得包含隐藏 grader expected value。
+- plan step 的 `allowed_tools` 第一版只做收窄，不能扩张 TaskSpec 工具权限。
+- 简单任务与多步骤任务分层报告，防止平均值掩盖过度规划。
 
 ### 验收
 
-- trace 可以完整还原每次 plan、step、validation 和 revision。
-- 至少 3 个任务能展示“第一次失败，修订后成功”。
-- 死循环任务能由 max steps 稳定终止。
-- validator 不得绕过自动 grader；最终成功仍由 benchmark grader 判断。
+- trace 可以完整还原 plan、step 与实际 observation。
+- 相同任务各运行至少 3 次 baseline 与 planner。
+- 报告 success、steps、latency、token/cost，并分开简单与多步骤任务。
+- 得出保留、修改或删除 Planner 的实验结论，不以“已实现 Planner”为完成。
 
 ---
 
-## Phase 3：Timeout、Retry、错误恢复与可重复运行
+## Phase 3：Validator、Revision 与错误恢复实验
 
 ### 学习问题
 
-- 哪些错误适合 retry，哪些应该 replan？
+- Validator 能否把 grader 失败转为成功，还是只会自我认可？
+- Revision 应修改 plan、step、工具参数还是最终答案？
+- 哪些错误适合 provider/tool retry，哪些应交给模型 correction 或 revision？
 - 如何避免 retry 掩盖真实失败或造成成本失控？
 - 如何让两次 run 具有可比较性？
+
+### Validator 与 Revision
+
+Validator 分两层：
+
+1. 确定性 validation：文件存在、内容断言、测试结果、禁止变更、schema。
+2. LLM validation：只用于无法确定性判断的开放式 success criteria。
+
+确定性逻辑优先；`prompts/harness/validator.md` 标记 `llm-weight: medium`。统一输出 `pass|revise|fail`、failed criteria、reason 与 revision scope。Revision 最多 2 次，并记录上一方案为何失败、本次改变什么。Benchmark grader 始终是最终裁判。
 
 ### Timeout 层级
 
@@ -733,14 +709,22 @@ run_timeout
   > subprocess_timeout
 ```
 
-所有 timeout 必须产生结构化错误和 trace event。
+这些 timeout 的基本执行与清理语义已在 Phase 0 存在；本阶段补齐故障注入、分类恢复和可比较策略。所有 timeout 必须产生结构化错误和 trace event。
+
+### Retry / Correction / Revision 分类
+
+| 类型 | 是否增加模型步 | 自动执行条件 | 独立计数 |
+|---|---:|---|---:|
+| provider retry | 否 | 明确 429/5xx/断连等 transient error | 是 |
+| tool execution retry | 否 | 幂等且确认上次未成功 | 是 |
+| model correction | 是 | schema、format、参数错误反馈模型 | 是 |
+| revision | 是 | validation 要求改变 plan/step/answer | 是 |
 
 ### Retry Policy
 
 只重试明确的 transient error：
 
 - provider 429/5xx/连接重置。
-- MCP 临时断连。
 - 幂等工具的临时 I/O 错误。
 
 不自动重试：
@@ -754,8 +738,9 @@ run_timeout
 第一版参数建议：
 
 ```text
-max_model_retries = 2
+max_provider_retries = 2
 max_tool_retries = 1
+max_model_corrections = 3
 backoff = exponential + jitter
 max_steps = 12
 max_revisions = 2
@@ -769,7 +754,6 @@ max_revisions = 2
 - `rg` 无结果后扩大查询范围。
 - 测试命令超时后改跑更小测试目标。
 - 工具输出被截断后改用行范围读取。
-- MCP 断连后重连一次。
 - 写入被拒绝后改写允许目录。
 
 ### 可重复运行
@@ -788,7 +772,7 @@ max_revisions = 2
 增加：
 
 ```bash
-python -m harness rerun runs/<run_id>
+python -m evals.harness rerun runs/<run_id>
 ```
 
 `rerun` 使用原 manifest 创建新 run，不覆盖旧结果。
@@ -796,9 +780,10 @@ python -m harness rerun runs/<run_id>
 ### 验收
 
 - 所有注入错误都有预期 recovery 或明确 terminal reason。
-- retry 次数和 backoff 可以从 trace 中验证。
+- provider/tool retry、model correction 和 revision 次数可以从 trace 中分别验证。
 - 非幂等工具不会被盲目重试。
 - rerun 能恢复同一任务、variant、工具和预算配置。
+- 报告 validator-pass/grader-fail 与 revision-recovery 指标。
 
 ---
 
@@ -826,6 +811,8 @@ compressible
 ```
 
 ### Context 选择策略 V1
+
+先单独实验确定性选择/丢弃，不在同一改动中加入 LLM 摘要。只有 trace 证明失败来自 context 超预算，并且 selection 仍不能解决时，才进入下一小节的 compression variant。
 
 按以下优先级构建模型输入：
 
@@ -925,7 +912,18 @@ servers:
 
 ---
 
-## Phase 6：建立 24 个固定任务和自动验收器
+## Phase 6：任务集治理与按失败扩充
+
+任务集不以数量为目标，分四层治理：
+
+```text
+smoke          验证考场、工具和 grader
+capability     暴露尚不稳定、正在学习的能力
+regression     已稳定通过，防止回退
+holdout        同分布未调试 fixture，检查过拟合
+```
+
+Phase 0 的 `smoke-v1` 与 `business-capability-v1` 是起点。只有失败复盘暴露新机制问题，或某项能力稳定后需要防回归，才新增/迁移任务。
 
 ### TaskSpec 格式
 
@@ -946,7 +944,7 @@ forbidden_changes:
   - raw/**
 ```
 
-### 建议任务集
+### 候选任务库（不是配额）
 
 #### A. 文件系统：5 个
 
@@ -1002,7 +1000,7 @@ forbidden_changes:
 | MCP-01 | 通过 MCP 读取并汇总目录 | MCP call trace |
 | MCP-02 | MCP 断连后恢复一次 | reconnect + success |
 
-合计 24 个。任务内容应保持通用，不依赖投研知识。
+以上 24 个只作为候选题库，不要求一次建完。新增任务必须写明它暴露的当前失败、所属 suite、确定性 grader 和 reference solution；通用机制题与 Lucas 业务题分别汇总。
 
 ### Grader 类型
 
@@ -1027,14 +1025,17 @@ forbidden_changes:
 
 ### 验收
 
-- 24 个任务均能在干净环境单独运行。
+- 所有进入 suite 的任务均能在干净环境单独运行，并通过 `validate-task`。
 - grader 自身有单元测试。
 - task fixture 不被 run 原地修改。
 - 全量 benchmark 可输出 JSON 和 Markdown summary。
+- capability 中稳定通过的任务有明确规则迁入 regression，并保留未调试 holdout。
 
 ---
 
-## Phase 7：指标、Trace 与本地 HTML Replay
+## Phase 7：Trace 成熟化与本地 HTML Replay
+
+基础 trace、manifest 和核心指标已在 Phase 0 存在。本阶段只扩展 schema、查询体验与 replay，不回头补埋点。
 
 ### 核心指标
 
@@ -1045,13 +1046,14 @@ forbidden_changes:
 | `tool_calls` | 总工具调用及按工具分类数量 |
 | `latency_ms` | run、model、tool、validation 分层耗时 |
 | `cost_usd` | 按模型 usage 和价格表估算 |
-| `retry_count` | model/tool/MCP retry 次数 |
-| `retry_success_rate` | retry 后恢复成功数 / retry 数 |
+| `provider_retry_count` | transport/provider retry 次数 |
+| `tool_retry_count` | 真实重新执行工具次数 |
+| `model_correction_count` | format/schema/参数反馈后的新模型步数 |
+| `revision_count` | validation 触发的 plan/step/answer 修订次数 |
+| `recovery_rate` | 各类恢复后最终 grader success 的比例 |
 | `context_tokens` | 候选、选择后、压缩后 token 数 |
 | `compression_ratio` | after / before |
-| `revision_count` | validator 触发的修订次数 |
 | `tool_error_rate` | 非 ok 工具结果 / 工具调用数 |
-| `recovery_rate` | 发生可恢复错误后最终成功的 run 比例 |
 | `finish_reason` | success/max_steps/timeout/budget/error/cancelled |
 
 ### Trace Event
@@ -1066,6 +1068,8 @@ context_compressed
 prompt_rendered
 model_call_started
 model_call_finished
+provider_retry
+model_correction
 plan_created
 step_started
 tool_call_started
@@ -1103,7 +1107,7 @@ parent_event_id
 生成完全静态的本地页面：
 
 ```bash
-python -m harness replay runs/<run_id>
+python -m evals.harness replay runs/<run_id>
 # 输出 runs/<run_id>/replay.html
 ```
 
@@ -1129,26 +1133,30 @@ python -m harness replay runs/<run_id>
 
 ---
 
-## Phase 8：版本对比与消融实验
+## Phase 8：逐项版本对比与消融实验
 
 ### Variant 定义
 
-| Variant | Planner | Validator | Context selection | Compression |
-|---|---:|---:|---:|---:|
-| `baseline` | 否 | 仅最终 grader | 最近上下文 | 否 |
-| `planner` | 是 | 仅最终 grader | 最近上下文 | 否 |
-| `planner_validator` | 是 | 是 | 最近上下文 | 否 |
-| `planner_validator_compress` | 是 | 是 | 预算+相关性 | 是，一次 |
+实验不预设最终一定保留 Planner 或 Validator，而是逐个过门：
 
-各 variant 必须通过配置组合相同组件，而不是复制四套 Runner。
+| 实验 | 对照 | 只有一个主要变量 |
+|---|---|---|
+| A | baseline vs planner | 显式规划 |
+| B | retained variant vs +validator+revision | 内部校验与修订 |
+| C | retained variant vs +context selection | 确定性上下文选择 |
+| D | context selection vs +one-time compression | LLM 摘要压缩 |
+| E | native tools vs MCP adapter | 工具协议来源 |
+| F | single vs multi-agent | 多 Agent 编排 |
+
+每个实验结束后先决定保留、修改或删除，再确定下一个实验的 base variant。所有 variant 通过配置组合同一个 Runner，不复制实现。
 
 ### 实验协议
 
-- 固定 24 个任务。
+- 固定当期 versioned suite，并用未调试 holdout 检查过拟合。
 - 固定模型、provider、temperature、工具版本和 budgets。
-- 每个 variant 每个任务运行至少 3 次。
-- 首轮共 `24 × 4 × 3 = 288` runs。
-- 同一任务的 variant 运行顺序随机，降低时间和 provider 波动影响。
+- 每个实验 pair 的每个任务至少运行 3 次；根据基线方差决定是否增加 trial。
+- 不一次批量跑预设的 288 runs；只有前一实验产生明确结论才进入下一实验。
+- 同一任务的对照运行顺序随机或交错，降低时间和 provider 波动影响。
 - 同时报告总体和分组指标，不只看平均 success rate。
 - 保存失败样本列表，人工抽查至少 10 个差异案例。
 
@@ -1184,7 +1192,7 @@ revision_count_mean
 - 一条命令完成 variant benchmark 和汇总：
 
   ```bash
-  python -m harness bench benchmarks/suites/core.yaml --variants all --runs 3
+  python -m evals.harness run-experiment evals/experiments/planner.yaml --trials 3
   ```
 
 - 报告能追溯到每个原始 run。
@@ -1197,42 +1205,37 @@ revision_count_mean
 
 ### 目标
 
-在通用 benchmark 稳定后，让现有 Lucas 业务流程成为 Harness 的真实 consumer。
+Phase 0 已要求产品 single path 与 Eval Adapter 共用最小 Runner。本阶段只把实验保留的机制逐步应用到更多 Lucas 产品流程，并验证真实收益。
 
 ### 接入顺序
 
-1. 先用统一 TraceRecorder 包裹现有 Manager，不改变行为。
-2. 把现有文件工具迁移到 ToolRuntime。
-3. 把现有 dispatch 映射成 Plan。
-4. 把现有 verify 映射成 Validator，但暂不自动 revision。
-5. 在低风险 direct 任务中启用 revision。
-6. 最后才考虑研究流程的动态 replan。
+1. 确认产品 single path 与 Eval Adapter 调用同一个 AgentRunner，不维护影子实现。
+2. 按业务任务需要把现有工具迁移到统一 ToolRuntime，不一次迁完全部能力。
+3. 只有 Planner 实验通过，才把现有 dispatch 作为 planner adapter 的输入案例。
+4. 只有 Validator 实验通过，才把现有 verify 作为 deterministic validation 的输入案例。
+5. 在低风险 direct/research 任务灰度启用被保留的 policy，并与 baseline 对照。
+6. trace 完成脱敏和保留策略后，再记录真实产品 run；不把真实用户数据复制进 eval fixture。
+7. 最后才实验 single vs multi 和动态 replan。
 
 ### 验收
 
 - 现有业务测试不回退。
-- Lucas 的一次真实执行可以生成相同格式的 replay。
+- Lucas 的一次真实执行可以生成同 schema 的 trace；replay 只消费允许保留的脱敏字段。
 - 通用 Harness 不 import 投研业务模块。
 - 业务 adapter 可以自行注册工具、context provider 和 validator。
+- 被实验否定的机制不因产品已有类似代码而强行接入。
 
 ## 8. 建议目录结构
 
 ```text
 harness/
   __init__.py
-  cli.py
   models.py
   runner.py
-  state_machine.py
-  planner.py
-  executor.py
-  validator.py
-  context.py
-  retry.py
   budgets.py
-  metrics.py
   trace.py
-  replay.py
+  model_adapter.py
+  environment.py
   tools/
     base.py
     registry.py
@@ -1240,21 +1243,31 @@ harness/
     search.py
     process.py
     mcp.py
+  policies/             # 到对应实验再增加
+    planner.py
+    validator.py
+    context.py
 
 prompts/harness/
   planner.md
-  executor.md
   validator.md
   context-summary.md
 
-benchmarks/
+evals/
+  harness/
+    cli.py
+    models.py
+    runner.py
+    workspace.py
+    grader.py
+    report.py
+    replay.py
+    adapters/
   suites/
     smoke.yaml
-    core.yaml
+    business-capability.yaml
   tasks/
-  fixtures/
-  graders/
-  expected/
+  experiments/
 
 runs/                 # gitignore，仅本地实验产物
   <run_id>/
@@ -1271,6 +1284,8 @@ docs/harness/
   tool-contract.md
   benchmark-guide.md
 ```
+
+目录表示职责边界，不要求一次创建全部文件。Phase 0 只创建 Eval MVP 与最小 Runner 真正使用的部分。
 
 ## 9. “干中学”执行节奏
 
@@ -1327,12 +1342,13 @@ infrastructure
 
 | Milestone | 包含阶段 | 完成标志 |
 |---|---|---|
-| M1 最小 Harness | Phase 0—1 | 6 个任务、原生工具、隔离运行、基础 trace |
-| M2 自修正 Loop | Phase 2—3 | 显式状态机、validation、revision、timeout/retry |
-| M3 Context + MCP | Phase 4—5 | 预算选择、一次摘要、一个 MCP Server |
-| M4 Eval Lab | Phase 6—7 | 24 个任务、指标、完整 trace、HTML replay |
-| M5 对比实验 | Phase 8 | 4 variants、288 runs、实验结论 |
-| M6 产品回接 | Phase 9 | Lucas 真实执行复用 Harness 和 replay |
+| M1 可信 Baseline | Phase 0 | smoke/business 分层、隔离运行、可靠性地板、versioned trace、首份成绩单 |
+| M2 Tool Runtime | Phase 1 | 结构化工具协议、三种输出视图、权限和故障测试 |
+| M3 Planner 实验 | Phase 2 | baseline vs planner 的可归因结论 |
+| M4 自修正实验 | Phase 3 | Validator/Revision 与四类恢复指标 |
+| M5 Context + MCP | Phase 4—5 | 通过门控的 context selection/compression 与一个 MCP 对照实验 |
+| M6 Eval Lab | Phase 6—7 | suite 治理、稳定 trace schema、按需 HTML replay |
+| M7 连续实验 | Phase 8—9 | 逐项消融结论和产品中受控应用 |
 
 ## 11. 风险与控制
 
@@ -1364,7 +1380,7 @@ infrastructure
 
 风险：错误被反复重试，latency 和 cost 激增。
 
-控制：仅 transient error 重试；记录 retry recovery rate；设置 run 级预算。
+控制：区分 provider retry、tool retry、model correction 和 revision；只对明确 transient provider error 或安全的幂等工具自动重试，分别记录恢复率并设置独立预算。
 
 ### 11.6 Trace 泄露敏感信息
 
@@ -1382,35 +1398,35 @@ infrastructure
 
 为了尽快获得第一次完整学习反馈，建议第一轮只做：
 
-1. `TaskSpec/RunConfig/RunResult`。
-2. `read_file/search_code/apply_patch/run_tests` 四个工具。
-3. Baseline ReAct loop，最大 8 步。
-4. 最小显式 planner variant。
-5. 6 个 smoke tasks。
-6. JSONL trace：model、tool、error、finish。
-7. success rate、steps、latency、context tokens 四个指标。
-8. baseline vs planner，各任务运行 3 次。
+1. 严格、versioned `TaskSpec/RunLimits/AgentResult/GradeResult`。
+2. 临时工作区、Oracle/reference、Outcome/Safety/Process grader。
+3. 共用的最小 AgentRunner、ModelAdapter、StepContext、Environment/ToolRuntime 和 TraceSink。
+4. `read_file/search_code/apply_patch/run_tests` 四个工具。
+5. max model turns/corrections、run/model/tool timeout、cancellation、输出上限和清理。
+6. versioned JSONL trace：model、tool、error、artifact、finish。
+7. deterministic FakeModel loop integration test。
+8. 6 个 smoke tasks，各运行 3 次并生成第一份 baseline。
 
-这轮刻意不做 validator、compression、MCP 和 HTML replay。其成功标准不是 planner 一定胜出，而是能够用真实 runs 回答：
+这轮刻意不做 Planner、Validator、compression、MCP 和 HTML replay。成功标准是能够可信回答：
 
-> 显式 planner 在哪些任务上有帮助，在哪些任务上只是增加了步骤和成本？
+> 当前最小 single Agent 在哪些原子能力上成功或失败，失败来自 Agent、工具、grader 还是基础设施？
 
-回答完这个问题，再进入 Validator 阶段。
+smoke baseline 冻结后，再加入业务 capability；两层 baseline 都可信后才进入 Planner 实验。
 
 ## 13. Definition of Done
 
 整个路线图不是以“所有模块都有代码”为完成，而以以下证据为完成：
 
-- 24 个固定任务和 grader 可以在干净环境运行。
-- 4 个 variants 可通过配置选择。
-- 每个 run 都有 manifest、trace、metrics、artifact 和 replay。
-- `plan -> execute -> validate -> revise -> finish` 在 trace 中明确可见。
-- timeout、retry、max steps 和工具恢复都有注入测试。
+- 所有进入 smoke、capability、regression、holdout 的任务都通过 `validate-task`，可在干净环境运行。
+- baseline 与实验保留的 variants 可通过配置组合同一个 Runner。
+- 每个 run 都有 manifest、trace、metrics 和 artifact，并能按需生成 replay。
+- baseline 的 model/tool loop 可从 trace 还原；Plan/Validation/Revision 只在相应 variant 中出现。
+- timeout、cancellation、四类 retry/correction/revision、max steps 和工具恢复都有注入测试。
 - Context 超预算时发生一次可追踪压缩。
 - 至少一个 MCP Server 被实际用于 benchmark。
-- 有一份 288 runs 的对比报告。
+- 每个进入下一阶段的机制都有至少 3 trials/task 的成对对比报告，并根据方差增加 trial。
 - 有代表性成功与失败 replay。
 - 有明确记录哪些机制改善成功率，哪些只增加成本。
-- Lucas 业务入口至少复用 ToolRuntime 和 TraceRecorder。
+- Lucas 产品 single path 与 Eval Adapter 复用同一 AgentRunner、ToolRuntime 和 TraceRecorder。
 
 达到这些标准后，Lucas 才真正从“带工具的固定工作流”进化为一个可以持续实验、测量和复盘的 Agent Harness。
