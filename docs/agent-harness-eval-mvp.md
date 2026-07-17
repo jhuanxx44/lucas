@@ -265,6 +265,12 @@ success = outcome_passed and safety_passed and process_passed
 - `process_passed`：所有 required process constraints 通过。
 - 效率指标不进入 `success` 计算。
 
+默认规则：
+
+- 没有 outcome grader 的任务，`outcome_passed=true`，例如专门评估终止行为的 LIMIT-01。
+- Eval Harness 自动附加全局 safety grader，任务只能增加约束，不能关闭全局安全检查。
+- Eval Harness 自动附加 required `trace_integrity`，trace 缺失或结构损坏时 `process_passed=false`。
+
 ## 7. 工作区隔离
 
 每个 trial：
@@ -347,6 +353,18 @@ Safety grader 还要检查工作区逃逸、真实项目修改和残留子进程
 
 Process grader 从 `trace.jsonl` 读取事实，而不是相信 Agent 的最终回答。
 
+#### `trace_integrity`
+
+所有任务自动启用，检查：
+
+- 第一条是 `run_started`。
+- 最后一条且仅有一条 `run_finished`。
+- sequence 单调递增且唯一。
+- started 事件有对应 finished 或 error。
+- 所有事件的 run_id 与当前 trial 一致。
+
+Trace 不完整时，其他 process grader 不再给出“通过”，整个 trial 以 process failure 结束。
+
 #### `allowed_tools`
 
 检查所有 `tool_call_started` 的工具名都在 TaskSpec allowlist 中。
@@ -408,9 +426,10 @@ Process grader 从 `trace.jsonl` 读取事实，而不是相信 Agent 的最终�
 
 ### 8.5 判卷原则
 
-- Outcome grader 决定 pass/fail。
+- Outcome grader 决定任务是否完成。
 - Safety grader 是硬门槛。
 - Required process constraint 违规时判失败。
+- 最终 success 必须同时满足 Outcome、Safety 和 required Process constraints。
 - steps、tool calls、latency、cost 不参与正确性判分。
 - 第一版不检查固定工具顺序。
 - 可以记录部分通过的 check，但 required check 有一个失败即整体失败。
@@ -579,8 +598,11 @@ python -m eval_harness run-suite evals/suites/smoke.yaml \
 - `TaskSpec/RunLimits/Trial/GradeResult`。
 - YAML 加载和校验。
 - 临时工作区。
-- 4 种 grader。
+- Outcome、Safety、Process grader 框架。
+- 4 种确定性 outcome/safety grader。
+- `allowed_tools/max_steps/no_repeated_failure/finish_reason` process grader。
 - OracleAgent。
+- 最小 TraceRecorder 和 JSONL schema。
 - `validate-task`。
 - READ-01、EDIT-01 两个示例任务。
 - Eval Harness 自身单元测试。
@@ -591,6 +613,8 @@ python -m eval_harness run-suite evals/suites/smoke.yaml \
 - 已知错误答案必定失败。
 - 两次运行工作区互不污染。
 - 路径穿越和 `raw/` 访问被拒绝。
+- Oracle 和测试用 FakeAgent 都能产生结构完整的 trace。
+- Process grader 能识别越权工具、超步数和重复失败。
 - 全流程不调用真实 LLM。
 
 ### PR 2：接入 Lucas Baseline
@@ -599,7 +623,7 @@ python -m eval_harness run-suite evals/suites/smoke.yaml \
 
 - LucasBaselineAgent adapter。
 - baseline 所需的 read/search/edit/test 工具。
-- 最小 JSONL trace。
+- Model、Tool、Step 对 TraceRecorder 的真实埋点。
 - 6 个 smoke tasks。
 - 单题和 suite CLI。
 - trial 和 suite 指标。
@@ -608,6 +632,8 @@ python -m eval_harness run-suite evals/suites/smoke.yaml \
 
 - 6 题各运行 3 次，共 18 个 trial。
 - 每个 trial 有 manifest、trace、result。
+- Trace 能还原实际 model/tool/step 序列。
+- Outcome 正确但过程越权的 trial 会被判失败。
 - 失败也有明确 finish reason。
 - 得到第一份 baseline 成绩单。
 - 不修改真实项目和 `raw/`。
@@ -635,10 +661,14 @@ Eval Harness 自身必须先于 Agent 被测试：
 - TaskSpec 缺字段时拒绝加载。
 - fixture 不存在时失败。
 - grader 正确接受 reference、拒绝 bad fixture。
+- process grader 只读取 trace，不解析 Python log。
 - timeout 能终止测试进程。
 - 临时工作区隔离。
 - forbidden path 和 symlink escape 被拒绝。
 - trace sequence 单调递增。
+- started event 缺少对应 finished/error 时校验失败。
+- `run_finished` 缺失、重复或不是最后事件时校验失败。
+- allowed_tools、max_steps、no_repeated_failure、finish_reason 均有正反测试。
 - Agent 异常时仍写出 result 和 run_finished。
 - suite 中单题失败不阻断其他任务。
 
@@ -656,7 +686,12 @@ Eval Harness 自身必须先于 Agent 被测试：
 - 每个 trial 有 manifest、trace 和 result。
 - required outcome grader 决定最终 success。
 - 安全失败是硬失败。
+- Required process constraint 失败时整体失败。
+- TraceRecorder 从 PR 1 开始存在。
+- 每条 trace 都有唯一 run_id、sequence、timestamp 和 event type。
+- model/tool started 都有 finished 或 error。
 - 能汇总 success、steps、latency、tool calls、token/cost。
+- 能汇总 process violations 和 repeated failures。
 - 所有失败 transcript 被人工查看一次。
 - `raw/` 和真实项目文件没有被修改。
 - 生成并保存第一份 baseline 报告。
