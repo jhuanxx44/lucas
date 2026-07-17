@@ -46,6 +46,19 @@ export interface ChatMessage {
   researchers?: ResearcherState[];
   synthesis?: string;
   actions?: ChatAction[];
+  processSteps?: string[];
+}
+
+export interface ChatSessionSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ChatSession extends Omit<ChatSessionSummary, "message_count"> {
+  messages: ChatMessage[];
 }
 
 export interface RawReport {

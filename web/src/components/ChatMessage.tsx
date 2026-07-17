@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage as ChatMessageType } from "@/types";
+import { AnalysisProcess } from "./AnalysisProcess";
 
 interface Props {
   message: ChatMessageType;
@@ -18,6 +19,7 @@ export function ChatMessage({ message, onAction }: Props) {
 
   return (
     <div className="mb-3">
+      <AnalysisProcess steps={message.processSteps ?? []} />
       <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:text-zinc-600 dark:prose-p:text-zinc-300">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {message.content}

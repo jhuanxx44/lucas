@@ -23,6 +23,15 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
 
+def _extract_json_object(text: str) -> dict | None:
+    value = extract_json(text)
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+        return value[0]
+    return None
+
+
 def _cleanup_download_tmp(tmp_path: str):
     stem, _ = os.path.splitext(tmp_path)
     for ext in (".md", ".pdf"):
@@ -159,9 +168,9 @@ class Manager:
             response_mime_type="application/json",
             temperature=0.3,
         )
-        plan = extract_json(text)
+        plan = _extract_json_object(text)
         if plan is None:
-            logger.warning("Manager dispatch JSON 解析失败，使用全部研究员: %s", text[:200])
+            logger.warning("Manager dispatch JSON 不是对象，使用全部研究员: %s", text[:200])
             plan = {
                 "action": "research",
                 "researcher_ids": self.config.list_researcher_ids(),
@@ -251,7 +260,7 @@ class Manager:
                 response_mime_type="application/json",
                 temperature=0.3,
             )
-            result = extract_json(text)
+            result = _extract_json_object(text)
             if result is None:
                 return text
 

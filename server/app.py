@@ -22,9 +22,10 @@ def create_app() -> FastAPI:
     )
     from server.middleware import UserContextMiddleware
     app.add_middleware(UserContextMiddleware)
-    from server.routers import wiki, chat
+    from server.routers import wiki, chat, sessions
     app.include_router(wiki.router, prefix="/api/wiki")
     app.include_router(chat.router, prefix="/api")
+    app.include_router(sessions.router, prefix="/api/sessions")
     dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web", "dist")
     if os.path.isdir(dist_dir):
         app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")

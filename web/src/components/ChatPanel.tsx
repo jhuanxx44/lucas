@@ -4,11 +4,14 @@ import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
 import { ResearcherCard } from "./ResearcherCard";
 import { SynthesisCard } from "./SynthesisCard";
+import { AnalysisProcess } from "./AnalysisProcess";
 import { fetchWikiIndex } from "@/lib/api";
 import { MessageSquare, RefreshCw, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
-import type { WikiItem } from "@/types";
+import type { ChatMessage as ChatMessageType, WikiItem } from "@/types";
 
 interface ChatPanelProps {
+  initialMessages: ChatMessageType[];
+  onMessagesCommitted: (messages: ChatMessageType[]) => void;
   onResearchTarget?: (target: string) => void;
   onResearchDone?: () => void;
 }
@@ -44,8 +47,13 @@ function generateSuggestions(
   });
 }
 
-export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) {
-  const { state, sendMessage, cancel } = useChat(onResearchTarget, onResearchDone);
+export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarget, onResearchDone }: ChatPanelProps) {
+  const { state, sendMessage, cancel } = useChat(
+    initialMessages,
+    onMessagesCommitted,
+    onResearchTarget,
+    onResearchDone,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
 
@@ -126,6 +134,8 @@ export function ChatPanel({ onResearchTarget, onResearchDone }: ChatPanelProps) 
         {state.messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
         ))}
+
+        {state.isLoading && <AnalysisProcess steps={state.processSteps} live />}
 
         {state.isLoading && activeResearchers.length > 0 && (
           <div className="space-y-2">

@@ -1,6 +1,65 @@
-import type { WikiIndex, WikiPage, SearchResult, RawTree, WikiTreeNode } from "@/types";
+import type {
+  ChatMessage,
+  ChatSession,
+  ChatSessionSummary,
+  WikiIndex,
+  WikiPage,
+  SearchResult,
+  RawTree,
+  WikiTreeNode,
+} from "@/types";
 
 const BASE = "/api";
+
+export async function fetchSessions(): Promise<ChatSessionSummary[]> {
+  const res = await fetch(`${BASE}/sessions`);
+  if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
+  return res.json();
+}
+
+export async function createSession(title = ""): Promise<ChatSession> {
+  const res = await fetch(`${BASE}/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error(`Failed to create session: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSession(sessionId: string): Promise<ChatSession> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}`);
+  if (!res.ok) throw new Error(`Failed to fetch session: ${res.status}`);
+  return res.json();
+}
+
+export async function renameSession(sessionId: string, title: string): Promise<ChatSession> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error(`Failed to rename session: ${res.status}`);
+  return res.json();
+}
+
+export async function replaceSessionMessages(
+  sessionId: string,
+  messages: ChatMessage[],
+): Promise<ChatSession> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/messages`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+  if (!res.ok) throw new Error(`Failed to save session: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete session: ${res.status}`);
+}
 
 export async function fetchWikiIndex(): Promise<WikiIndex> {
   const res = await fetch(`${BASE}/wiki/index`);

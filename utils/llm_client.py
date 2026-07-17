@@ -163,9 +163,10 @@ class _GeminiClient(LLMClient):
                 thinking_budget=_budget if self.enable_thinking else 0
             ),
         )
-        async for chunk in self._client.aio.models.generate_content_stream(
+        stream = await self._client.aio.models.generate_content_stream(
             model=self.model, contents=contents, config=config
-        ):
+        )
+        async for chunk in stream:
             if chunk.text:
                 yield chunk.text
 
