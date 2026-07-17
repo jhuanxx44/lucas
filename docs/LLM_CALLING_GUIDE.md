@@ -10,10 +10,10 @@
 ```bash
 OPENAI_API_KEY=your-api-key
 OPENAI_BASE_URL=http://llmapi.bilibili.co/v1   # 内部代理地址
-OPENAI_MODEL=gemini-3.1-pro                     # 默认模型
+OPENAI_MODEL=deepseek-v4-flash                  # 默认模型
 ```
 
-> 变量名叫 `OPENAI_*` 是历史原因，实际走的是 Gemini 协议。
+> 裸调用默认使用 DeepSeek V4 Flash；`OPENAI_*` 保留为 OpenAI 兼容代理兜底。也可以配置 `DEEPSEEK_API_KEY` 和 `DEEPSEEK_BASE_URL` 直连 DeepSeek provider。
 
 ---
 
@@ -77,7 +77,7 @@ async for chunk in client.chat_stream(
 ```python
 from utils.llm import create_client
 
-client = create_client(model="gemini-3.1-pro", system_prompt="...")
+client = create_client(model="deepseek-v4-flash", system_prompt="...")
 ```
 
 ---

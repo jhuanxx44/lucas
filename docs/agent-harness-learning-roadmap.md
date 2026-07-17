@@ -939,7 +939,7 @@ budgets:
 grader:
   type: exact_json
   expected:
-    provider: gemini
+    provider: deepseek
 forbidden_changes:
   - raw/**
 ```

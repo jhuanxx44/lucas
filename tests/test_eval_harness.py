@@ -202,7 +202,7 @@ def test_answer_json_exact_rejects_extra_fields(tmp_path):
         _task(tmp_path),
         outcome_graders=[{
             "type": "answer_json",
-            "expected": {"provider": "gemini", "timeout": 10},
+            "expected": {"provider": "deepseek", "timeout": 10},
             "exact": True,
             "required": True,
         }],
@@ -213,7 +213,7 @@ def test_answer_json_exact_rejects_extra_fields(tmp_path):
         task,
         task.fixture_dir,
         {},
-        AgentResult(answer={"provider": "gemini", "timeout": 10, "extra": True}),
+        AgentResult(answer={"provider": "deepseek", "timeout": 10, "extra": True}),
         trace.path,
         "run-1",
     )

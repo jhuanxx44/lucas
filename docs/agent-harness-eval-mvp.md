@@ -407,7 +407,7 @@ success = outcome_passed and safety_passed and process_passed
 ```yaml
 - type: answer_json
   expected:
-    provider: gemini
+    provider: deepseek
     timeout: 10
 ```
 

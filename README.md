@@ -38,7 +38,7 @@ utils/        LLM统一调用层
 |----------|----------|------|
 | MiniMax | `MiniMax-M2.7` | OpenAI 兼容 |
 | Gemini | `gemini-3.1-pro` | OpenAI 兼容 |
-| DeepSeek | `deepseek-v3` | OpenAI 兼容 |
+| DeepSeek | `deepseek-v4-flash`（项目默认） | OpenAI 兼容 |
 | Qwen | `qwen-plus` | OpenAI 兼容 |
 | Claude | `claude-3-5-sonnet` | OpenAI 兼容 |
 

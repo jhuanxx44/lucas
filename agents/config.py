@@ -86,7 +86,7 @@ def load_config(config_path: str = None) -> AgentsConfig:
 
     # 解析 manager
     manager_raw = raw["manager"]
-    manager_provider = manager_raw.get("provider", "gemini")
+    manager_provider = manager_raw.get("provider", "deepseek")
     manager_model_override = manager_raw.get("model")
     manager_model = get_provider_model(manager_provider, manager_model_override)
 
@@ -98,7 +98,7 @@ def load_config(config_path: str = None) -> AgentsConfig:
 
     # 解析 single agent
     single_raw = raw.get("single_agent", {})
-    single_provider = single_raw.get("provider", "gemini")
+    single_provider = single_raw.get("provider", "deepseek")
     single_model = get_provider_model(single_provider, single_raw.get("model"))
     single_agent = SingleAgentConfig(
         name=single_raw.get("name", "Lucas"),
@@ -113,7 +113,7 @@ def load_config(config_path: str = None) -> AgentsConfig:
     # 解析 researchers
     researchers = []
     for r in raw.get("researchers", []):
-        researcher_provider = r.get("provider", "gemini")
+        researcher_provider = r.get("provider", "deepseek")
         researcher_model_override = r.get("model")
         researcher_model = get_provider_model(researcher_provider, researcher_model_override)
 

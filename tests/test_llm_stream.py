@@ -3,6 +3,25 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+def test_default_client_uses_deepseek_v4_flash_and_deepseek_env():
+    from utils.llm_client import _OpenAICompatClient, create_client
+
+    env = {
+        "DEEPSEEK_API_KEY": "deepseek-key",
+        "DEEPSEEK_BASE_URL": "https://deepseek.example/v1",
+    }
+    with patch.dict("os.environ", env, clear=True):
+        with patch("openai.AsyncOpenAI") as mock_openai:
+            client = create_client()
+
+    assert isinstance(client, _OpenAICompatClient)
+    assert client.model == "deepseek-v4-flash"
+    mock_openai.assert_called_once_with(
+        base_url="https://deepseek.example/v1",
+        api_key="deepseek-key",
+    )
+
+
 @pytest.mark.asyncio
 async def test_gemini_chat_stream_awaits_sdk_stream():
     from utils.llm_client import _GeminiClient

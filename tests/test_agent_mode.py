@@ -12,8 +12,14 @@ def test_default_config_uses_single_agent_mode():
     config = load_config()
 
     assert config.runtime.agent_mode == "single"
+    assert config.manager.provider == "deepseek"
+    assert config.manager.model == "deepseek-v4-flash"
     assert config.single_agent is not None
+    assert config.single_agent.provider == "deepseek"
+    assert config.single_agent.model == "deepseek-v4-flash"
     assert config.single_agent.prompt == "single-agent"
+    assert all(researcher.provider == "deepseek" for researcher in config.researchers)
+    assert all(researcher.model == "deepseek-v4-flash" for researcher in config.researchers)
 
 
 def test_invalid_agent_mode_is_rejected():

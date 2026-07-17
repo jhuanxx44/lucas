@@ -7,7 +7,7 @@ Lucas LLM 统一调用层
 用法：
     from utils.llm_client import create_client
 
-    client = create_client("gemini-3.1-pro", system_prompt="你是股市分析师")
+    client = create_client("deepseek-v4-flash", system_prompt="你是股市分析师")
     text, usage = await client.chat("分析宁德时代")
 
     client2 = create_client("deepseek-v3.2")
@@ -35,6 +35,7 @@ _OPENAI_COMPAT_PREFIXES = ('glm-', 'ppio/', 'huawei/', 'zai/', 'MiniMax-', 'deep
 # 特定模型前缀 → 独立的 API_KEY / BASE_URL 环境变量
 _PROVIDER_ENV_OVERRIDES = {
     'MiniMax-': ('MINIMAX_API_KEY', 'MINIMAX_BASE_URL'),
+    'deepseek-': ('DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL'),
 }
 
 MAX_RETRIES = 3
@@ -296,10 +297,10 @@ def create_client(
         create_client(provider="minimax")
 
     方式2: 直接指定模型名（向后兼容）
-        create_client(model="gemini-3.1-pro")
+        create_client(model="deepseek-v4-flash")
 
     方式3: 同时指定 provider + model（model 覆盖 provider 默认）
-        create_client(provider="gemini", model="gemini-3.1-pro")
+        create_client(provider="deepseek", model="deepseek-v4-flash")
 
     路由规则：
         glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-* / claude-*  → OpenAI 兼容
@@ -309,7 +310,7 @@ def create_client(
         # 从 provider 配置获取模型
         actual_model = get_provider_model(provider, model)
     else:
-        actual_model = model or os.environ.get("OPENAI_MODEL", "gemini-3.1-pro")
+        actual_model = model or os.environ.get("OPENAI_MODEL", "deepseek-v4-flash")
 
     if any(actual_model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
         return _OpenAICompatClient(model=actual_model, system_prompt=system_prompt)

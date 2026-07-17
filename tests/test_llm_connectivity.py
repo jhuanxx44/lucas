@@ -24,10 +24,10 @@ async def test_model(model: str):
 
 
 async def main():
-    models = ["gemini-3.1-pro"]
+    models = ["deepseek-v4-flash"]
 
     # 可选：取消注释测试其他模型
-    # models.append("deepseek-v3.2")
+    # models.append("gemini-3.1-pro")
     # models.append("glm-4.7")
     # models.append("qwen-max")
 

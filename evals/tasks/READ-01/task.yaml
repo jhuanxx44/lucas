@@ -18,7 +18,7 @@ graders:
   outcome:
     - type: answer_json
       expected:
-        provider: gemini
+        provider: deepseek
         timeout: 10
       exact: true
       required: true

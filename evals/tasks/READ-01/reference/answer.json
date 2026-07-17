@@ -1,4 +1,4 @@
 {
-  "provider": "gemini",
+  "provider": "deepseek",
   "timeout": 10
 }
