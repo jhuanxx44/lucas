@@ -29,6 +29,8 @@ def _service(response: str) -> KnowledgeService:
     ws = MagicMock()
     ws.wiki_root = "/tmp/test_wiki"
     ws.raw_root = "/tmp/test_raw"
+    ws.ingested_root = "/tmp/test_ingested"
+    ws.reports_root = "/tmp/test_reports"
     ws.root = "/tmp/test_workspace"
     return KnowledgeService(FakeClient(response), memory=None, prompt_loader=lambda _name: prompt, workspace=ws)
 

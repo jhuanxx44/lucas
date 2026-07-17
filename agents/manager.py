@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import tempfile
 import time
 import uuid
 from typing import AsyncGenerator
@@ -328,9 +330,19 @@ class Manager:
 
                 if ingest_url:
                     from utils.source_collector import download_single_url
-                    tmp_dir = os.path.join(self._ws.raw_root, "sources", "_tmp")
-                    dl_result = await download_single_url(ingest_url, tmp_dir, dispatch_result.get("title", ""))
+                    tmp_dir = tempfile.mkdtemp(prefix="lucas-ingest-")
+                    try:
+                        dl_result = await download_single_url(
+                            ingest_url,
+                            tmp_dir,
+                            dispatch_result.get("title", ""),
+                            relpath_base=self._ws.root,
+                        )
+                    except Exception:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        raise
                     if dl_result is None:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
                         yield _evt("synthesis_chunk", {"text": f"无法抓取 URL: {ingest_url}"})
                         yield _evt("done", {"total_tokens": 0})
                         return

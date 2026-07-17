@@ -1,5 +1,5 @@
 """
-外部资源收集器：下载研究员引用的 URL，保存到 raw/sources/。
+外部资源收集器：下载研究员引用的 URL，保存到 ingested/。
 PDF 保留原件 + 提取文本为 .md，HTML 提取正文为 .md，失败静默跳过。
 """
 import asyncio
@@ -15,7 +15,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-_SOURCES_DIR = os.path.join(_PROJECT_ROOT, "raw", "sources")
+_SOURCES_DIR = os.path.join(_PROJECT_ROOT, "ingested")
 
 _UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -104,13 +104,21 @@ async def _download_one(
     return None
 
 
-async def download_single_url(url: str, dest_dir: str, title: str = "") -> Optional[dict]:
+async def download_single_url(
+    url: str,
+    dest_dir: str,
+    title: str = "",
+    relpath_base: str | None = None,
+) -> Optional[dict]:
     """下载单个 URL 到指定目录，返回 {"title", "url", "path"} 或 None。"""
     today = date.today().isoformat()
     async with httpx.AsyncClient(
         headers={"User-Agent": "Mozilla/5.0 (compatible; LucasBot/1.0)"},
     ) as client:
-        return await _download_one(client, url, title, dest_dir, today)
+        return await _download_one(
+            client, url, title, dest_dir, today,
+            relpath_base=relpath_base,
+        )
 
 
 async def collect_sources(

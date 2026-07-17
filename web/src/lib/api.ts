@@ -99,8 +99,14 @@ export function rawPdfUrl(path: string): string {
 }
 
 export async function fetchRawReport(rawPath: string): Promise<WikiPage> {
-  const stripped = rawPath.replace(/^raw\//, "");
-  return fetchRawFile(stripped);
+  if (rawPath.startsWith("reports/")) {
+    const stripped = rawPath.replace(/^reports\//, "");
+    const safePath = stripped.split("/").map(encodeURIComponent).join("/");
+    const res = await fetch(`${BASE}/wiki/report/${safePath}`);
+    if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`);
+    return res.json();
+  }
+  return fetchRawFile(rawPath.replace(/^raw\//, ""));
 }
 
 export async function fetchWikiTree(): Promise<WikiTreeNode[]> {

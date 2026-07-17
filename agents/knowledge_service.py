@@ -18,7 +18,7 @@ _PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
 
 
 class KnowledgeService:
-    """知识库服务：负责报告归档、wiki 更新、raw 编译和记忆持久化。"""
+    """知识库服务：负责报告归档、资料编译、wiki 更新和记忆持久化。"""
 
     def __init__(self, client, memory, prompt_loader, workspace):
         self.client = client
@@ -27,6 +27,8 @@ class KnowledgeService:
         self._ws = workspace
         self._wiki_dir = workspace.wiki_root
         self._raw_dir = workspace.raw_root
+        self._ingested_dir = workspace.ingested_root
+        self._reports_dir = workspace.reports_root
 
     def _make_slug(self, question: str) -> str:
         slug = question.replace(" ", "_").replace("/", "_").replace("?", "").replace("？", "")
@@ -46,7 +48,7 @@ class KnowledgeService:
         if all_urls:
             collected = await collect_sources(
                 all_urls, report.industry, report.companies,
-                sources_dir=os.path.join(self._raw_dir, "sources"),
+                sources_dir=self._ingested_dir,
                 relpath_base=self._ws.root,
                 on_status=status,
             )
@@ -309,9 +311,9 @@ class KnowledgeService:
 
         # 目录结构：有公司放公司下，无公司放行业下
         if companies:
-            report_dir = os.path.join(self._raw_dir, industry, companies[0], f"{today}_{slug}")
+            report_dir = os.path.join(self._reports_dir, industry, companies[0], f"{today}_{slug}")
         else:
-            report_dir = os.path.join(self._raw_dir, industry, f"{today}_{slug}")
+            report_dir = os.path.join(self._reports_dir, industry, f"{today}_{slug}")
         os.makedirs(report_dir, exist_ok=True)
 
         # 写各研究员报告
@@ -775,9 +777,11 @@ class KnowledgeService:
                 if not page_type or not name:
                     continue
 
-                # 从 raw 路径提取行业: raw/{行业}/... 或 raw/sources/{行业}/...
+                # 从来源路径提取行业：raw/{行业}/... 或 ingested/{行业}/...
                 parts = rel_path.split("/")
-                if len(parts) > 2 and parts[1] == "sources":
+                if len(parts) > 1 and parts[0] == "ingested":
+                    raw_industry = parts[1]
+                elif len(parts) > 2 and parts[1] == "sources":
                     raw_industry = parts[2] if len(parts) > 3 else "未分类"
                 else:
                     raw_industry = parts[1] if len(parts) > 2 else "未分类"
@@ -892,9 +896,9 @@ class KnowledgeService:
         slug = self._make_slug(title)
 
         if company:
-            dest_dir = os.path.join(self._raw_dir, "sources", industry, company)
+            dest_dir = os.path.join(self._ingested_dir, industry, company)
         else:
-            dest_dir = os.path.join(self._raw_dir, "sources", industry)
+            dest_dir = os.path.join(self._ingested_dir, industry)
         os.makedirs(dest_dir, exist_ok=True)
 
         filename = f"{today}_{slug}.md"

@@ -59,6 +59,15 @@ def get_raw_report(path: str, request: Request):
     return parse_wiki_page(file_path)
 
 
+@router.get("/report/{path:path}")
+def get_report(path: str, request: Request):
+    ws = _get_ws(request)
+    file_path = _safe_join(ws.reports_root, path)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Report not found")
+    return parse_wiki_page(file_path)
+
+
 def _build_raw_tree(raw_dir: str) -> dict:
     industries = []
     sources = []

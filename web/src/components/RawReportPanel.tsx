@@ -31,7 +31,12 @@ function parseResearcherLabel(path: string, researchersStr: string | null): stri
 
 export function RawReportPanel({ sources, researchers }: RawReportPanelProps) {
   const paths = Array.isArray(sources)
-    ? (sources as string[]).filter((s) => typeof s === "string" && s.startsWith("raw/") && !s.startsWith("raw/sources/"))
+    ? (sources as string[]).filter((s) =>
+        typeof s === "string" && (
+          s.startsWith("reports/") ||
+          (s.startsWith("raw/") && !s.startsWith("raw/sources/"))
+        )
+      )
     : [];
 
   const [reports, setReports] = useState<ReportState[]>(() =>
@@ -68,7 +73,7 @@ export function RawReportPanel({ sources, researchers }: RawReportPanelProps) {
 
   return (
     <div className="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
-      <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 mb-3">研究员原始报告</h3>
+      <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 mb-3">研究员报告</h3>
       <div className="space-y-2">
         {reports.map((r, i) => (
           <div key={r.path} className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">

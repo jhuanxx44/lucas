@@ -20,6 +20,14 @@ class Workspace(ABC):
 
     @property
     @abstractmethod
+    def ingested_root(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def reports_root(self) -> str: ...
+
+    @property
+    @abstractmethod
     def memory_root(self) -> str: ...
 
 
@@ -48,6 +56,14 @@ class LocalWorkspace(Workspace):
     @property
     def raw_root(self) -> str:
         return os.path.join(self._root, "raw")
+
+    @property
+    def ingested_root(self) -> str:
+        return os.path.join(self._root, "ingested")
+
+    @property
+    def reports_root(self) -> str:
+        return os.path.join(self._root, "reports")
 
     @property
     def memory_root(self) -> str:

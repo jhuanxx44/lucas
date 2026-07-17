@@ -19,6 +19,8 @@ def _ws_mock(wiki_root=None, raw_root=None):
     ws = MagicMock()
     ws.wiki_root = wiki_root or os.path.join(PROJECT_ROOT, "wiki")
     ws.raw_root = raw_root or os.path.join(PROJECT_ROOT, "raw")
+    ws.ingested_root = "/tmp/test_ingested"
+    ws.reports_root = "/tmp/test_reports"
     ws.memory_root = "/tmp/test_memory"
     ws.root = "/tmp/test_workspace"
     ws.user_id = "test"
@@ -48,6 +50,26 @@ def test_wiki_search():
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
+
+
+def test_report_endpoint_reads_reports_root(tmp_path):
+    reports_root = tmp_path / "reports"
+    report_path = reports_root / "industry" / "report.md"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        "---\ntitle: Test Report\n---\n\nReport body\n",
+        encoding="utf-8",
+    )
+    ws = _ws_mock()
+    ws.reports_root = str(reports_root)
+
+    with patch("server.routers.wiki.LocalWorkspace", return_value=ws):
+        from server.app import create_app
+
+        response = TestClient(create_app()).get("/api/wiki/report/industry/report.md")
+
+    assert response.status_code == 200
+    assert response.json()["content"].strip() == "Report body"
 
 
 def test_wiki_path_traversal_blocked():

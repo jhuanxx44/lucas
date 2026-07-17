@@ -110,6 +110,10 @@ class ToolKit:
         search_dirs = []
         if scope in ("raw", "all"):
             search_dirs.append(self._ws.raw_root)
+        if scope in ("ingested", "all"):
+            search_dirs.append(self._ws.ingested_root)
+        if scope in ("reports", "all"):
+            search_dirs.append(self._ws.reports_root)
         if scope in ("wiki", "all"):
             search_dirs.append(self._ws.wiki_root)
         if scope in ("all",):
@@ -209,7 +213,7 @@ class ToolKit:
         return {
             "list_files": {
                 "description": "列出指定目录下的文件和子目录",
-                "params": {"path": "相对于项目根目录的路径，如 raw/reports 或 wiki/companies。留空则列出根目录"},
+                "params": {"path": "相对于项目根目录的路径，如 raw、ingested、reports 或 wiki/companies。留空则列出根目录"},
                 "fn": self.list_files,
             },
             "read_file": {
@@ -219,7 +223,7 @@ class ToolKit:
             },
             "search_files": {
                 "description": "按关键词搜索文件名和文件内容，返回匹配文件及上下文片段",
-                "params": {"keyword": "搜索关键词，如 胜宏 或 PCB", "scope": "搜索范围: raw / wiki / all（默认 all）"},
+                "params": {"keyword": "搜索关键词，如 胜宏 或 PCB", "scope": "搜索范围: raw / ingested / reports / wiki / all（默认 all）"},
                 "fn": self.search_files,
             },
             "recall": {

@@ -12,4 +12,6 @@ memory/
 web/.vite
 wiki/
 raw/
+ingested/
+reports/
 workspaces/
