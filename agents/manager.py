@@ -13,6 +13,7 @@ from agents.models import Task, ResearcherTask, ResearchResult, ManagerReport
 from agents.memory import ManagerMemory
 from agents.researcher import _find_wiki_context
 from agents.research_service import ResearchService
+from agents.single_agent_service import SingleAgentService
 from agents.knowledge_service import KnowledgeService
 from agents.tools import ToolKit
 from workspace import Workspace
@@ -61,6 +62,11 @@ class Manager:
         )
         self._toolkit = ToolKit(workspace)
         self.research_service = ResearchService(config, self.client, self._load_prompt)
+        self.single_agent_service = (
+            SingleAgentService(config, self._load_prompt)
+            if config.runtime.agent_mode == "single"
+            else None
+        )
         self.knowledge_service = KnowledgeService(self.client, self.memory, self._load_prompt, workspace)
 
     def _load_prompt(self, name: str) -> str:
@@ -468,10 +474,18 @@ class Manager:
             return
 
         task: Task = dispatch_result
-        researcher_configs = [
-            rc for rid in task.researcher_ids
-            if (rc := self.config.get_researcher(rid)) is not None
-        ]
+        if self.config.runtime.agent_mode == "single":
+            if self.single_agent_service is None:
+                raise RuntimeError("single agent service is not configured")
+            single = self.single_agent_service.agent_config
+            researcher_configs = [single]
+            research_service = self.single_agent_service
+        else:
+            researcher_configs = [
+                rc for rid in task.researcher_ids
+                if (rc := self.config.get_researcher(rid)) is not None
+            ]
+            research_service = self.research_service
 
         yield _evt("dispatch", {
             "researchers": [{"id": rc.id, "name": rc.name} for rc in researcher_configs],
@@ -479,14 +493,14 @@ class Manager:
         })
 
         results: list[ResearchResult] = []
-        async for evt in self.research_service.run(task):
+        async for evt in research_service.run(task):
             if evt["event"] == "_results":
                 results = evt["data"]["results"]
                 continue
             yield evt
 
         yield _evt("status", {"message": "正在汇总分析结果..."})
-        if len(results) > 1:
+        if self.config.runtime.agent_mode == "multi" and len(results) > 1:
             synthesis = await self.research_service.synthesize(question, results)
         elif len(results) == 1:
             synthesis = results[0].content

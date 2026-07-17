@@ -1,3 +1,14 @@
+runtime:
+  agent_mode: single
+
+single_agent:
+  name: Lucas
+  provider: gemini
+  prompt: single-agent
+  expertise: 财务、行情、技术、宏观和行业综合分析
+  enable_search: true
+  data_types: [financials, quote, kline, north_flow, sector_flow]
+
 manager:
   provider: gemini
   system_prompt: |
