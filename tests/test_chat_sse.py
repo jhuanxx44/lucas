@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime
 
 import pytest
 from unittest.mock import patch
@@ -215,6 +216,8 @@ async def test_agent_stream_history_injected_into_instruction(tmp_path):
     assert "用户: 之前的问题" in prompt
     assert "助手: 之前的回答" in prompt
     assert "用户问题：新问题" in prompt
+    # 当前日期由代码注入（模型训练截止会误判年份）
+    assert f"当前日期：{datetime.now():%Y-%m-%d}" in prompt
     assert visible_events[-1][1] == {"total_tokens": 0}  # FakeModel 无 usage
 
 

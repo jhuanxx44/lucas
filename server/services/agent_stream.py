@@ -22,7 +22,7 @@ import asyncio
 import json
 import logging
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -126,6 +126,18 @@ def _render_history(history: list[dict] | None) -> str:
     return "以下是本次对话的历史记录（仅用于理解上下文，不要复述）：\n" + "\n".join(lines) + "\n\n"
 
 
+_WEEKDAYS = "一二三四五六日"
+
+
+def _render_date_header() -> str:
+    """注入当前日期——模型训练截止会误以为现在是过去，日期必须由代码保证"""
+    now = datetime.now()
+    return (
+        f"当前日期：{now:%Y-%m-%d}（星期{_WEEKDAYS[now.weekday()]}）。"
+        "涉及「最新」「近期」「最近」等时间表述时以此为准，搜索查询和财务数据解读都要考虑该日期。\n\n"
+    )
+
+
 def _status_message(evt: dict) -> str:
     """工具 step → status 文案，如「调用 web_search: 贵州茅台 年报」"""
     args = evt.get("args") or {}
@@ -177,7 +189,7 @@ async def chat_event_stream(
                                    system_prompt=system_prompt)
             model_adapter = LLMClientAdapter(client, temperature=config.temperature)
         runner = AgentRunner(model_adapter, tools, load_prompt_template(_PROMPT_PATH))
-        instruction = _render_history(history) + f"用户问题：{question}"
+        instruction = _render_date_header() + _render_history(history) + f"用户问题：{question}"
         limits = RunLimits(max_steps=config.max_steps, timeout_seconds=_TIMEOUT_SECONDS)
 
         queue: asyncio.Queue = asyncio.Queue()
