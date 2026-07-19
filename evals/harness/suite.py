@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from evals.harness.adapters.base import AgentAdapter
@@ -11,7 +12,8 @@ from evals.harness.runner import run_trial
 
 def build_adapter(name: str, task: TaskSpec) -> AgentAdapter:
     if name == "oracle":
-        return OracleAgent(task.reference_dir)
+        tool_name = "write_file" if "write_file" in task.allowed_tools else "apply_patch"
+        return OracleAgent(task.reference_dir, tool_name=tool_name)
     if name == "lucas-single":
         return LucasSingleAgent()
     raise ValueError(f"unknown agent: {name}")
@@ -26,7 +28,8 @@ async def run_suite(
     if trials < 1:
         raise ValueError("trials must be a positive integer")
     suite = load_suite(suite_path)
-    suite_run_id = f"{suite.id.lower()}-{uuid.uuid4().hex[:8]}"
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    suite_run_id = f"{suite.id.lower()}-{stamp}-{uuid.uuid4().hex[:8]}"
     suite_dir = runs_root / suite_run_id
     suite_dir.mkdir(parents=True, exist_ok=False)
 

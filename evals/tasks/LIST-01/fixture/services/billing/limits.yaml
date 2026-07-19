@@ -1,0 +1,2 @@
+rate_limit: 100
+window: 60

@@ -29,7 +29,12 @@ async def validate_task(task_path: str | Path, runs_root: Path) -> dict:
         raise ValueError("known-bad trial unexpectedly passed required graders")
 
     _, oracle_grade, oracle_run = await run_trial(
-        task, OracleAgent(task.reference_dir), runs_root
+        task,
+        OracleAgent(
+            task.reference_dir,
+            tool_name="write_file" if "write_file" in task.allowed_tools else "apply_patch",
+        ),
+        runs_root,
     )
     if not oracle_grade.success:
         failed = [

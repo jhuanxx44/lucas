@@ -9,8 +9,9 @@ from evals.harness.trace import TraceRecorder
 class OracleAgent:
     variant = "oracle"
 
-    def __init__(self, reference_dir: Path):
+    def __init__(self, reference_dir: Path, tool_name: str = "apply_patch"):
         self.reference_dir = reference_dir
+        self.tool_name = tool_name
 
     async def run(
         self,
@@ -36,7 +37,7 @@ class OracleAgent:
                 call_id = f"oracle-tool-{index}"
                 trace.record("tool_call_started", {
                     "tool_call_id": call_id,
-                    "tool": "apply_patch",
+                    "tool": self.tool_name,
                     "args": {"path": relative.as_posix()},
                 })
                 destination.parent.mkdir(parents=True, exist_ok=True)

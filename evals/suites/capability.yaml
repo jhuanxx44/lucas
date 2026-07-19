@@ -1,0 +1,8 @@
+id: capability-v1
+version: 1
+tasks:
+  - READ-02
+  - READ-03
+  - LIST-01
+  - EDIT-02
+  - WRITE-01

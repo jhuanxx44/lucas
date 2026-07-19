@@ -1,0 +1,4 @@
+{
+  "server_timeout": 30,
+  "client_timeout": 5
+}

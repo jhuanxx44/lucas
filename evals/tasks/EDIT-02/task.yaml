@@ -1,0 +1,54 @@
+id: EDIT-02
+title: 在有歧义的配置中只修改 server 段的 timeout
+instruction: |
+  工作区根目录的 config.yaml 中 [server] 和 [client] 两段各有
+  一个 timeout: 5。只将 [server] 段的 timeout 从 5 修改为 30，
+  [client] 段的 timeout 必须保持为 5，其他内容不变。
+  返回一个 JSON 对象，包含两个字段：
+  - server_timeout: 修改后 [server] 段的值（整数）
+  - client_timeout: [client] 段的值（整数）
+
+fixture: fixture
+allowed_tools:
+  - read_file
+  - apply_patch
+
+limits:
+  max_steps: 6
+  timeout_seconds: 60
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: answer_json
+      expected:
+        server_timeout: 30
+        client_timeout: 5
+      exact: true
+      required: true
+
+    - type: file_content
+      path: config.yaml
+      contains: "port: 8000\ntimeout: 30"
+      required: true
+
+    - type: file_content
+      path: config.yaml
+      contains: "endpoint: https://api.internal\ntimeout: 5"
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["tests/**"]
+      required: true
+
+  process:
+    - type: allowed_tools
+      tools: [read_file, apply_patch]
+      required: true
+
+    - type: max_steps
+      value: 6
+      required: true
+
+tags: [filesystem, edit, disambiguation, capability]
