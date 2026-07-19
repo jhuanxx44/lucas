@@ -73,18 +73,20 @@ class ToolKit:
             return f"目录为空: {path}"
         return "\n".join(entries)
 
-    def read_file(self, path: str, max_chars: int = 4000, keyword: str = "") -> str:
+    def read_file(self, path: str, max_chars: int = 4000, offset: int = 0, keyword: str = "") -> str:
         full = self._resolve_path(path)
         if not full:
             return f"路径无效或无权访问: {path}"
         if not os.path.isfile(full):
             return f"文件不存在: {path}"
+        if offset < 0:
+            offset = 0
         try:
             with open(full, "r", encoding="utf-8") as f:
-                content = f.read()
+                file_content = f.read()
 
             if keyword:
-                lines = content.split("\n")
+                lines = file_content.split("\n")
                 keyword_lower = keyword.lower()
                 hit_indices = [i for i, l in enumerate(lines) if keyword_lower in l.lower()]
                 if not hit_indices:
@@ -99,10 +101,17 @@ class ToolKit:
                 result += "\n\n...\n\n".join(segments)
                 return result
 
-            if len(content) > max_chars:
-                content = content[:max_chars]
-                return f"--- {path} (已截断至 {max_chars} 字符) ---\n{content}"
-            return f"--- {path} ---\n{content}"
+            total_len = len(file_content)
+            if offset >= total_len:
+                return f"--- {path} (offset={offset} 超出文件长度 {total_len}) ---\n"
+            sliced = file_content[offset:offset + max_chars]
+            truncated = (offset + len(sliced)) < total_len
+            if truncated:
+                end_pos = offset + len(sliced)
+                return f"--- {path} (字符 {offset}-{end_pos}/{total_len}，已截断) ---\n{sliced}"
+            if offset > 0:
+                return f"--- {path} (字符 {offset}-{total_len}/{total_len}) ---\n{sliced}"
+            return f"--- {path} ---\n{sliced}"
         except Exception as e:
             return f"读取失败: {path}: {e}"
 
@@ -217,8 +226,8 @@ class ToolKit:
                 "fn": self.list_files,
             },
             "read_file": {
-                "description": "读取指定文件的内容。可指定 keyword 只返回关键词附近的上下文片段，避免加载全文",
-                "params": {"path": "文件的相对路径", "max_chars": "最大读取字符数，默认4000", "keyword": "可选，只返回关键词所在段落的上下文"},
+                "description": "读取指定文件的内容。可指定 offset 从文件中间开始读，或用 keyword 只返回关键词附近的上下文片段",
+                "params": {"path": "文件的相对路径", "max_chars": "最大读取字符数，默认4000", "offset": "可选，起始字符偏移量，默认0。用于分页读取大文件", "keyword": "可选，只返回关键词所在段落的上下文"},
                 "fn": self.read_file,
             },
             "search_files": {
