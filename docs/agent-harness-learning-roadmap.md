@@ -88,6 +88,8 @@ model -> tool -> observation -> model -> ... -> finish
 
 建议把通用 Harness 与现有 Lucas 业务能力分开：
 
+> 2026-07-20 更新：single 模式重构（M1–M6）完成后，`agents/` 旧业务链路（Manager + researcher DAG）已删除；产品聊天链路与 eval adapter 均直接使用 `harness/AgentRunner`，业务工具经 `harness/tools/business.py` 注册。下表中的 `agents/` 一行及"Manager 作为 adapter/consumer"的表述仅为历史快照。
+
 ```text
 harness/              Agent Harness 通用运行时
 evals/harness/        Evaluation Harness 运行、隔离、判卷和汇总
@@ -107,6 +109,8 @@ server/ + web/        产品入口与 replay 入口
 ## 5. 现阶段 Agent Harness 能力基线
 
 本节盘点的是 Lucas 作为通用 Agent Harness 的底层能力，不评价其具体业务知识或投研效果。盘点基于 2026-07-17 当前工作树；其中包含尚未提交但已存在于工作区的会话持久化、LLM 流式修复和数据源相关改动。
+
+> 2026-07-20 更新：本节（含 5.2 执行拓扑、5.3 能力总表、5.4 中对 `agents/manager.py` 的分析）是重构前快照。single 模式重构后 `agents/` 已删除，当前架构与实验结论见 `docs/plans/2026-07-20-single-mode-rewrite.md` 与 `docs/harness/experiment-log.md`。
 
 ### 5.1 成熟度标尺
 

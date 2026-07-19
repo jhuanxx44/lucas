@@ -770,6 +770,8 @@ python -m evals.harness run-suite evals/suites/business-capability.yaml \
 
 ## 14. 实施拆分
 
+> 2026-07-20 更新：本文 PR 0 中"`agents.yaml` 增加 `runtime.agent_mode`"的实施方式已被 single 模式重构取代——`agents.yaml` 与 `agents/` 已删除，配置统一在 `lucas.yaml`（`runtime` + `single_agent` 段），运行时直接使用 `harness/AgentRunner`。下文 PR 划分仅作历史参考。
+
 ### PR 0：建立单 Agent Baseline 模式
 
 实现：

@@ -120,3 +120,58 @@
 - baseline suite：`runs/capability-v1-20260720-012217/012325/012406-*`
 - 实验组 suite：`runs/capability-v1-20260720-012830/012941/013055-*`
 - 幻觉失败 run：`runs/capability-v1-20260720-013055-6c7e16be/runs/read-02-*`
+
+---
+
+## 实验 003：Single 模式推倒重来重构（Phase 9 提前启动，M1–M7）（2026-07-20）
+
+### 背景
+
+项目内两代逻辑并存：`harness/` 通用 AgentRunner（Phase 0 产物）与 `agents/` 旧业务流水线（Manager dispatch + researcher 固定 DAG）各扛一条生产路径。按规划文档 `docs/plans/2026-07-20-single-mode-rewrite.md`，把 roadmap Phase 9「接回 Lucas」提前启动：产品后端只保留一条路径——`harness/AgentRunner` single 模式，删除 `agents/` 全部旧逻辑。策略为**先建后拆（build-then-cut）**：新链路建好并验收后再删旧代码，共七个里程碑（M7 为收尾）。
+
+### 六个里程碑的关键决策
+
+- **M1 结构解耦**：`RunLimits/AgentResult/StepContext` 与 `TraceRecorder` 从 evals 上移/复制到 `harness/models.py`、`harness/trace.py`，Runner 解除对 `evals.harness.*` 的 import，trace 参数改为可选（产品路径可关 trace）。纯移动，无行为变化。
+- **M2 产品化缺口**：`ToolHandler` 支持 `async def`（registry.execute 改 async，同步 handler 兼容）；`ModelAdapter.complete()` 返回 `(text, usage)`，Runner 累计 TokenUsage 写进 AgentResult，`max_cost_usd` 开始被消费（超预算以 `budget_exceeded` 终止；约定 `max_cost_usd <= 0` 视为不限）；新增 `harness/config.py::load_agent_config()` 从 `lucas.yaml` 读配置，eval adapter 与 server 共用。
+- **M3 业务工具注册**：`harness/tools/business.py` 注册 `web_search`（薄包 utils）、`stock_quote`/`stock_kline`（按 provider 方法粒度拆，不做 LLM 前置提取股票代码）、`wiki_recall`（索引优先召回，wiki 解析核心上移 `utils/wiki_core.py` 供 server 与 harness 共同 import，先 index.md 匹配再全文 fallback）。
+- **M4 新聊天链路**：`server/services/agent_stream.py` 以 Runner `on_event` 钩子把 run 过程映射为既有 SSE 事件——run 开始固定发 `researcher_start {id: "single"}`、每个工具 step 发 `status`、answer 作为 `synthesis_chunk` 推送、`researcher_done`/`done {total_tokens}`、异常发 `error`。两个取舍：事件级流式而非逐 token（JSON-per-step 协议下模型输出必须完整才能解析，逐 token 与协议天然冲突，本版接受）；`dispatch`/`actions` 事件停发（前端缺省行为正常，文案退化为"分析过程"）。前端零改动。
+- **M5 wiki 知识模块重建**：`server/services/knowledge.py` 重写，保留旧实现的 7 条设计思想（四层存储边界、来源与页面分离的声明式溯源、Plan→Compile 两段式、写入前确定性校验+备份、增量更新语义、收录两段确认、索引优先召回）；丢弃 A 股硬编码、字符串拼装 index.md、手写 frontmatter 扫描等实现细节。报告 sidecar 机制不迁移（reports/ 归档层整体未接回，见 backlog）。
+- **M6 删除旧代码**：删 `agents/` 全目录、`utils/verify.py`、`agents.yaml`、`migrate_to_workspace.py` 及 6 个直接测 agents 的测试文件，合计 -4135 行；`grep -r "from agents\|import agents"` 零命中。
+
+### 验收证据
+
+- 全量测试 **143 个通过**（`pytest tests/ --ignore=tests/test_llm_connectivity.py`）。
+- eval smoke suite（READ-01/EDIT-01）全过。
+- 真实 LLM 冒烟：stock_quote 问答（聊天链路经 AgentRunner 调行情工具作答）与 classify-source（wiki 收录两段确认第一段）均通过。
+- M6 三重验收：grep 零命中 + 全量测试绿 + server 启动/前端冒烟通过。
+
+### 与 roadmap Phase 9 验收逐条核对
+
+| Phase 9 要求 | 结果 |
+|---|---|
+| 产品 single path 与 Eval Adapter 调用同一个 AgentRunner，不维护影子实现（接入顺序 1 / 目标） | ✅ server 的 agent_stream 与 evals adapter 都装配同一个 `harness.AgentRunner` + `load_agent_config()` |
+| 现有业务测试不回退 | ✅ 143 测试全绿，wiki 约束测试（存储边界等）已迁移到新模块 |
+| 真实执行可生成同 schema 的 trace（脱敏后 replay） | ⚠️ 部分：trace schema 统一且 Runner 支持，产品路径默认关 trace；脱敏与保留策略未做（对应接入顺序 6，未启动） |
+| 通用 Harness 不 import 投研业务模块 | ✅ `harness/` 不 import server/evals；业务工具在 `harness/tools/business.py` 注册，核心模型无业务概念 |
+| 业务 adapter 可自行注册工具、context provider 和 validator | ⚠️ 部分：工具注册已通用化；context provider / validator 挂点未建（留 Phase 2/3） |
+| 被实验否定的机制不因产品已有类似代码而强行接入 | ✅ Planner/Validator 未提前实现，仅登记 backlog 与探针任务（READ-02 / LIST-01） |
+
+### Backlog（按优先级不分先后登记）
+
+1. answer 阶段逐 token 流式（answer 无工具调用，可安全 stream；目前是事件级）
+2. embedding 召回替换 wiki_recall 的子串匹配
+3. wiki 写入改 patch/event sourcing（`docs/lucas-design-review.md` 的建议；本版保留整页覆盖写）
+4. Planner 实验（READ-02 探针驱动，Phase 2）
+5. Validator 实验（LIST-01 指代错误 + READ-02 T3 无依据作答两个驱动案例，Phase 3）
+6. 中止机制与超时层级（runner 的 `timeout_seconds` 目前只声明不强制）
+7. TokenUsage 价格表按 provider 区分（目前单一价格假设）
+8. reports/ 层归档恢复（sidecar 未随 M5 迁移，需重新设计）
+9. wiki 更新的丢失段落检测从警告升级为拒绝写入（待实践验证误报率）
+10. `workspaces/` 残留 5.9MB 用户数据待用户确认处置
+11. 业务工具 eval task（web_search/stock_quote/wiki_recall 的固定 task + 确定性 grader，需真实 LLM key 跑 baseline 对照）
+
+### 产物
+
+- 规划：`docs/plans/2026-07-20-single-mode-rewrite.md`
+- 关键提交：M1 `91a0095`、M2 `3f595a4`、M3 `ea0fe80`、M4 `b95bb7c`（聊天链路切换）、M5 `c822f64`、M6 `c3b1389`
+- 干中学教程：`docs/learnings/2026-07-20-single-模式重构.md`

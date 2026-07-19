@@ -6,9 +6,6 @@ runtime:
 single_agent:
   name: Lucas
   provider: deepseek
-  expertise: 财务、行情、技术、宏观和行业综合分析
-  enable_search: true
-  data_types: [financials, quote, kline, north_flow, sector_flow]
   temperature: 0.0
   max_steps: 10
   allowed_tools: [read_file, apply_patch, list_files, search, write_file, web_search, stock_quote, stock_kline, wiki_recall]

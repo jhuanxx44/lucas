@@ -1,6 +1,6 @@
 # Lucas — 投研认知的复利引擎
 
-基于 Karpathy LLM Wiki 模式构建的A股专属知识库，持续将原始资料编译为结构化认知，配合多 Agent 专家系统进行深度分析。
+基于 Karpathy LLM Wiki 模式构建的A股专属知识库，持续将原始资料编译为结构化认知，配合单 Agent（ReAct 循环）进行深度分析。
 
 当前按本地单用户模式运行，数据直接存放在项目根目录的 `raw/`、`ingested/`、`reports/`、`wiki/` 和 `memory/`。
 
@@ -12,10 +12,10 @@ ingested/     系统抓取或通过界面收录的资料
 reports/      Agent 生成的报告、元数据和证据 sidecar
 wiki/         LLM编译的结构化Wiki
 prompts/      编译模板
-agents/       多Agent专家系统
-agents.yaml   研究员配置
+harness/      通用 AgentRunner（single 模式 ReAct 循环）与工具集
+lucas.yaml    Agent 与 wiki 领域配置
 providers.yaml 模型提供商配置
-server/       FastAPI 后端
+server/       FastAPI 后端（services/agent_stream.py 聊天链路、services/knowledge.py wiki 收录编译）
 web/          React 前端
 utils/        LLM统一调用层
 ```
@@ -54,4 +54,4 @@ utils/        LLM统一调用层
 ### Agent 分析
 1. 启动 `./dev.sh`，打开浏览器访问前端
 2. 输入问题（如"分析宁德时代"）
-3. Lucas 自动派发给相关研究员，汇总多视角分析
+3. Lucas 由单个 Agent 自主调用行情、搜索和 wiki 召回工具完成分析
