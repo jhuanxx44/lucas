@@ -11,7 +11,6 @@ from harness.tools.filesystem import (
     READ_FILE_SPEC,
     WRITE_FILE_SPEC,
 )
-from harness.tools.process import make_run_tests_spec
 from harness.tools.search import SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.json_extract import extract_json
@@ -44,7 +43,6 @@ class LucasSingleAgent:
             LIST_FILES_SPEC,
             SEARCH_SPEC,
             WRITE_FILE_SPEC,
-            make_run_tests_spec(),
         ])
         runner = AgentRunner(
             self.model_adapter, tools, load_prompt_template(PROMPT_PATH)

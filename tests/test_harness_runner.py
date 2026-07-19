@@ -13,7 +13,6 @@ from harness.tools.filesystem import (
     READ_FILE_SPEC,
     WRITE_FILE_SPEC,
 )
-from harness.tools.process import make_run_tests_spec
 from harness.tools.search import SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 
@@ -36,7 +35,7 @@ class FakeModel:
 
 def _runner(tmp_path: Path, model: FakeModel, trace: TraceRecorder, specs=None):
     tools = ToolRuntime(tmp_path, specs or [
-        READ_FILE_SPEC, APPLY_PATCH_SPEC, make_run_tests_spec(),
+        READ_FILE_SPEC, APPLY_PATCH_SPEC,
     ])
     return AgentRunner(model, tools, load_prompt_template(
         Path(__file__).resolve().parent.parent / "prompts" / "harness" / "tool-loop.md"
@@ -309,29 +308,6 @@ def test_apply_patch_path_escape_denied(tmp_path):
         "path": "../outside.txt", "old": "a", "new": "b",
     })
     assert result.status == "denied"
-
-
-def test_run_tests_rejects_non_pytest(tmp_path):
-    result = _execute(tmp_path, make_run_tests_spec(), "run_tests",
-                      {"command": ["rm", "-rf", "."]})
-    assert result.status == "denied"
-
-
-def test_run_tests_passes(tmp_path):
-    (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert True\n")
-    result = _execute(tmp_path, make_run_tests_spec(), "run_tests",
-                      {"command": ["pytest", "test_ok.py", "-q"]})
-    assert result.status == "ok"
-    assert "exit code: 0" in result.observation
-
-
-def test_run_tests_timeout_kills(tmp_path):
-    (tmp_path / "test_slow.py").write_text(
-        "import time\n\ndef test_slow():\n    time.sleep(30)\n"
-    )
-    result = _execute(tmp_path, make_run_tests_spec(default_timeout=1), "run_tests",
-                      {"command": ["pytest", "test_slow.py", "-q"]})
-    assert result.status == "timeout"
 
 
 def test_tool_not_in_allowed_denied(tmp_path):
