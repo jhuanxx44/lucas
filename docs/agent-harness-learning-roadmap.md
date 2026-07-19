@@ -679,6 +679,26 @@ Planner 输出稳定 JSON：
 - 报告 success、steps、latency、token/cost，并分开简单与多步骤任务。
 - 得出保留、修改或删除 Planner 的实验结论，不以“已实现 Planner”为完成。
 
+### Thought 与 Plan 的分层共存（复杂度路由）
+
+Thought 与 Plan 不是互斥的两种范式，而是按任务复杂度分层的两档机制，实际系统中两者共存：
+
+- **轻档：显式 Thought（ReAct 完整形态）**。在当前单 JSON action 协议中增加 `thought` 字段，模型每步先写一句“为什么选这个动作”再给 action。改动极小（协议加一个字段 + prompt 模板一行说明），收益是推理进入 trace，可复盘“为什么选错工具”，同时零额外 LLM 调用。适合简单任务和作为所有路径的默认底座。
+- **重档：显式 Plan（本 Phase 的 Planner）**。仅当被判定为复杂任务时才先产出 `goal + success_criteria + steps[]`，再逐步执行。Plan 是任务级的一次性结构，Thought 是步骤级的持续推理；启用 Plan 时步骤内仍保留 Thought。
+- **路由**：由 Router（或 Runner 前置一次轻量判别，建议 `llm-weight: light`）判断任务复杂度，简单任务直接走 Thought-only 循环，复杂任务先 Plan 再执行。路由判错的代价不对称——复杂任务漏判为简单只是退回 baseline 行为，简单任务误判为复杂则浪费一次规划调用，因此路由应偏向“默认简单”。
+
+实验顺序上，Thought 字段可作为 Phase 2 之前的过渡单变量实验（baseline vs +thought），也可以在 Planner 实验之后作为第三臂（thought-only / plan-only / 路由分层）对比。无论顺序如何，复杂度路由本身是否判得准，应通过简单/多步骤任务分层报告来验证，而不是直接假设路由正确。
+
+### Codex 式变体：哑工具 + prompt 路由（理论上最成熟）
+
+调研 OpenAI Codex CLI（codex-rs）后确认的第三种实现路径，工业界最成熟的方案，作为实验中的**标杆对照组**：
+
+- **Plan 做成哑工具**：提供 `update_plan` 工具（参数为步骤列表，每项含 `step` 与 `status: pending|in_progress|completed`），harness 侧收到调用后只做两件事——记录到 trace、返回固定字符串 `"Plan updated"`。不保存 plan 状态、不强制状态机、不校验，计划完全存在于上下文中由模型自律维护。
+- **路由靠 prompt 一句话**：在 prompt 中写明“简单任务（约最简单的 25%）不要使用规划工具，不要做单步计划”，由模型自行判断任务复杂度，不做代码级复杂度判别。
+- **Thought 依赖模型 API 原生 reasoning 输出**：Codex 的推理是 Responses API 的一等历史条目；若所用模型/API 支持原生 reasoning，优先直接利用，而非自造 thought 字段。
+
+该变体的定位：不代表直接采用，而是与 baseline、重 Planner 同任务同预算对比（success / steps / latency / cost，简单与复杂任务分层报告）。若 Codex 式变体与重 Planner 效果相当，应保留更简单的 Codex 式；若重 Planner 显著更优，再保留结构化方案。另外两个可借鉴点（各自独立成实验变量，不绑定本变体）：上下文压缩复用一次普通模型调用实现（`tasks/compact.rs` 模式），而非 harness 特殊字符串处理；同一响应内多个工具调用并行执行。
+
 ---
 
 ## Phase 3：Validator、Revision 与错误恢复实验
