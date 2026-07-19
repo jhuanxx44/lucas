@@ -9,7 +9,7 @@ llm-weight: medium
 ## 可用工具
 {tools_desc}
 
-## 历史工具调用结果
+## 历史交互记录
 {observations}
 
 ## 输出要求

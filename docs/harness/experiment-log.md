@@ -84,3 +84,39 @@
 
 - runs：`runs/<suite>-<时间戳>-<hash>/runs/<task>-<hash>/`（manifest / trace.jsonl / result.json / artifacts/ / workspace/）
 - 代表性 replay：修复前失败 `runs/tmp-read02-20260720-000317-aae0dde6/runs/read-02-fed6c05c7623`；修复后成功 ×3 `runs/tmp-read02-20260720-003325-96570d18/runs/`
+
+---
+
+## 实验 002：Runner 历史结构（observations-only → 全量消息回放）（2026-07-20）
+
+### 假设
+
+让模型在每轮能看到自己之前的原始输出（调了什么工具、参数、答案草稿），改善多步骤任务的状态追踪与自我纠错。单变量：仅历史结构；模型、prompt 其余部分、工具、limits、任务集不变。
+
+### 实现
+
+- `StepContext.observations` → `history`（`{"role": assistant|tool, "content"}`），模型原始输出（含格式错误的）原样入历史
+- `_render` 按序渲染为 `【你】/【工具】` 交错段落；invalid 反馈作为 tool 侧消息入历史
+- 仍走单 prompt 字符串渲染，不改 ModelAdapter 接口（切原生 messages API 是另一个独立实验）
+- 新测试 `test_history_replays_model_raw_output`：第二轮 prompt 同时含第一轮模型原始输出和 observation（旧结构做不到，测试即假设的可证伪形式）
+
+### 结果（capability × 3 trials，对照同条件 baseline）
+
+| 指标 | baseline（改造前） | 改造后 |
+|---|---|---|
+| 成功率 | 15/15 | 14/15 |
+| READ-02 | 4/4/5 步全过 | 4 步过 / 7 步过 / 1 步挂 |
+| prompt_chars（READ-02 单 run） | 10.8-13.6 万 | 12.4 万 / 28.0 万（7 步） / 769（挂） |
+| 其余 4 题 | 稳定 | 稳定，prompt_chars 微涨（回放原始输出，增量小） |
+
+### 结论
+
+1. **保留改动**。架构上这是路线图已确认的正确结构（Codex/mini-swe-agent 均为全量回放），小样本未显示退化，成本增幅主要来自步数而非回放机制本身（模型输出很小，observation 累积才是大头，两者共有）。
+2. **新失败模式登记**：READ-02 T3 模型第 1 步零观察直接幻觉作答（432/516/538/527，正确值 2606/2891/…）。第一步 prompt 与旧结构几乎相同，倾向归因为模型随机性而非历史结构，但它暴露的缺口真实存在——**"无依据直接作答"没有任何拦截**。登记为 Phase 3 Validator 第二个驱动案例（答案是否有 observation 支撑）。
+3. baseline 参考更新：历史结构=全量回放，READ-02 成功率约 5/6（小样本）。
+
+### 产物
+
+- baseline suite：`runs/capability-v1-20260720-012217/012325/012406-*`
+- 实验组 suite：`runs/capability-v1-20260720-012830/012941/013055-*`
+- 幻觉失败 run：`runs/capability-v1-20260720-013055-6c7e16be/runs/read-02-*`

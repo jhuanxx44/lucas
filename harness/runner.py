@@ -64,17 +64,19 @@ class AgentRunner:
                 "output_chars": len(raw),
                 "artifact": output_ref,
             })
+            # 全量回放：模型自己的原始输出（包括格式错误的）进入后续上下文
+            context.history.append({"role": "assistant", "content": raw})
             action = _parse_action(raw)
             if action is None:
                 trace.record("action_parsed", {
                     "step_id": context.step_id, "kind": "invalid",
                 })
-                context.observations.append(
+                context.history.append({"role": "tool", "content": (
                     "你的上一条回复格式不对。请返回且只返回一个 JSON 对象："
                     '调用工具用 {"action": "tool", "tool": "工具名", "args": {...}}；'
                     '最终作答用 {"action": "answer", "reply": "答案"}。'
                     "如果答案本身是 JSON，请把它作为 reply 的字符串值或直接用其内容作答。"
-                )
+                )})
                 trace.record("step_finished", {"step_id": context.step_id})
                 continue
 
@@ -121,12 +123,15 @@ class AgentRunner:
                     "error_code": result.error_code,
                 })
                 last_failed_signature = signature
-            context.observations.append(observation)
+            context.history.append({"role": "tool", "content": observation})
             trace.record("step_finished", {"step_id": context.step_id})
         return AgentResult(finish_reason="max_steps", error="max steps exhausted")
 
     def _render(self, context: StepContext, allowed_tools: list[str]) -> str:
-        observations = "\n\n".join(context.observations) or "（暂无）"
+        labels = {"assistant": "【你】", "tool": "【工具】"}
+        observations = "\n\n".join(
+            f"{labels[m['role']]}{m['content']}" for m in context.history
+        ) or "（暂无）"
         return self.prompt_template.format(
             instruction=context.instruction,
             tools_desc=self.tools.describe(allowed_tools),

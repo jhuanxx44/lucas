@@ -86,6 +86,23 @@ async def test_full_loop_tool_then_answer(tmp_path):
     assert events[7]["data"]["tool_call_id"] == "call-1"
 
 
+async def test_history_replays_model_raw_output(tmp_path):
+    """全量回放：第二轮 prompt 同时包含第一轮模型的原始输出和工具 observation"""
+    (tmp_path / "config.yaml").write_text("provider: deepseek\ntimeout: 10\n")
+    first_output = json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "config.yaml"}})
+    model = FakeModel([
+        first_output,
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    await _runner(tmp_path, model, trace).run("read config", ["read_file"], LIMITS, trace)
+
+    second_prompt = model.prompts[1]
+    assert f"【你】{first_output}" in second_prompt
+    assert "【工具】[read_file] status=ok" in second_prompt
+    assert "provider: deepseek" in second_prompt
+
+
 async def test_trace_records_prompt_and_model_output_artifacts(tmp_path):
     (tmp_path / "config.yaml").write_text("provider: deepseek\n")
     model = FakeModel([
