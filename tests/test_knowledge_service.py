@@ -19,8 +19,10 @@ import pytest
 from harness.config import WikiConfig, load_wiki_config
 from server.services.knowledge import (
     KnowledgeService,
+    ensure_source_in_frontmatter,
     parse_classification,
     rebuild_index,
+    split_frontmatter,
     validate_page,
     validate_plan,
 )
@@ -407,6 +409,75 @@ async def test_ingest_plan_failure_degrades(tmp_path):
 
 
 # ── 声明式溯源（已编译检测靠 wiki 页面 frontmatter sources） ──
+
+
+def test_ensure_source_appends_missing_source():
+    """LLM 漏写 sources → 代码补上；已有 sources 保留"""
+    content = (
+        "---\ntitle: 宁德时代\ntype: company\nupdated: 2026-01-01\n"
+        "sources:\n  - ingested/新能源/a.md\n---\n\n# 宁德时代\n\n正文。\n"
+    )
+    fixed = ensure_source_in_frontmatter(content, "ingested/新能源/b.md")
+    fm, body = split_frontmatter(fixed)
+    assert fm["sources"] == ["ingested/新能源/a.md", "ingested/新能源/b.md"]
+    assert fm["title"] == "宁德时代"
+    assert body == "\n\n# 宁德时代\n\n正文。\n"
+
+
+def test_ensure_source_no_sources_field():
+    """frontmatter 完全没有 sources 字段 → 新建 sources"""
+    content = "---\ntitle: t\ntype: company\nupdated: 2026-01-01\n---\n\n正文\n"
+    fixed = ensure_source_in_frontmatter(content, "ingested/x.md")
+    fm, _ = split_frontmatter(fixed)
+    assert fm["sources"] == ["ingested/x.md"]
+
+
+def test_ensure_source_already_present_returns_unchanged():
+    """sources 已含该路径 → 原样返回（逐字节不变）"""
+    content = (
+        "---\ntitle: t\ntype: company\nupdated: 2026-01-01\n"
+        "sources:\n  - ingested/x.md\n---\n\n正文\n"
+    )
+    assert ensure_source_in_frontmatter(content, "ingested/x.md") == content
+
+
+def test_ensure_source_no_frontmatter_passthrough():
+    """缺 frontmatter 的坏输出原样返回，交给 validate_page 拦截"""
+    content = "没有 frontmatter 的坏输出"
+    assert ensure_source_in_frontmatter(content, "ingested/x.md") == content
+
+
+async def test_ingest_guarantees_source_in_page_frontmatter(tmp_path):
+    """LLM 编译输出漏写 sources → 落盘页面 frontmatter 仍含本来源路径（幂等溯源）"""
+    rel_source = f"ingested/新能源/宁德时代/{TODAY}_宁德时代季报.md"
+    page_without_sources = (
+        f"---\ntitle: 宁德时代\ntype: company\ncreated: {TODAY}\nupdated: {TODAY}\n---\n\n"
+        "# 宁德时代\n\n## 基本信息\n\n动力电池龙头。\n"
+    )
+    client = FakeClient([PLAN_ONE, page_without_sources])
+    service = _service(tmp_path, client)
+
+    events = await _collect(
+        service, content="材料", title="宁德时代季报", industry="新能源", company="宁德时代",
+    )
+
+    assert "error" not in _event_types(events)
+    page = tmp_path / "wiki" / "companies" / "新能源" / "宁德时代.md"
+    assert page.is_file()
+    fm, body = split_frontmatter(page.read_text(encoding="utf-8"))
+    assert rel_source in fm["sources"]
+    assert "动力电池龙头" in body
+
+
+def test_page_path_escapes_glob_chars(tmp_path):
+    """页面名含 glob 特殊字符时不会误匹配其他页面"""
+    service = _service(tmp_path, FakeClient())
+    other = tmp_path / "wiki" / "companies" / "新能源" / "宁德时代.md"
+    other.parent.mkdir(parents=True)
+    other.write_text("x", encoding="utf-8")
+    # "宁德[时]代" 若不 escape，glob 会把它当字符类匹配到 "宁德时代.md"
+    path = service._page_path("company", "宁德[时]代", "新能源")
+    assert path.endswith("宁德[时]代.md")
 
 
 def test_compiled_sources_scans_frontmatter(tmp_path):

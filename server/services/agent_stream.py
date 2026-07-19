@@ -3,14 +3,16 @@
 替代旧 stream.py（agents.Manager 链路，已删除）。事件协议与前端
 web/src/hooks/useChat.ts 严格对齐：
 
+  dispatch {researchers, mode}    run 开始（先于 researcher_start；
+                                  useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
   status {message}                每个工具 step 完成
   synthesis_chunk {text}          最终答案（事件级流式，整段一次推送）
   researcher_done {id}            答案推送完成后
   done {total_tokens}             正常结束（AgentResult.usage 累计）
-  error {message}                 异常 / 解析失败 / budget_exceeded / max_steps
+  error {message}                 异常 / 解析失败 / budget_exceeded / max_steps / timeout
 
-dispatch / actions 不再发送（前端缺省行为正常）。
+actions 不再发送（前端缺省行为正常）。
 """
 import asyncio
 import json
@@ -22,7 +24,7 @@ from harness.config import load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
-from harness.tools.business import BUSINESS_TOOL_SPECS
+from harness.tools.business import BUSINESS_TOOL_NAMES, BUSINESS_TOOL_SPECS
 from harness.tools.registry import ToolRuntime
 from utils.llm_client import create_client
 
@@ -72,12 +74,16 @@ def _status_message(evt: dict) -> str:
 
 
 def _error_message(result: AgentResult) -> str:
-    """finish_reason → 中文友好文案"""
+    """finish_reason → 中文友好文案（内部英文错误不外抛）"""
     if result.finish_reason == "budget_exceeded":
         return "本次分析超出成本预算，已中止。请缩小问题范围后重试。"
     if result.finish_reason == "max_steps":
         return "分析步骤达到上限仍未能得出结论。请把问题拆小后重试。"
-    return f"分析过程中断：{result.error or '未知原因'}"
+    if result.finish_reason == "timeout":
+        return "分析超时，已中止。请缩小问题范围后重试。"
+    logger.warning("agent run 内部中断: finish_reason=%s error=%s",
+                   result.finish_reason, result.error)
+    return "分析过程中断，请稍后重试。"
 
 
 async def chat_event_stream(
@@ -87,12 +93,14 @@ async def chat_event_stream(
     workspace: Path | None = None,
     model_adapter=None,
 ) -> AsyncGenerator[str, None]:
+    run_task: asyncio.Task | None = None
     try:
         config = load_agent_config()
         if model_adapter is None:
             client = create_client(provider=config.provider, model=config.model)
             model_adapter = LLMClientAdapter(client, temperature=config.temperature)
-        # 聊天链路只挂业务工具（只读取数）；wiki 根 = 工作区/wiki，由 server 侧装配传入
+        # 聊天链路只挂业务工具（只读取数）：工具注册与白名单都用 BUSINESS_TOOL_*，
+        # 与 lucas.yaml 的 allowed_tools 无关；wiki 根 = 工作区/wiki，由 server 侧装配传入
         tools = ToolRuntime(workspace or _PROJECT_ROOT, BUSINESS_TOOL_SPECS)
         runner = AgentRunner(model_adapter, tools, load_prompt_template(_PROMPT_PATH))
         instruction = _render_history(history) + f"用户问题：{question}"
@@ -100,10 +108,14 @@ async def chat_event_stream(
 
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
-            runner.run(instruction, config.allowed_tools, limits,
+            runner.run(instruction, BUSINESS_TOOL_NAMES, limits,
                        on_event=queue.put_nowait)
         )
 
+        yield _sse("dispatch", {
+            "researchers": [{"id": "single", "name": config.name}],
+            "mode": "single",
+        })
         yield _sse("researcher_start", {"id": "single", "name": config.name})
         # 运行期间增量排出工具 step 事件；answer 事件以最终 AgentResult 为准，不重复推送
         while not run_task.done():
@@ -131,3 +143,7 @@ async def chat_event_stream(
     except Exception as e:
         logger.exception("agent stream error for question: %s", question[:80])
         yield _sse("error", {"message": f"分析过程出错：{e}"})
+    finally:
+        # 客户端断开（GeneratorExit）或异常退出时取消 run，不再继续烧 token
+        if run_task is not None and not run_task.done():
+            run_task.cancel()

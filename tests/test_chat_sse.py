@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -109,14 +110,31 @@ async def test_agent_stream_full_event_sequence(tmp_path):
     events = await _collect("查一下茅台", model=model, workspace=tmp_path)
 
     assert [e for e, _ in events] == [
-        "researcher_start", "status", "synthesis_chunk", "researcher_done", "done",
+        "dispatch", "researcher_start", "status", "synthesis_chunk", "researcher_done", "done",
     ]
-    assert events[0][1] == {"id": "single", "name": "Lucas"}
-    assert "wiki_recall" in events[1][1]["message"]
-    assert "贵州茅台" in events[1][1]["message"]
-    assert events[2][1] == {"text": "最终答案"}
-    assert events[3][1] == {"id": "single"}
-    assert events[4][1] == {"total_tokens": 430}
+    assert events[0][1] == {"researchers": [{"id": "single", "name": "Lucas"}], "mode": "single"}
+    assert events[1][1] == {"id": "single", "name": "Lucas"}
+    assert "wiki_recall" in events[2][1]["message"]
+    assert "贵州茅台" in events[2][1]["message"]
+    assert events[3][1] == {"text": "最终答案"}
+    assert events[4][1] == {"id": "single"}
+    assert events[5][1] == {"total_tokens": 430}
+
+
+async def test_agent_stream_dispatch_contract(tmp_path):
+    """契约锁定：dispatch 先于 researcher_start，payload 含 researchers + mode=single。
+
+    前端 useChat.ts 依赖 dispatch 触发 onResearchTarget（wiki 联动）。
+    """
+    model = FakeModel([json.dumps({"action": "answer", "reply": "ok"})])
+    events = await _collect("问题", model=model, workspace=tmp_path)
+
+    assert events[0][0] == "dispatch"
+    assert events[0][1] == {
+        "researchers": [{"id": "single", "name": "Lucas"}],
+        "mode": "single",
+    }
+    assert events[1][0] == "researcher_start"
 
 
 async def test_agent_stream_history_injected_into_instruction(tmp_path):
@@ -129,7 +147,7 @@ async def test_agent_stream_history_injected_into_instruction(tmp_path):
     events = await _collect("新问题", history=history, model=model, workspace=tmp_path)
 
     assert [e for e, _ in events] == [
-        "researcher_start", "synthesis_chunk", "researcher_done", "done",
+        "dispatch", "researcher_start", "synthesis_chunk", "researcher_done", "done",
     ]
     prompt = model.prompts[0]
     assert "用户: 之前的问题" in prompt
@@ -146,9 +164,9 @@ async def test_agent_stream_model_exception_yields_error(tmp_path):
 
     events = await _collect("test", model=BoomModel(), workspace=tmp_path)
 
-    assert [e for e, _ in events] == ["researcher_start", "error"]
-    assert "分析过程出错" in events[1][1]["message"]
-    assert "boom" in events[1][1]["message"]
+    assert [e for e, _ in events] == ["dispatch", "researcher_start", "error"]
+    assert "分析过程出错" in events[2][1]["message"]
+    assert "boom" in events[2][1]["message"]
 
 
 async def test_agent_stream_max_steps_yields_error(tmp_path):
@@ -160,7 +178,49 @@ async def test_agent_stream_max_steps_yields_error(tmp_path):
     events = await _collect("永不回答", model=model, workspace=tmp_path)
 
     kinds = [e for e, _ in events]
-    assert kinds[0] == "researcher_start"
+    assert kinds[0] == "dispatch"
+    assert kinds[1] == "researcher_start"
     assert kinds[-1] == "error"
     assert kinds.count("status") == 10
     assert "步骤达到上限" in events[-1][1]["message"]
+
+
+async def test_agent_stream_client_disconnect_cancels_run(tmp_path):
+    """客户端断开（SSE generator 提前关闭）→ run_task 被取消，不再继续烧 token"""
+    cancelled = asyncio.Event()
+
+    class HangingModel:
+        async def complete(self, prompt: str):
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return json.dumps({"action": "answer", "reply": "x"}), None
+
+    from server.services.agent_stream import chat_event_stream
+    gen = chat_event_stream("问题", workspace=tmp_path, model_adapter=HangingModel())
+    first = await gen.__anext__()
+    assert "event: dispatch" in first
+    await asyncio.sleep(0.05)  # 让 run_task 进入挂起的模型调用
+    await gen.aclose()
+    await asyncio.sleep(0.01)  # 让取消传播到挂起的模型调用
+    assert cancelled.is_set()
+
+
+def test_error_message_timeout_friendly():
+    """finish_reason=timeout → 中文文案"""
+    from harness.models import AgentResult
+    from server.services.agent_stream import _error_message
+    msg = _error_message(AgentResult(finish_reason="timeout", error="elapsed 121s"))
+    assert "超时" in msg
+
+
+def test_error_message_hides_internal_english():
+    """内部英文错误（如 repeated failing tool call aborted）不原样抛给用户"""
+    from harness.models import AgentResult
+    from server.services.agent_stream import _error_message
+    msg = _error_message(AgentResult(
+        finish_reason="error", error="repeated failing tool call aborted: read_file"))
+    assert "repeated" not in msg
+    assert "中断" in msg

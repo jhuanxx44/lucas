@@ -157,6 +157,28 @@ def validate_plan(data) -> list[dict]:
     return plans
 
 
+def ensure_source_in_frontmatter(content: str, source_path: str) -> str:
+    """代码保证本来源路径进入 frontmatter sources（LLM 漏写则补上），不靠 prompt 自觉。
+
+    sources 已含该路径时原样返回（逐字节不变）；缺 frontmatter 时原样返回，
+    交由 validate_page 确定性拦截。
+    """
+    fm, body = split_frontmatter(content)
+    if not fm:
+        return content
+    sources = fm.get("sources")
+    if isinstance(sources, str):
+        sources = [sources]
+    elif not isinstance(sources, list):
+        sources = []
+    sources = [str(s) for s in sources]
+    if source_path in sources:
+        return content
+    fm = {**fm, "sources": [*sources, source_path]}
+    dumped = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False)
+    return f"---\n{dumped}---{body}"
+
+
 def validate_page(content: str, old_content: str = "") -> tuple[str | None, list[str]]:
     """写入前确定性校验。返回 (拒绝原因, 丢失的旧段落列表)；拒绝原因 None 表示通过。"""
     if not content.startswith("---"):
@@ -382,6 +404,8 @@ class KnowledgeService:
                         old_content = f.read()
 
                 new_content = await self._compile_page(plan, source_path, source_content, old_content)
+                # 代码保证本来源进入 frontmatter sources（幂等溯源不靠 LLM 自觉）
+                new_content = ensure_source_in_frontmatter(new_content, source_path)
 
                 error, lost = validate_page(new_content, old_content if old_content else "")
                 if error:
@@ -435,7 +459,7 @@ class KnowledgeService:
         name = _safe_segment(name, default="untitled")
         if page_type == "company":
             # 同一公司不得出现在多个分类下：已有页面优先复用其位置
-            pattern = os.path.join(self._wiki_dir, "companies", "*", f"{name}.md")
+            pattern = os.path.join(self._wiki_dir, "companies", "*", f"{glob.escape(name)}.md")
             matches = glob.glob(pattern)
             if matches:
                 return matches[0]

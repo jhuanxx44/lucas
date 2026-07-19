@@ -590,6 +590,46 @@ async def test_zero_budget_means_unlimited(tmp_path):
     assert result.finish_reason == "completed"
 
 
+# ---------- 超时 ----------
+
+async def test_timeout_terminates_after_step(tmp_path):
+    """每步结束后检查总超时：超过 timeout_seconds 后以 timeout 终止，不再开始下一步"""
+    class SlowModel:
+        def __init__(self):
+            self.prompts: list[str] = []
+
+        async def complete(self, prompt: str):
+            self.prompts.append(prompt)
+            await asyncio.sleep(0.05)
+            return json.dumps({"action": "tool", "tool": "read_file",
+                               "args": {"path": "a.txt"}}), None
+
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    model = SlowModel()
+    trace = _trace(tmp_path)
+    limits = RunLimits(max_steps=5, timeout_seconds=0.01)
+    result = await _runner(tmp_path, model, trace).run("t", ["read_file"], limits, trace)
+
+    assert result.finish_reason == "timeout"
+    assert "timeout" in result.error
+    # 第一步已执行，第二步未开始
+    assert len(model.prompts) == 1
+    events = _events(trace)
+    assert len([e for e in events if e["event"] == "step_started"]) == 1
+    timeout_event = next(e for e in events if e["event"] == "timeout")
+    assert timeout_event["data"]["timeout_seconds"] == 0.01
+
+
+async def test_zero_timeout_means_unlimited(tmp_path):
+    """timeout_seconds=0/None 表示不限制（与 max_cost_usd 约定一致）"""
+    model = FakeModel([json.dumps({"action": "answer", "reply": "done"})])
+    trace = _trace(tmp_path)
+    for timeout in (0, -1, None):
+        limits = RunLimits(max_steps=5, timeout_seconds=timeout)
+        result = await _runner(tmp_path, model, trace).run("t", [], limits, trace)
+        assert result.finish_reason == "completed", timeout
+
+
 # ---------- lucas_single adapter ----------
 
 async def test_lucas_single_adapter_parses_json_answer(tmp_path, monkeypatch):

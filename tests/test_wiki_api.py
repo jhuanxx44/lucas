@@ -91,3 +91,34 @@ def test_safe_join_rejects_base():
     with pytest.raises(HTTPException) as exc_info:
         _safe_join("/tmp/wiki", "")
     assert exc_info.value.status_code == 403
+
+
+def test_classify_source_returns_friendly_error():
+    """classify 端点：service 构造或 LLM 调用失败 → 500 + 中文友好 detail（不是裸异常）"""
+    ws = _ws_mock()
+    with patch("server.routers.wiki.LocalWorkspace", return_value=ws), \
+         patch("server.routers.wiki._create_knowledge_service",
+               side_effect=RuntimeError("LLM 配置缺失")):
+        from server.app import create_app
+        resp = TestClient(create_app(), raise_server_exceptions=False).post(
+            "/api/wiki/classify-source", json={"content": "材料内容"})
+
+    assert resp.status_code == 500
+    assert "分类失败" in resp.json()["detail"]
+
+
+def test_ingest_source_init_failure_yields_error_event():
+    """ingest 的 SSE 流内 service 构造失败 → 以 error 事件收尾，而不是断连"""
+    ws = _ws_mock()
+    with patch("server.routers.wiki.LocalWorkspace", return_value=ws), \
+         patch("server.routers.wiki._create_knowledge_service",
+               side_effect=RuntimeError("LLM 配置缺失")):
+        from server.app import create_app
+        resp = TestClient(create_app()).post(
+            "/api/wiki/ingest-source",
+            json={"content": "材料内容", "title": "t", "industry": "电子"})
+
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert "event: error" in resp.text
+    assert "初始化知识服务失败" in resp.text

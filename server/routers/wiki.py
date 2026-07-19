@@ -181,9 +181,12 @@ async def classify_source(req: ClassifySourceRequest, request: Request):
         raise HTTPException(status_code=400, detail="content 不能为空")
 
     ws = _get_ws(request)
-    ks = _create_knowledge_service(ws)
-    result = await ks.classify_source(req.content)
-    return result
+    try:
+        ks = _create_knowledge_service(ws)
+        return await ks.classify_source(req.content)
+    except Exception as e:
+        logger.exception("classify-source error")
+        raise HTTPException(status_code=500, detail=f"分类失败：{e}")
 
 
 class IngestSourceRequest(BaseModel):
@@ -206,7 +209,14 @@ async def ingest_source(req: IngestSourceRequest, request: Request):
     ws = _get_ws(request)
 
     async def _stream():
-        ks = _create_knowledge_service(ws)
+        try:
+            ks = _create_knowledge_service(ws)
+        except Exception as e:
+            # 服务构造失败（如 LLM 配置缺失）也要以 error 事件收尾，而不是断连
+            logger.exception("ingest-source init error: %s", req.title)
+            payload = json.dumps({"message": f"初始化知识服务失败：{e}"}, ensure_ascii=False)
+            yield f"event: error\ndata: {payload}\n\n"
+            return
         async for event_type, data in ks.ingest_source(
             content=req.content,
             url=req.url,

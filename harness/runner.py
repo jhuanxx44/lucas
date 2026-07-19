@@ -55,6 +55,7 @@ class AgentRunner:
         total_observation_chars = 0
         total_usage: TokenUsage | None = None
         cost_usd = 0.0
+        run_started = time.monotonic()
         artifacts: Path | None = None
         if trace is not None:
             artifacts = trace.path.parent / "artifacts"
@@ -62,6 +63,20 @@ class AgentRunner:
         else:
             trace = _NullTrace()
         for step in range(1, limits.max_steps + 1):
+            # 每步结束后（下一步开始前）检查总超时；None 或 <=0 表示不限制（与 max_cost_usd 约定一致）
+            if limits.timeout_seconds and limits.timeout_seconds > 0 and step > 1:
+                elapsed = time.monotonic() - run_started
+                if elapsed > limits.timeout_seconds:
+                    trace.record("timeout", {
+                        "step_id": context.step_id,
+                        "elapsed_seconds": round(elapsed, 3),
+                        "timeout_seconds": limits.timeout_seconds,
+                    })
+                    return AgentResult(
+                        finish_reason="timeout",
+                        error=f"elapsed {elapsed:.1f}s exceeded timeout {limits.timeout_seconds}s",
+                        usage=total_usage, cost_usd=cost_usd,
+                    )
             context.step_id = f"step-{step}"
             trace.record("step_started", {"step_id": context.step_id})
             prompt = self._render(context, allowed_tools)
