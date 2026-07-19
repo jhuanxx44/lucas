@@ -693,7 +693,7 @@ Thought 与 Plan 不是互斥的两种范式，而是按任务复杂度分层的
 
 调研 OpenAI Codex CLI（codex-rs）后确认的第三种实现路径，工业界最成熟的方案，作为实验中的**标杆对照组**：
 
-- **Plan 做成哑工具**：提供 `update_plan` 工具（参数为步骤列表，每项含 `step` 与 `status: pending|in_progress|completed`），harness 侧收到调用后只做两件事——记录到 trace、返回固定字符串 `"Plan updated"`。不保存 plan 状态、不强制状态机、不校验，计划完全存在于上下文中由模型自律维护。
+- **Plan 做成哑工具**：提供 `update_plan` 工具（参数为步骤列表，每项含 `step` 与 `status: pending|in_progress|completed`），harness 侧不保存 plan 状态、不强制状态机、不校验，计划完全存在于上下文中由模型自律维护。**注意不能照抄 Codex 返回固定字符串 `"Plan updated"`**：Codex 全量回放对话历史，模型的调用内容天然留在上下文；而 lucas 当前 Runner 只回放 observations（见 Phase 4「历史结构」），因此 observation 必须回显 plan 全文，否则下一轮 plan 从上下文中消失。
 - **路由靠 prompt 一句话**：在 prompt 中写明“简单任务（约最简单的 25%）不要使用规划工具，不要做单步计划”，由模型自行判断任务复杂度，不做代码级复杂度判别。
 - **Thought 依赖模型 API 原生 reasoning 输出**：Codex 的推理是 Responses API 的一等历史条目；若所用模型/API 支持原生 reasoning，优先直接利用，而非自造 thought 字段。
 
@@ -814,6 +814,14 @@ python -m evals.harness rerun runs/<run_id>
 - 哪些 context 真正帮助任务成功？
 - 当上下文超预算时，丢弃、截断和摘要哪种更有效？
 - 压缩带来的信息损失如何观察？
+
+### 历史结构：observations-only vs 全量消息回放
+
+当前 Runner 的已知设计差距：每轮 prompt 只由 `instruction + tools_desc + observations` 渲染，模型自己说过的话（action JSON、答案草稿、推理）不会进入后续上下文。后果：模型无法引用自己之前的判断，多轮交互场景（用户针对 Agent 上一条回复追问）下 Agent 完全看不到自己说过什么。
+
+Codex 与 mini-swe-agent 均采用全量消息回放（模型的每条消息都是历史的一等条目），这是工业界验证过的默认正确结构。lucas 当前的 observations-only 是极简实现的副作用，不是有意设计。
+
+决策：在 Phase 4 开头先将 Runner 的历史结构改为全量消息回放（记录每轮的 assistant 消息与 observation，按序回放），作为后续所有 Context 实验的新 baseline。此改动本身是单变量实验（observations-only vs 全量回放），预期对多步骤任务的自我纠错能力有改善；若 token 成本显著上升，由本 Phase 的选择/压缩策略对冲，而不是退回丢弃历史。在此结构落地前，依赖上下文的哑工具（如 `update_plan`）必须用 observation 回显内容兜底（见 Phase 2 Codex 式变体）。
 
 ### ContextItem
 
