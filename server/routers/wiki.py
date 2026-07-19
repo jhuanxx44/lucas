@@ -6,7 +6,7 @@ import shutil
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from server.services.wiki_parser import parse_wiki_index, parse_wiki_page, search_wiki
+from utils.wiki_core import parse_wiki_index, parse_wiki_page, search_wiki
 from workspace import LocalWorkspace
 
 logger = logging.getLogger(__name__)

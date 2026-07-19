@@ -5,6 +5,7 @@ from evals.harness.trace import TraceRecorder
 from harness.config import load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.runner import AgentRunner, load_prompt_template
+from harness.tools.business import BUSINESS_TOOL_NAMES, BUSINESS_TOOL_SPECS
 from harness.tools.filesystem import (
     APPLY_PATCH_SPEC,
     LIST_FILES_SPEC,
@@ -43,11 +44,14 @@ class LucasSingleAgent:
             LIST_FILES_SPEC,
             SEARCH_SPEC,
             WRITE_FILE_SPEC,
+            *BUSINESS_TOOL_SPECS,
         ])
+        # 业务工具默认全开：并入任务白名单（去重保序），任务仍可通过白名单控制其余工具
+        effective_tools = list(dict.fromkeys([*allowed_tools, *BUSINESS_TOOL_NAMES]))
         runner = AgentRunner(
             self.model_adapter, tools, load_prompt_template(PROMPT_PATH)
         )
-        result = await runner.run(instruction, allowed_tools, limits, trace)
+        result = await runner.run(instruction, effective_tools, limits, trace)
         if isinstance(result.answer, str):
             parsed = extract_json(result.answer)
             if isinstance(parsed, dict):
