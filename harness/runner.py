@@ -1,6 +1,7 @@
 import json
 import time
 from pathlib import Path
+from typing import Callable
 
 from harness.model_adapter import ModelAdapter
 from harness.models import AgentResult, RunLimits, StepContext
@@ -40,7 +41,15 @@ class AgentRunner:
         allowed_tools: list[str],
         limits: RunLimits,
         trace: TraceRecorder | None = None,
+        on_event: Callable[[dict], None] | None = None,
     ) -> AgentResult:
+        """on_event：可选的 step 事件钩子（同步回调，零开销缺省）。
+
+        工具执行完成时回调 {"kind": "tool_step", "step", "tool", "args", "ok",
+        "observation"}（observation 截断为前 500 字符摘要）；
+        answer 产出时回调 {"kind": "answer", "step", "answer"}。
+        不改变任何终止语义，仅用于外部观察（如 SSE 桥）。
+        """
         context = StepContext(step_id="", instruction=instruction)
         last_failed_signature = None
         total_observation_chars = 0
@@ -111,6 +120,8 @@ class AgentRunner:
                     "answer_preview": str(answer_text)[:500],
                 })
                 trace.record("step_finished", {"step_id": context.step_id})
+                if on_event is not None:
+                    on_event({"kind": "answer", "step": step, "answer": answer_text})
                 return AgentResult(
                     answer=answer_text, finish_reason="completed",
                     usage=total_usage, cost_usd=cost_usd,
@@ -165,6 +176,15 @@ class AgentRunner:
                 last_failed_signature = signature
             context.history.append({"role": "tool", "content": observation})
             trace.record("step_finished", {"step_id": context.step_id})
+            if on_event is not None:
+                on_event({
+                    "kind": "tool_step",
+                    "step": step,
+                    "tool": tool,
+                    "args": args,
+                    "ok": result.ok,
+                    "observation": observation[:500],
+                })
         return AgentResult(
             finish_reason="max_steps", error="max steps exhausted",
             usage=total_usage, cost_usd=cost_usd,

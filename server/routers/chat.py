@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from server.services.stream import chat_event_stream
+from server.services.agent_stream import chat_event_stream
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
