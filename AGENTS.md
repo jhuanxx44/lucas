@@ -24,6 +24,11 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - 产品功能围绕明确的成功标准实现和测试。
 - 文档任务只修改必要文档，不顺手改代码。
 
+### 干中学输出
+
+- 每次完成一个产品功能后，必须输出一份简短教程/解释，用浅显易懂的语言解释实现中涉及的核心原理、关键设计决策及其取舍理由。
+- 教程写入 `docs/learnings/` 目录，文件名格式：`YYYY-MM-DD-功能简述.md`。
+
 ### Agent 机制实验
 
 当任务的目的在于验证 Planning、Tool、Context、Loop、Memory、Validation、Reliability、Evaluation 或 Trace 等机制时，采用 eval-driven 流程：
