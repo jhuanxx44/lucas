@@ -1,8 +1,10 @@
 from typing import Protocol
 
+from utils.token_tracker import TokenUsage
+
 
 class ModelAdapter(Protocol):
-    async def complete(self, prompt: str) -> str: ...
+    async def complete(self, prompt: str) -> tuple[str, TokenUsage | None]: ...
 
 
 class LLMClientAdapter:
@@ -12,10 +14,9 @@ class LLMClientAdapter:
         self.client = client
         self.temperature = temperature
 
-    async def complete(self, prompt: str) -> str:
-        text, _ = await self.client.chat(
+    async def complete(self, prompt: str) -> tuple[str, TokenUsage | None]:
+        return await self.client.chat(
             prompt,
             response_mime_type="application/json",
             temperature=self.temperature,
         )
-        return text

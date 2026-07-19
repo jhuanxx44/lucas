@@ -1,3 +1,4 @@
+import inspect
 import time
 from pathlib import Path
 
@@ -20,7 +21,7 @@ class ToolRuntime:
             lines.append(f"- {spec.name}: {spec.description}\n  参数: {spec.args_description}")
         return "\n".join(lines) if lines else "（无可用工具）"
 
-    def execute(self, name: str, args: dict, allowed_tools: list[str]) -> ToolResult:
+    async def execute(self, name: str, args: dict, allowed_tools: list[str]) -> ToolResult:
         spec = self._specs.get(name)
         if spec is None:
             return ToolResult(status="invalid_input", error_code="unknown_tool",
@@ -34,6 +35,8 @@ class ToolRuntime:
         start = time.monotonic()
         try:
             result = spec.handler(self.workspace, args)
+            if inspect.isawaitable(result):
+                result = await result
         except Exception as e:
             result = ToolResult(status="error", error_code="handler_exception",
                                 observation=f"{type(e).__name__}: {e}")

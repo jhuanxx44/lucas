@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Awaitable, Callable
 
 TOOL_STATUSES = {"ok", "invalid_input", "denied", "timeout", "error"}
 
-ToolHandler = Callable[[Path, dict], "ToolResult"]
+# handler 可以是同步或 async；ToolRuntime.execute 统一 await 兼容两者
+ToolHandler = Callable[[Path, dict], "ToolResult | Awaitable[ToolResult]"]
 
 
 @dataclass(frozen=True)

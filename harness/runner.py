@@ -6,6 +6,7 @@ from harness.model_adapter import ModelAdapter
 from harness.models import AgentResult, RunLimits, StepContext
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
+from utils.token_tracker import TokenUsage
 
 
 class _NullTrace:
@@ -43,6 +44,8 @@ class AgentRunner:
         context = StepContext(step_id="", instruction=instruction)
         last_failed_signature = None
         total_observation_chars = 0
+        total_usage: TokenUsage | None = None
+        cost_usd = 0.0
         artifacts: Path | None = None
         if trace is not None:
             artifacts = trace.path.parent / "artifacts"
@@ -67,8 +70,11 @@ class AgentRunner:
                 "step_id": context.step_id, "model_call_id": f"model-{step}",
             })
             started = time.monotonic()
-            raw = await self.model.complete(prompt)
+            raw, usage = await self.model.complete(prompt)
             duration_ms = (time.monotonic() - started) * 1000
+            if usage is not None:
+                total_usage = usage if total_usage is None else total_usage.merge(usage)
+            cost_usd = total_usage.total_cost if total_usage is not None else 0.0
             output_ref = (
                 _write_artifact(artifacts, f"output-{context.step_id}.txt", raw)
                 if artifacts is not None else None
@@ -79,6 +85,7 @@ class AgentRunner:
                 "duration_ms": round(duration_ms, 1),
                 "output_chars": len(raw),
                 "artifact": output_ref,
+                **(_usage_trace_data(usage)),
             })
             # 全量回放：模型自己的原始输出（包括格式错误的）进入后续上下文
             context.history.append({"role": "assistant", "content": raw})
@@ -104,7 +111,10 @@ class AgentRunner:
                     "answer_preview": str(answer_text)[:500],
                 })
                 trace.record("step_finished", {"step_id": context.step_id})
-                return AgentResult(answer=answer_text, finish_reason="completed")
+                return AgentResult(
+                    answer=answer_text, finish_reason="completed",
+                    usage=total_usage, cost_usd=cost_usd,
+                )
 
             tool, args = action["tool"], action["args"]
             trace.record("action_parsed", {
@@ -116,12 +126,26 @@ class AgentRunner:
                 return AgentResult(
                     finish_reason="error",
                     error=f"repeated failing tool call aborted: {tool}",
+                    usage=total_usage, cost_usd=cost_usd,
+                )
+            # 预算在执行下一个工具前检查：已产出的最终答案不会被预算拦截丢弃
+            if limits.max_cost_usd and cost_usd > limits.max_cost_usd:
+                trace.record("budget_exceeded", {
+                    "step_id": context.step_id,
+                    "cost_usd": round(cost_usd, 6),
+                    "max_cost_usd": limits.max_cost_usd,
+                })
+                trace.record("step_finished", {"step_id": context.step_id})
+                return AgentResult(
+                    finish_reason="budget_exceeded",
+                    error=f"cost {cost_usd:.4f} USD exceeded budget {limits.max_cost_usd} USD",
+                    usage=total_usage, cost_usd=cost_usd,
                 )
             call_id = f"call-{step}"
             trace.record("tool_call_started", {
                 "tool_call_id": call_id, "tool": tool, "args": args,
             })
-            result = self.tools.execute(tool, args, allowed_tools)
+            result = await self.tools.execute(tool, args, allowed_tools)
             observation = _format_observation(tool, result)
             total_observation_chars += len(observation)
             if result.ok:
@@ -141,7 +165,10 @@ class AgentRunner:
                 last_failed_signature = signature
             context.history.append({"role": "tool", "content": observation})
             trace.record("step_finished", {"step_id": context.step_id})
-        return AgentResult(finish_reason="max_steps", error="max steps exhausted")
+        return AgentResult(
+            finish_reason="max_steps", error="max steps exhausted",
+            usage=total_usage, cost_usd=cost_usd,
+        )
 
     def _render(self, context: StepContext, allowed_tools: list[str]) -> str:
         labels = {"assistant": "【你】", "tool": "【工具】"}
@@ -159,6 +186,16 @@ def _write_artifact(artifacts: Path, name: str, content: str) -> str:
     path = artifacts / name
     path.write_text(content, encoding="utf-8")
     return f"artifacts/{name}"
+
+
+def _usage_trace_data(usage: TokenUsage | None) -> dict:
+    if usage is None:
+        return {}
+    return {
+        "prompt_tokens": usage.prompt_tokens,
+        "completion_tokens": usage.completion_tokens,
+        "total_tokens": usage.total_tokens,
+    }
 
 
 def _parse_action(raw: str) -> dict | None:

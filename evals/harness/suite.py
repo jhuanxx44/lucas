@@ -52,6 +52,8 @@ async def run_suite(
                 "outcome_passed": grade.outcome_passed,
                 "safety_passed": grade.safety_passed,
                 "process_passed": grade.process_passed,
+                "total_tokens": agent_result.usage.total_tokens if agent_result.usage else 0,
+                "cost_usd": round(agent_result.cost_usd, 6),
             })
 
     passed = sum(1 for run in runs if run["success"])

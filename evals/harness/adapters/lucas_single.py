@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from agents.config import load_config
 from evals.harness.models import AgentResult, RunLimits
 from evals.harness.trace import TraceRecorder
+from harness.config import load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.filesystem import (
@@ -24,9 +24,9 @@ class LucasSingleAgent:
 
     def __init__(self, model_adapter=None):
         if model_adapter is None:
-            single = load_config().single_agent
-            client = create_client(provider=single.provider, model=single.model)
-            model_adapter = LLMClientAdapter(client, temperature=0.0)
+            config = load_agent_config()
+            client = create_client(provider=config.provider, model=config.model)
+            model_adapter = LLMClientAdapter(client, temperature=config.temperature)
         self.model_adapter = model_adapter
 
     async def run(

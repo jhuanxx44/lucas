@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import pytest
 from harness.models import RunLimits
 from harness.trace import TraceRecorder, read_trace
 from harness.runner import AgentRunner, load_prompt_template
-from harness.tools.base import ToolSpec
+from harness.tools.base import ToolResult, ToolSpec
 from harness.tools.filesystem import (
     APPLY_PATCH_SPEC,
     LIST_FILES_SPEC,
@@ -15,22 +16,26 @@ from harness.tools.filesystem import (
 )
 from harness.tools.search import SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
+from utils.token_tracker import TokenUsage
 
 LIMITS = RunLimits(max_steps=5, timeout_seconds=30)
 
 
 class FakeModel:
-    """按脚本依次返回固定响应"""
+    """按脚本依次返回固定响应；响应可以是 str 或 (str, TokenUsage) 元组"""
 
-    def __init__(self, responses: list[str]):
+    def __init__(self, responses: list):
         self.responses = list(responses)
         self.prompts: list[str] = []
 
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str) -> tuple[str, TokenUsage | None]:
         self.prompts.append(prompt)
         if self.responses:
-            return self.responses.pop(0)
-        return json.dumps({"action": "answer", "reply": "fallback"})
+            item = self.responses.pop(0)
+            if isinstance(item, tuple):
+                return item
+            return item, None
+        return json.dumps({"action": "answer", "reply": "fallback"}), None
 
 
 def _runner(tmp_path: Path, model: FakeModel, trace: TraceRecorder, specs=None):
@@ -210,7 +215,7 @@ async def test_invalid_json_feedback_then_recover(tmp_path):
 
 def _execute(tmp_path: Path, spec: ToolSpec, name: str, args: dict, allowed=None):
     tools = ToolRuntime(tmp_path, [spec])
-    return tools.execute(name, args, allowed if allowed is not None else [name])
+    return asyncio.run(tools.execute(name, args, allowed if allowed is not None else [name]))
 
 
 def test_read_file_path_traversal_denied(tmp_path):
@@ -466,6 +471,123 @@ async def test_observation_chars_accumulate_in_trace(tmp_path):
     assert second["total_observation_chars"] == (
         first["observation_chars"] + second["observation_chars"]
     )
+
+
+# ---------- 异步工具 / usage / 预算 ----------
+
+async def test_async_tool_handler_is_awaited(tmp_path):
+    """async handler 在一个 run 内被正确 await，同步 handler 也不受影响"""
+    calls = []
+
+    async def async_handler(workspace: Path, args: dict) -> ToolResult:
+        await asyncio.sleep(0)  # 让出事件循环，证明确实被 await
+        calls.append(args)
+        (workspace / "async.txt").write_text("written by async tool", encoding="utf-8")
+        return ToolResult(status="ok", observation="async-done")
+
+    spec = ToolSpec(name="async_tool", description="d", args_description="a",
+                    handler=async_handler)
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "async_tool", "args": {"x": 1}}),
+        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "async.txt"}}),
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    tools = ToolRuntime(tmp_path, [spec, READ_FILE_SPEC])
+    runner = AgentRunner(model, tools, load_prompt_template(
+        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "tool-loop.md"
+    ))
+    result = await runner.run("task", ["async_tool", "read_file"], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
+    assert calls == [{"x": 1}]
+    # 异步工具的 observation 进入后续 prompt，且同步工具读到了它写的文件
+    assert "async-done" in model.prompts[1]
+    assert "written by async tool" in model.prompts[2]
+
+
+async def test_usage_accumulates_into_result(tmp_path):
+    """每次模型调用的 usage 累计进 AgentResult，成本按 token_tracker 估算"""
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    u1 = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150, model="m")
+    u2 = TokenUsage(prompt_tokens=200, completion_tokens=80, total_tokens=280, model="m")
+    model = FakeModel([
+        (json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}), u1),
+        (json.dumps({"action": "answer", "reply": "done"}), u2),
+    ])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run("t", ["read_file"], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
+    assert result.usage is not None
+    assert result.usage.prompt_tokens == 300
+    assert result.usage.completion_tokens == 130
+    assert result.usage.total_tokens == 430
+    assert result.cost_usd == result.usage.total_cost > 0
+    finished = [e for e in _events(trace) if e["event"] == "model_call_finished"]
+    assert finished[0]["data"]["prompt_tokens"] == 100
+    assert finished[1]["data"]["total_tokens"] == 280
+
+
+async def test_result_usage_defaults_when_model_reports_none(tmp_path):
+    """模型不返回 usage 时只记录 0 成本，不影响既有行为"""
+    model = FakeModel([json.dumps({"action": "answer", "reply": "done"})])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run("t", [], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
+    assert result.usage is None
+    assert result.cost_usd == 0.0
+
+
+async def test_budget_exceeded_terminates_before_tool_call(tmp_path):
+    """累计成本超限后以 budget_exceeded 终止，且不再执行后续工具"""
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    # 1M prompt tokens × $2/M = $2.0 成本
+    costly = TokenUsage(prompt_tokens=1_000_000, total_tokens=1_000_000, model="m")
+    model = FakeModel([
+        (json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}), costly),
+    ])
+    trace = _trace(tmp_path)
+    limits = RunLimits(max_steps=5, timeout_seconds=30, max_cost_usd=1.0)
+    result = await _runner(tmp_path, model, trace).run("t", ["read_file"], limits, trace)
+
+    assert result.finish_reason == "budget_exceeded"
+    assert result.usage is not None
+    assert result.cost_usd > 1.0
+    events = _events(trace)
+    assert not any(e["event"] == "tool_call_started" for e in events)
+    budget = next(e for e in events if e["event"] == "budget_exceeded")
+    assert budget["data"]["max_cost_usd"] == 1.0
+
+
+async def test_budget_does_not_discard_final_answer(tmp_path):
+    """超限的那次调用恰好产出最终答案时，答案仍按 completed 返回"""
+    costly = TokenUsage(prompt_tokens=1_000_000, total_tokens=1_000_000, model="m")
+    model = FakeModel([
+        (json.dumps({"action": "answer", "reply": "done"}), costly),
+    ])
+    trace = _trace(tmp_path)
+    limits = RunLimits(max_steps=5, timeout_seconds=30, max_cost_usd=1.0)
+    result = await _runner(tmp_path, model, trace).run("t", [], limits, trace)
+
+    assert result.finish_reason == "completed"
+    assert result.answer == "done"
+    assert result.cost_usd > 1.0
+
+
+async def test_zero_budget_means_unlimited(tmp_path):
+    """max_cost_usd=0（evals 任务的"未设置"约定）不触发预算终止"""
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    costly = TokenUsage(prompt_tokens=1_000_000, total_tokens=1_000_000, model="m")
+    model = FakeModel([
+        (json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}), costly),
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run("t", ["read_file"], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
 
 
 # ---------- lucas_single adapter ----------
