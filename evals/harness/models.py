@@ -4,12 +4,13 @@ from typing import Any
 
 import yaml
 
+# RunLimits/AgentResult/TraceEvent 已上移至 harness.models，此处 re-export 保持向后兼容
+from harness.models import AgentResult, RunLimits, TraceEvent
 
-@dataclass(frozen=True)
-class RunLimits:
-    max_steps: int
-    timeout_seconds: float
-    max_cost_usd: float = 0.0
+__all__ = [
+    "AgentResult", "GradeResult", "RunLimits", "SuiteSpec", "TaskSpec",
+    "TraceEvent", "Trial", "load_suite", "load_task",
+]
 
 
 @dataclass(frozen=True)
@@ -58,13 +59,6 @@ class Trial:
 
 
 @dataclass
-class AgentResult:
-    answer: Any = None
-    finish_reason: str = "completed"
-    error: str = ""
-
-
-@dataclass
 class GradeResult:
     success: bool
     outcome_passed: bool
@@ -76,15 +70,6 @@ class GradeResult:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
-
-@dataclass(frozen=True)
-class TraceEvent:
-    sequence: int
-    run_id: str
-    timestamp: str
-    event: str
-    data: dict
 
 
 def load_task(task_path: str | Path) -> TaskSpec:

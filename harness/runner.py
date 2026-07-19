@@ -2,11 +2,17 @@ import json
 import time
 from pathlib import Path
 
-from evals.harness.models import AgentResult, RunLimits
-from evals.harness.trace import TraceRecorder
 from harness.model_adapter import ModelAdapter
-from harness.models import StepContext
+from harness.models import AgentResult, RunLimits, StepContext
 from harness.tools.registry import ToolRuntime
+from harness.trace import TraceRecorder
+
+
+class _NullTrace:
+    """trace 为空时的 no-op 替代，保持 Runner 主循环不做分支判断"""
+
+    def record(self, event: str, data: dict | None = None) -> None:
+        return None
 
 
 def load_prompt_template(path: str | Path) -> str:
@@ -32,19 +38,26 @@ class AgentRunner:
         instruction: str,
         allowed_tools: list[str],
         limits: RunLimits,
-        trace: TraceRecorder,
+        trace: TraceRecorder | None = None,
     ) -> AgentResult:
         context = StepContext(step_id="", instruction=instruction)
         last_failed_signature = None
         total_observation_chars = 0
-        artifacts = trace.path.parent / "artifacts"
-        artifacts.mkdir(exist_ok=True)
+        artifacts: Path | None = None
+        if trace is not None:
+            artifacts = trace.path.parent / "artifacts"
+            artifacts.mkdir(exist_ok=True)
+        else:
+            trace = _NullTrace()
         for step in range(1, limits.max_steps + 1):
             context.step_id = f"step-{step}"
             trace.record("step_started", {"step_id": context.step_id})
             prompt = self._render(context, allowed_tools)
             # 大 payload 写 artifact，trace 只留引用；prompt 不含敏感信息（工作区隔离、env 已净化）
-            prompt_ref = _write_artifact(artifacts, f"prompt-{context.step_id}.txt", prompt)
+            prompt_ref = (
+                _write_artifact(artifacts, f"prompt-{context.step_id}.txt", prompt)
+                if artifacts is not None else None
+            )
             trace.record("prompt_rendered", {
                 "step_id": context.step_id,
                 "prompt_chars": len(prompt),
@@ -56,7 +69,10 @@ class AgentRunner:
             started = time.monotonic()
             raw = await self.model.complete(prompt)
             duration_ms = (time.monotonic() - started) * 1000
-            output_ref = _write_artifact(artifacts, f"output-{context.step_id}.txt", raw)
+            output_ref = (
+                _write_artifact(artifacts, f"output-{context.step_id}.txt", raw)
+                if artifacts is not None else None
+            )
             trace.record("model_call_finished", {
                 "step_id": context.step_id,
                 "model_call_id": f"model-{step}",

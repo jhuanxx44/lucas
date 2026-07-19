@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness.models import RunLimits
-from evals.harness.trace import TraceRecorder, read_trace
+from harness.models import RunLimits
+from harness.trace import TraceRecorder, read_trace
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.base import ToolSpec
 from harness.tools.filesystem import (
