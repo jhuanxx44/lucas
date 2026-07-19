@@ -15,6 +15,7 @@ Lucas LLM 统一调用层
 """
 import os
 import abc
+import json
 import re
 import time
 import asyncio
@@ -42,10 +43,6 @@ MAX_RETRIES = 3
 _RETRY_WAIT = [3, 5, 10]
 
 _THINK_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
-
-
-def _strip_think_tags(text: str) -> str:
-    return _THINK_RE.sub('', text)
 
 
 def _is_retryable(e: Exception) -> bool:
@@ -215,8 +212,29 @@ class _OpenAICompatClient(LLMClient):
 
         response = await self._client.chat.completions.create(**params)
 
+        msg = response.choices[0].message
+
+        # 处理 tool_calls（OpenAI 兼容格式，MiniMax/Claude/DeepSeek 等）
+        tool_calls = getattr(msg, "tool_calls", None) or getattr(msg, "function_call", None)
+        if tool_calls:
+            tc = tool_calls[0] if isinstance(tool_calls, list) else tool_calls
+            func = tc.get("function", tc) if isinstance(tc, dict) else tc
+            # func 可以是 dict（OpenAI 格式）或对象（某些 provider）
+            if isinstance(func, dict):
+                name = func.get("name", str(func))
+                args = func.get("arguments", "{}")
+            else:
+                name = getattr(func, "name", str(func))
+                args = getattr(func, "arguments", "{}")
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {"raw": args}
+            return json.dumps({"action": "tool", "tool": name, "args": args}, ensure_ascii=False), None
+
         text = ""
-        if response.choices and response.choices[0].message.content:
+        if msg.content:
             text = response.choices[0].message.content
             text = _strip_think_tags(text)
 
