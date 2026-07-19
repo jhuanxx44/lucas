@@ -12,9 +12,6 @@ from workspace import LocalWorkspace
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-_PROMPTS_DIR = os.path.join(_PROJECT_ROOT, "prompts")
-
 
 def _get_ws(request: Request) -> LocalWorkspace:
     try:
@@ -173,30 +170,9 @@ class ClassifySourceRequest(BaseModel):
 
 
 def _create_knowledge_service(workspace):
-    from agents.config import load_config
-    from agents.knowledge_service import KnowledgeService
-    from agents.memory import ManagerMemory
-    from utils.llm_client import create_client
+    from server.services.knowledge import create_knowledge_service
 
-    config = load_config()
-    client = create_client(
-        model=config.manager.model,
-        system_prompt=config.manager.system_prompt,
-        enable_thinking=False,
-    )
-    memory = ManagerMemory(workspace.memory_root)
-
-    def _load_prompt(name: str) -> str:
-        path = os.path.join(_PROMPTS_DIR, f"{name}.md")
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        if content.startswith("---\n"):
-            end = content.find("\n---\n", 4)
-            if end != -1:
-                content = content[end + 5:]
-        return content
-
-    return KnowledgeService(client, memory, _load_prompt, workspace)
+    return create_knowledge_service(workspace)
 
 
 @router.post("/classify-source")
@@ -231,29 +207,13 @@ async def ingest_source(req: IngestSourceRequest, request: Request):
 
     async def _stream():
         ks = _create_knowledge_service(ws)
-
-        events = []
-
-        def on_status(msg):
-            events.append(("status", {"message": msg}))
-
-        try:
-            result = await ks.ingest_source(
-                content=req.content,
-                url=req.url,
-                title=req.title,
-                industry=req.industry,
-                company=req.company,
-                on_status=on_status,
-            )
-            events.append(("saved", {"path": result["path"]}))
-            events.append(("compiled", {"pages": result["compiled_pages"]}))
-            events.append(("done", result))
-        except Exception as e:
-            logger.exception("ingest-source error")
-            events.append(("error", {"message": str(e)}))
-
-        for event_type, data in events:
+        async for event_type, data in ks.ingest_source(
+            content=req.content,
+            url=req.url,
+            title=req.title,
+            industry=req.industry,
+            company=req.company,
+        ):
             yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

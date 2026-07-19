@@ -14,3 +14,22 @@ single_agent:
   temperature: 0.0
   max_steps: 10
   allowed_tools: [read_file, apply_patch, list_files, search, write_file, web_search, stock_quote, stock_kline, wiki_recall]
+
+# wiki 知识模块（server/services/knowledge.py）领域配置
+# 领域本体（行业列表、索引标题）在此维护，不进代码
+wiki:
+  provider: deepseek   # classify/plan/compile 的 LLM provider
+  model:               # 可选覆盖；空则用 provider 默认模型
+  index_title: "Lucas 知识库索引"
+  source_max_chars: 8000   # 注入 plan/compile prompt 的材料截断长度
+  industries:          # 领域本体：classify/plan 的候选行业（可自由增删）
+    - 电子
+    - 新能源
+    - 化工
+    - 医药生物
+    - 计算机
+    - 汽车
+    - 电力设备
+    - 食品饮料
+    - 机械设备
+    - 银行

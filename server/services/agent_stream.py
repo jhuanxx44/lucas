@@ -1,6 +1,6 @@
 """新聊天链路：AgentRunner（harness single 模式）→ SSE 桥。
 
-替代旧 stream.py（agents.Manager 链路，M6 删除）。事件协议与前端
+替代旧 stream.py（agents.Manager 链路，已删除）。事件协议与前端
 web/src/hooks/useChat.ts 严格对齐：
 
   researcher_start {id, name}     run 开始（固定 id="single"）

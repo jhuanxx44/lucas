@@ -2,6 +2,7 @@
 
 lucas.yaml 自 M2 起承载 agents.yaml 的 runtime + single_agent 段
 （manager/researchers 段不迁移，agents/ 旧链路仍读 agents.yaml，M6 才删除）。
+M5 起新增 wiki 段：wiki 知识模块的领域本体（行业列表、索引标题等）。
 """
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -49,4 +50,33 @@ def load_agent_config(config_path: str | Path | None = None) -> AgentConfig:
         name=agent.get("name", "Lucas"),
         prompt=agent.get("prompt", "single-agent"),
         agent_mode=runtime.get("agent_mode", "single"),
+    )
+
+
+@dataclass
+class WikiConfig:
+    """wiki 知识模块（server/services/knowledge.py）的领域配置"""
+
+    provider: str = "deepseek"
+    model: str = ""  # 解析后的实际模型名（provider 默认或 lucas.yaml 覆盖）
+    industries: list[str] = field(default_factory=list)
+    index_title: str = "Lucas 知识库索引"
+    source_max_chars: int = 8000
+
+
+def load_wiki_config(config_path: str | Path | None = None) -> WikiConfig:
+    """读取 lucas.yaml 的 wiki 段（领域本体：行业列表、索引标题）；缺文件或缺字段时用默认值"""
+    path = Path(config_path) if config_path is not None else _DEFAULT_PATH
+    raw = {}
+    if path.is_file():
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    wiki = raw.get("wiki") or {}
+    provider = wiki.get("provider", "deepseek")
+    industries = wiki.get("industries") or []
+    return WikiConfig(
+        provider=provider,
+        model=get_provider_model(provider, wiki.get("model")),
+        industries=[str(i) for i in industries],
+        index_title=str(wiki.get("index_title") or "Lucas 知识库索引"),
+        source_max_chars=int(wiki.get("source_max_chars", 8000)),
     )
