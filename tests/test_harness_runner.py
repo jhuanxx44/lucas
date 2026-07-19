@@ -7,8 +7,14 @@ from evals.harness.models import RunLimits
 from evals.harness.trace import TraceRecorder, read_trace
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.base import ToolSpec
-from harness.tools.filesystem import APPLY_PATCH_SPEC, READ_FILE_SPEC
+from harness.tools.filesystem import (
+    APPLY_PATCH_SPEC,
+    LIST_FILES_SPEC,
+    READ_FILE_SPEC,
+    WRITE_FILE_SPEC,
+)
 from harness.tools.process import make_run_tests_spec
+from harness.tools.search import SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 
 LIMITS = RunLimits(max_steps=5, timeout_seconds=30)
@@ -69,14 +75,65 @@ async def test_full_loop_tool_then_answer(tmp_path):
     kinds = [event["event"] for event in _events(trace)]
     assert kinds == [
         "run_started",
-        "step_started", "tool_call_started", "tool_call_finished", "step_finished",
-        "step_started", "step_finished",
+        "step_started", "prompt_rendered", "model_call_started", "model_call_finished",
+        "action_parsed", "tool_call_started", "tool_call_finished", "step_finished",
+        "step_started", "prompt_rendered", "model_call_started", "model_call_finished",
+        "action_parsed", "step_finished",
     ]
     events = _events(trace)
     assert events[1]["data"]["step_id"] == "step-1"
-    assert events[2]["data"]["tool_call_id"] == "call-1"
-    assert events[2]["data"]["tool"] == "read_file"
-    assert events[3]["data"]["tool_call_id"] == "call-1"
+    assert events[6]["data"]["tool_call_id"] == "call-1"
+    assert events[6]["data"]["tool"] == "read_file"
+    assert events[7]["data"]["tool_call_id"] == "call-1"
+
+
+async def test_trace_records_prompt_and_model_output_artifacts(tmp_path):
+    (tmp_path / "config.yaml").write_text("provider: deepseek\n")
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "config.yaml"}}),
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    await _runner(tmp_path, model, trace).run("read", ["read_file"], LIMITS, trace)
+
+    events = _events(trace)
+    prompt_event = next(e for e in events if e["event"] == "prompt_rendered")
+    assert prompt_event["data"]["step_id"] == "step-1"
+    assert prompt_event["data"]["prompt_chars"] > 0
+    prompt_path = tmp_path / prompt_event["data"]["artifact"]
+    assert prompt_path.is_file()
+    assert prompt_path.read_text(encoding="utf-8") == model.prompts[0]
+
+    output_event = next(e for e in events if e["event"] == "model_call_finished")
+    assert output_event["data"]["duration_ms"] >= 0
+    output_path = tmp_path / output_event["data"]["artifact"]
+    assert json.loads(output_path.read_text(encoding="utf-8"))["action"] == "tool"
+
+    tool_action = next(
+        e for e in events if e["event"] == "action_parsed" and e["data"]["kind"] == "tool"
+    )
+    assert tool_action["data"]["tool"] == "read_file"
+    answer_action = next(
+        e for e in events if e["event"] == "action_parsed" and e["data"]["kind"] == "answer"
+    )
+    assert "done" in answer_action["data"]["answer_preview"]
+
+    finished = next(e for e in events if e["event"] == "tool_call_finished")
+    assert "provider: deepseek" in finished["data"]["observation"]
+
+
+async def test_invalid_json_records_action_parsed(tmp_path):
+    model = FakeModel([
+        "not json at all",
+        json.dumps({"action": "answer", "reply": "ok"}),
+    ])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run("t", [], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
+    parsed = [e for e in _events(trace) if e["event"] == "action_parsed"]
+    assert parsed[0]["data"]["kind"] == "invalid"
+    assert parsed[1]["data"]["kind"] == "answer"
 
 
 async def test_max_steps_exhausted(tmp_path):
@@ -92,6 +149,18 @@ async def test_max_steps_exhausted(tmp_path):
     assert result.finish_reason == "max_steps"
     steps = [e for e in _events(trace) if e["event"] == "step_started"]
     assert len(steps) == 3
+
+
+async def test_bare_json_answer_accepted(tmp_path):
+    """模型直接输出无 action 外壳的答案 JSON 时按 answer 接受"""
+    model = FakeModel(['{"y2022": 2606, "y2023": 2891}'])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run("t", [], LIMITS, trace)
+
+    assert result.finish_reason == "completed"
+    assert result.answer == {"y2022": 2606, "y2023": 2891}
+    parsed = [e for e in _events(trace) if e["event"] == "action_parsed"]
+    assert parsed[0]["data"]["kind"] == "answer"
 
 
 async def test_repeated_failure_aborts_before_third_call(tmp_path):
@@ -118,7 +187,7 @@ async def test_invalid_json_feedback_then_recover(tmp_path):
     result = await _runner(tmp_path, model, trace).run("task", [], LIMITS, trace)
     assert result.finish_reason == "completed"
     assert result.answer == "ok"
-    assert "不是合法 JSON" in model.prompts[1]
+    assert "格式不对" in model.prompts[1]
 
 
 # ---------- 工具 ----------
@@ -143,16 +212,75 @@ def test_read_file_symlink_escape_denied(tmp_path):
 
 
 def test_read_file_truncates(tmp_path):
-    (tmp_path / "big.txt").write_text("x" * 5000, encoding="utf-8")
+    (tmp_path / "big.txt").write_text("x" * 20000, encoding="utf-8")
     result = _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": "big.txt"})
     assert result.status == "ok"
     assert result.truncated
-    assert len(result.observation) == 4000
+    assert result.observation.startswith("[chars 0-16000 of 20000, truncated]\n")
+    assert len(result.observation.split("\n", 1)[1]) == 16000
+
+
+def test_read_file_offset_paginates(tmp_path):
+    """offset 让 LLM 分段读取：第一次读 0-4000，第二次读 4000-8000"""
+    (tmp_path / "big.txt").write_text("x" * 8000, encoding="utf-8")
+    r1 = _execute(tmp_path, READ_FILE_SPEC, "read_file",
+                  {"path": "big.txt", "max_chars": 4000})
+    assert r1.status == "ok"
+    assert r1.truncated
+    assert r1.observation.startswith("[chars 0-4000 of 8000, truncated]\n")
+    # observation 里的范围元信息直接给出下一页 offset
+    r2 = _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": "big.txt", "offset": 4000})
+    assert r2.status == "ok"
+    assert not r2.truncated
+    assert r2.observation.startswith("[chars 4000-8000 of 8000]\n")
+    # 两页内容拼回原文件
+    assert r1.observation.split("\n", 1)[1] + r2.observation.split("\n", 1)[1] == "x" * 8000
+
+
+def test_read_file_offset_at_end(tmp_path):
+    """offset 超出文件长度时明确提示，避免与空文件混淆"""
+    (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
+    result = _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": "a.txt", "offset": 10})
+    assert result.status == "ok"
+    assert result.observation == "offset 10 beyond end of file (total 5 chars)"
+    assert not result.truncated
 
 
 def test_read_file_not_found(tmp_path):
     result = _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": "missing.txt"})
     assert result.status == "error"
+
+
+def test_write_file_creates_new_file(tmp_path):
+    result = _execute(tmp_path, WRITE_FILE_SPEC, "write_file", {
+        "path": "wiki/notes/new.md", "content": "# 新页面\n",
+    })
+    assert result.status == "ok"
+    assert (tmp_path / "wiki" / "notes" / "new.md").read_text() == "# 新页面\n"
+
+
+def test_write_file_refuses_overwrite_by_default(tmp_path):
+    (tmp_path / "a.md").write_text("original", encoding="utf-8")
+    result = _execute(tmp_path, WRITE_FILE_SPEC, "write_file", {
+        "path": "a.md", "content": "changed",
+    })
+    assert result.status == "denied"
+    assert result.error_code == "already_exists"
+    assert (tmp_path / "a.md").read_text() == "original"
+
+    allowed = _execute(tmp_path, WRITE_FILE_SPEC, "write_file", {
+        "path": "a.md", "content": "changed", "overwrite": True,
+    })
+    assert allowed.status == "ok"
+    assert (tmp_path / "a.md").read_text() == "changed"
+
+
+def test_write_file_path_traversal_denied(tmp_path):
+    result = _execute(tmp_path, WRITE_FILE_SPEC, "write_file", {
+        "path": "../escape.md", "content": "x",
+    })
+    assert result.status == "denied"
+    assert not (tmp_path.parent / "escape.md").exists()
 
 
 def test_apply_patch_replaces_unique(tmp_path):
@@ -210,6 +338,141 @@ def test_tool_not_in_allowed_denied(tmp_path):
     result = _execute(tmp_path, READ_FILE_SPEC, "read_file",
                       {"path": "a.txt"}, allowed=[])
     assert result.status == "denied"
+
+
+# ---------- search 工具 ----------
+
+def test_search_literal_hit_offset(tmp_path):
+    content = "line one\ntarget here\nline three\n"
+    (tmp_path / "a.txt").write_text(content, encoding="utf-8")
+    result = _execute(tmp_path, SEARCH_SPEC, "search", {"query": "target"})
+    assert result.status == "ok"
+    assert result.observation.startswith("找到 1 处匹配:")
+    expected_offset = content.index("target here")
+    assert f"a.txt [chars {expected_offset}]" in result.observation
+    # 命中行带前后各一行上下文
+    assert "line one" in result.observation and "line three" in result.observation
+
+
+def test_search_multiple_results_sorted_by_offset(tmp_path):
+    (tmp_path / "a.txt").write_text("x\ntarget\ny\ntarget\n", encoding="utf-8")
+    result = _execute(tmp_path, SEARCH_SPEC, "search", {"query": "target"})
+    assert result.status == "ok"
+    assert result.observation.startswith("找到 2 处匹配:")
+    offsets = [int(line.split("[chars ")[1].split("]")[0])
+               for line in result.observation.splitlines() if "[chars " in line]
+    assert offsets == sorted(offsets)
+
+
+def test_search_max_results_truncates(tmp_path):
+    (tmp_path / "a.txt").write_text("hit\n" * 5, encoding="utf-8")
+    result = _execute(tmp_path, SEARCH_SPEC, "search",
+                      {"query": "hit", "max_results": 2})
+    assert result.status == "ok"
+    hits = [line for line in result.observation.splitlines() if "[chars " in line]
+    assert len(hits) == 2
+    assert "仅显示前 2 处" in result.observation
+
+
+def test_search_path_traversal_denied(tmp_path):
+    result = _execute(tmp_path, SEARCH_SPEC, "search",
+                      {"query": "x", "path": "../escape"})
+    assert result.status == "denied"
+
+
+def test_search_invalid_regex_falls_back_to_literal(tmp_path):
+    (tmp_path / "a.txt").write_text("value: re:(\nplain\n", encoding="utf-8")
+    result = _execute(tmp_path, SEARCH_SPEC, "search", {"query": "re:("})
+    assert result.status == "ok"  # 非法正则不报错，回退为字面搜索
+    assert "找到 1 处匹配:" in result.observation
+
+
+def test_search_regex_prefix_matches_pattern(tmp_path):
+    (tmp_path / "a.txt").write_text("abc123\nxyz\n", encoding="utf-8")
+    result = _execute(tmp_path, SEARCH_SPEC, "search",
+                      {"query": r"re:[a-z]+\d+"})
+    assert result.status == "ok"
+    assert "abc123" in result.observation
+
+
+# ---------- list_files 工具 ----------
+
+def test_list_files_tree_with_sizes(tmp_path):
+    (tmp_path / "config.yaml").write_text("a" * 128, encoding="utf-8")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "x.txt").write_text("hello", encoding="utf-8")
+    (sub / "y.txt").write_text("world", encoding="utf-8")
+    result = _execute(tmp_path, LIST_FILES_SPEC, "list_files", {})
+    assert result.status == "ok"
+    assert "📄 config.yaml (128B)" in result.observation
+    assert "📁 sub/ (2 项)" in result.observation
+    assert "📄 x.txt (5B)" in result.observation
+
+
+def test_list_files_max_depth_limits_expansion(tmp_path):
+    deep = tmp_path / "a" / "b"
+    deep.mkdir(parents=True)
+    (deep / "leaf.txt").write_text("x", encoding="utf-8")
+    result = _execute(tmp_path, LIST_FILES_SPEC, "list_files",
+                      {"max_depth": 1})
+    assert result.status == "ok"
+    assert "📁 a/" in result.observation
+    assert "leaf.txt" not in result.observation
+    assert "📁 b/" not in result.observation
+
+
+def test_list_files_path_traversal_denied(tmp_path):
+    result = _execute(tmp_path, LIST_FILES_SPEC, "list_files",
+                      {"path": "../escape"})
+    assert result.status == "denied"
+
+
+# ---------- apply_patch 失败反馈增强 ----------
+
+def test_apply_patch_non_unique_lists_offsets(tmp_path):
+    (tmp_path / "a.txt").write_text("head\ntimeout: 5\nmid\ntimeout: 5\n", encoding="utf-8")
+    result = _execute(tmp_path, APPLY_PATCH_SPEC, "apply_patch", {
+        "path": "a.txt", "old": "timeout: 5", "new": "timeout: 10",
+    })
+    assert result.status == "invalid_input"
+    assert "old occurs 2 times, must occur exactly once. 出现位置:" in result.observation
+    assert "[chars 5] ...timeout: 5..." in result.observation
+    assert "[chars 20] ...timeout: 5..." in result.observation
+
+
+def test_apply_patch_zero_occurrences_message_unchanged(tmp_path):
+    (tmp_path / "a.txt").write_text("hello\n", encoding="utf-8")
+    result = _execute(tmp_path, APPLY_PATCH_SPEC, "apply_patch", {
+        "path": "a.txt", "old": "nope", "new": "x",
+    })
+    assert result.status == "invalid_input"
+    assert result.observation == "old occurs 0 times, must occur exactly once"
+
+
+# ---------- observation 累计量埋点 ----------
+
+async def test_observation_chars_accumulate_in_trace(tmp_path):
+    (tmp_path / "a.txt").write_text("aaa", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("bbbbb", encoding="utf-8")
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}),
+        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "b.txt"}}),
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace).run(
+        "task", ["read_file"], LIMITS, trace
+    )
+    assert result.finish_reason == "completed"
+    finished = [e for e in _events(trace) if e["event"] == "tool_call_finished"]
+    assert len(finished) == 2
+    first, second = finished[0]["data"], finished[1]["data"]
+    assert first["observation_chars"] > 0
+    assert first["total_observation_chars"] == first["observation_chars"]
+    assert second["total_observation_chars"] == (
+        first["observation_chars"] + second["observation_chars"]
+    )
 
 
 # ---------- lucas_single adapter ----------
