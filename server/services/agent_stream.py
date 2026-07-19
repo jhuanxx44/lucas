@@ -140,9 +140,10 @@ async def chat_event_stream(
             yield _sse("done", {"total_tokens": total_tokens})
         else:
             yield _sse("error", {"message": _error_message(result)})
-    except Exception as e:
+    except Exception:
         logger.exception("agent stream error for question: %s", question[:80])
-        yield _sse("error", {"message": f"分析过程出错：{e}"})
+        # 内部异常（含 provider 英文报错、掩码 key 等）不外抛，统一中文兜底
+        yield _sse("error", {"message": "分析过程出错，请稍后重试。"})
     finally:
         # 客户端断开（GeneratorExit）或异常退出时取消 run，不再继续烧 token
         if run_task is not None and not run_task.done():

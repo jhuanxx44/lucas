@@ -165,8 +165,9 @@ async def test_agent_stream_model_exception_yields_error(tmp_path):
     events = await _collect("test", model=BoomModel(), workspace=tmp_path)
 
     assert [e for e, _ in events] == ["dispatch", "researcher_start", "error"]
-    assert "分析过程出错" in events[2][1]["message"]
-    assert "boom" in events[2][1]["message"]
+    assert events[2][1]["message"] == "分析过程出错，请稍后重试。"
+    # 内部异常详情（含 provider 英文报错）不外抛给前端
+    assert "boom" not in events[2][1]["message"]
 
 
 async def test_agent_stream_max_steps_yields_error(tmp_path):
