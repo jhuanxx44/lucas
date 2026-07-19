@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ResearcherState, ChatAction, ChatTraceStep, ChatRuntimeTraceEvent } from "@/types";
+import type { ChatMessage, ResearcherState, ChatAction } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -13,9 +13,6 @@ interface ChatState {
   synthesis: string;
   actions: ChatAction[];
   processSteps: string[];
-  traceSteps: ChatTraceStep[];
-  runtimeTrace: ChatRuntimeTraceEvent[];
-  activeQuestion: string | null;
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -29,8 +26,6 @@ type Action =
   | { type: "SYNTHESIS_CHUNK"; text: string }
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
-  | { type: "TRACE_STEP"; trace: ChatTraceStep }
-  | { type: "RUNTIME_TRACE"; trace: ChatRuntimeTraceEvent }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage };
 
@@ -43,10 +38,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         researchers: new Map(),
         synthesis: "",
         actions: [],
-        processSteps: ["Lucas 收到问题"],
-        traceSteps: [],
-        runtimeTrace: [],
-        activeQuestion: action.message.content,
+        processSteps: ["已收到问题"],
         isLoading: true,
         phase: "dispatching",
       };
@@ -76,12 +68,6 @@ function reducer(state: ChatState, action: Action): ChatState {
     case "PROCESS_STEP":
       if (!action.step || state.processSteps.at(-1) === action.step) return state;
       return { ...state, processSteps: [...state.processSteps, action.step] };
-    case "TRACE_STEP":
-      return { ...state, traceSteps: [...state.traceSteps, action.trace] };
-    case "RUNTIME_TRACE":
-      return state.runtimeTrace.at(-1)?.sequence === action.trace.sequence
-        ? { ...state, runtimeTrace: [...state.runtimeTrace.slice(0, -1), action.trace] }
-        : { ...state, runtimeTrace: [...state.runtimeTrace, action.trace] };
     case "DONE": {
       return {
         ...state,
@@ -89,7 +75,6 @@ function reducer(state: ChatState, action: Action): ChatState {
         actions: [],
         isLoading: false,
         phase: "idle",
-        activeQuestion: null,
       };
     }
     case "ERROR":
@@ -100,7 +85,6 @@ function reducer(state: ChatState, action: Action): ChatState {
         phase: "idle",
         actions: [],
         synthesis: "",
-        activeQuestion: null,
       };
     default:
       return state;
@@ -114,9 +98,6 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     synthesis: "",
     actions: [],
     processSteps: [],
-    traceSteps: [],
-    runtimeTrace: [],
-    activeQuestion: null,
     isLoading: false,
     phase: "idle",
   };
@@ -147,19 +128,6 @@ export function useChat(
       role: "assistant",
       content: "错误: 已取消",
       processSteps: [...stateRef.current.processSteps, "任务已取消"],
-      traceSteps: [
-        ...stateRef.current.traceSteps,
-        { id: nextId(), kind: "action", label: "任务已取消", status: "error" },
-      ],
-      runtimeTrace: [
-        ...stateRef.current.runtimeTrace,
-        {
-          sequence: stateRef.current.runtimeTrace.length + 1,
-          timestamp: new Date().toISOString(),
-          event: "run_finished",
-          data: { finishReason: "cancelled" },
-        },
-      ],
     };
     const messages = [...stateRef.current.messages, errorMessage];
     dispatch({ type: "ERROR", message: errorMessage });
@@ -177,9 +145,7 @@ export function useChat(
       const streamedResearchers = new Map<string, ResearcherState>();
       let streamedSynthesis = "";
       let streamedActions: ChatAction[] = [];
-      let streamedProcessSteps = ["Lucas 收到问题"];
-      let streamedTraceSteps: ChatTraceStep[] = [];
-      let streamedRuntimeTrace: ChatRuntimeTraceEvent[] = [];
+      let streamedProcessSteps = ["已收到问题"];
       let completed = false;
 
       const appendProcessStep = (step: string) => {
@@ -188,42 +154,7 @@ export function useChat(
         dispatch({ type: "PROCESS_STEP", step });
       };
 
-      const appendTraceStep = (trace: ChatTraceStep) => {
-        streamedTraceSteps = [...streamedTraceSteps, trace];
-        dispatch({ type: "TRACE_STEP", trace });
-      };
-
-      const appendRuntimeTrace = (
-        event: string,
-        data: Record<string, unknown>,
-        step?: number,
-      ) => {
-        const previous = streamedRuntimeTrace.at(-1);
-        if (event === "model_reasoning" && previous?.event === event && previous.step === step) {
-          const trace: ChatRuntimeTraceEvent = {
-            ...previous,
-            data: {
-              text: String(previous.data.text ?? "") + String(data.text ?? ""),
-            },
-          };
-          streamedRuntimeTrace = [...streamedRuntimeTrace.slice(0, -1), trace];
-          dispatch({ type: "RUNTIME_TRACE", trace });
-          return;
-        }
-        const trace: ChatRuntimeTraceEvent = {
-          sequence: streamedRuntimeTrace.length + 1,
-          timestamp: new Date().toISOString(),
-          event,
-          ...(step === undefined ? {} : { step }),
-          data,
-        };
-        streamedRuntimeTrace = [...streamedRuntimeTrace, trace];
-        dispatch({ type: "RUNTIME_TRACE", trace });
-      };
-
-
       dispatch({ type: "USER_MESSAGE", message: userMessage });
-      appendRuntimeTrace("run_started", { question });
 
       const history = previousMessages.map((m) => ({
         role: m.role,
@@ -241,65 +172,15 @@ export function useChat(
                 appendProcessStep(d.message);
                 break;
               case "dispatch":
-                appendProcessStep("Lucas 开始分析");
+                // single 模式：不再展示"选择研究员"步骤，dispatch 仅用于 wiki 联动定位
                 dispatch({ type: "DISPATCH" });
                 onResearchTarget?.(question);
                 break;
               case "researcher_start":
+                appendProcessStep(`${d.name}开始分析`);
                 streamedResearchers.set(d.id, { id: d.id, name: d.name, status: "running", text: "" });
                 dispatch({ type: "RESEARCHER_START", id: d.id, name: d.name });
                 break;
-              case "trace_event": {
-                const trace = data as {
-                  event: string;
-                  step?: number;
-                  data?: Record<string, unknown>;
-                };
-                appendRuntimeTrace(trace.event, trace.data ?? {}, trace.step);
-                break;
-              }
-              case "summary": {
-                const s = data as { step: number; text: string };
-                if (s.text) {
-                  appendRuntimeTrace("summary", { text: s.text }, s.step);
-                  appendTraceStep({
-                    id: nextId(),
-                    kind: "summary",
-                    label: s.text,
-                    status: "done",
-                    step: s.step,
-                  });
-                }
-                break;
-              }
-              case "tool_step": {
-                const toolStep = data as {
-                  step: number;
-                  tool: string;
-                  args: Record<string, unknown>;
-                  ok: boolean;
-                  output: string;
-                  message: string;
-                };
-                appendProcessStep(toolStep.message);
-                appendRuntimeTrace("tool_call_finished", {
-                  tool: toolStep.tool,
-                  args: toolStep.args,
-                  ok: toolStep.ok,
-                  output: toolStep.output,
-                }, toolStep.step);
-                appendTraceStep({
-                  id: nextId(),
-                  kind: "tool",
-                  label: toolStep.ok ? `Lucas 调用 ${toolStep.tool}` : `Lucas 调用 ${toolStep.tool} 失败`,
-                  status: toolStep.ok ? "done" : "error",
-                  step: toolStep.step,
-                  tool: toolStep.tool,
-                  input: toolStep.args,
-                  output: toolStep.output,
-                });
-                break;
-              }
               case "researcher_chunk":
                 if (streamedResearchers.has(d.id)) {
                   const researcher = streamedResearchers.get(d.id)!;
@@ -308,8 +189,7 @@ export function useChat(
                 dispatch({ type: "RESEARCHER_CHUNK", id: d.id, text: d.text });
                 break;
               case "researcher_done":
-                appendProcessStep("Lucas 完成分析");
-                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 完成分析", status: "done" });
+                appendProcessStep(`${streamedResearchers.get(d.id)?.name ?? d.id}完成分析`);
                 if (streamedResearchers.has(d.id)) {
                   const researcher = streamedResearchers.get(d.id)!;
                   streamedResearchers.set(d.id, { ...researcher, status: "done" });
@@ -326,12 +206,6 @@ export function useChat(
                 break;
               case "done": {
                 completed = true;
-                const done = data as { total_tokens?: number };
-                appendRuntimeTrace("assistant_answer", { content: streamedSynthesis });
-                appendRuntimeTrace("run_finished", {
-                  finishReason: "completed",
-                  totalTokens: done.total_tokens ?? 0,
-                });
                 const assistantMessage: ChatMessage = {
                   id: nextId(),
                   role: "assistant",
@@ -340,8 +214,6 @@ export function useChat(
                   synthesis: streamedSynthesis,
                   actions: streamedActions.length > 0 ? streamedActions : undefined,
                   processSteps: streamedProcessSteps,
-                  traceSteps: streamedTraceSteps,
-                  runtimeTrace: streamedRuntimeTrace,
                 };
                 const messages = [...previousMessages, userMessage, assistantMessage];
                 dispatch({ type: "DONE", message: assistantMessage });
@@ -352,18 +224,11 @@ export function useChat(
               case "error": {
                 completed = true;
                 appendProcessStep("处理失败");
-                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 分析失败", status: "error" });
-                appendRuntimeTrace("run_finished", {
-                  finishReason: "error",
-                  message: d.message,
-                });
                 const errorMessage: ChatMessage = {
                   id: nextId(),
                   role: "assistant",
                   content: `错误: ${d.message}`,
                   processSteps: streamedProcessSteps,
-                  traceSteps: streamedTraceSteps,
-                  runtimeTrace: streamedRuntimeTrace,
                 };
                 const messages = [...previousMessages, userMessage, errorMessage];
                 dispatch({ type: "ERROR", message: errorMessage });
@@ -377,18 +242,11 @@ export function useChat(
       } catch (e: unknown) {
         if (!completed && e instanceof Error && e.name !== "AbortError") {
           appendProcessStep("连接或处理失败");
-          appendTraceStep({ id: nextId(), kind: "action", label: "连接或处理失败", status: "error" });
-          appendRuntimeTrace("run_finished", {
-            finishReason: "connection_error",
-            message: e.message,
-          });
           const errorMessage: ChatMessage = {
             id: nextId(),
             role: "assistant",
             content: `错误: ${e.message}`,
             processSteps: streamedProcessSteps,
-            traceSteps: streamedTraceSteps,
-            runtimeTrace: streamedRuntimeTrace,
           };
           const messages = [...previousMessages, userMessage, errorMessage];
           dispatch({ type: "ERROR", message: errorMessage });

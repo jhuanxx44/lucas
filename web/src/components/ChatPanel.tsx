@@ -2,20 +2,17 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@/hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
-import { ResearcherCard } from "./ResearcherCard";
 import { SynthesisCard } from "./SynthesisCard";
 import { AnalysisProcess } from "./AnalysisProcess";
 import { fetchWikiIndex } from "@/lib/api";
-import { ArrowUpRight, RefreshCw, Sparkles, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
+import { MessageSquare, RefreshCw, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
 import type { ChatMessage as ChatMessageType, WikiItem } from "@/types";
-import type { LiveTraceTurn } from "./TracePanel";
 
 interface ChatPanelProps {
   initialMessages: ChatMessageType[];
   onMessagesCommitted: (messages: ChatMessageType[]) => void;
   onResearchTarget?: (target: string) => void;
   onResearchDone?: () => void;
-  onLiveTraceChange?: (turn: LiveTraceTurn | null) => void;
 }
 
 const ICONS = [TrendingUp, Building2, Lightbulb, BarChart3, Globe];
@@ -49,7 +46,7 @@ function generateSuggestions(
   });
 }
 
-export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarget, onResearchDone, onLiveTraceChange }: ChatPanelProps) {
+export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarget, onResearchDone }: ChatPanelProps) {
   const { state, sendMessage, cancel } = useChat(
     initialMessages,
     onMessagesCommitted,
@@ -83,64 +80,47 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
   const handleScroll = () => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    // 距底 <80px 视为贴底跟随；用户手动上滑离开后置 false，滚回底部再恢复。
     isNearBottom.current = scrollHeight - scrollTop - clientHeight < 80;
   };
 
-  // 内容增长时平滑滚到底，但仅在用户仍贴底时才滚，不抢占正在上滑查看历史的动作。
   useEffect(() => {
     if (scrollRef.current && isNearBottom.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [state.messages, state.researchers, state.synthesis]);
 
-  const activeResearchers = Array.from(state.researchers.values());
   const isEmpty = state.messages.length === 0 && !state.isLoading;
 
-  useEffect(() => {
-    onLiveTraceChange?.(
-      state.isLoading && state.activeQuestion
-        ? {
-            question: state.activeQuestion,
-            answer: state.synthesis,
-            steps: state.traceSteps,
-            runtimeTrace: state.runtimeTrace,
-          }
-        : null
-    );
-  }, [onLiveTraceChange, state.activeQuestion, state.isLoading, state.runtimeTrace, state.synthesis, state.traceSteps]);
-
   return (
-    <div className="relative flex h-full min-w-0 flex-col bg-white dark:bg-zinc-950">
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+    <div className="flex flex-col h-full">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
         {isEmpty && (
-          <div className="mx-auto flex h-full w-full max-w-4xl flex-col justify-center px-5 pb-24 sm:px-8">
-            <div className="mb-5 text-indigo-600 dark:text-indigo-400">
-              <Sparkles size={22} strokeWidth={1.8} />
+          <div className="flex flex-col items-center justify-center h-full text-center px-4 mx-auto max-w-md">
+            <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center mb-4">
+              <MessageSquare size={22} className="text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-3xl">
-              今天想研究什么？
-            </h1>
-            <p className="mb-8 mt-2 max-w-lg text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-              从公司基本面、行业趋势或已有 Wiki 开始，Lucas 会整理资料并给出可追溯的分析。
+            <h3 className="text-base font-medium text-zinc-800 dark:text-zinc-200 mb-1">
+              Lucas
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+              投研认知的复利引擎 — Lucas 自主调研，持续编译你的专属知识库
             </p>
-            <div className="grid gap-2 lg:grid-cols-3">
+            <div className="w-full space-y-2">
               {suggestions.map(({ icon: Icon, text }) => (
                 <button
                   key={text}
                   onClick={() => sendMessage(text)}
-                  className="group flex min-h-20 w-full items-start gap-3 rounded-xl border border-zinc-200 p-3.5 text-left text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 active:scale-[0.99] dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+                  className="w-full flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700/60 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-indigo-300 dark:hover:border-indigo-500/40 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
                 >
-                  <Icon size={16} className="mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-400" />
-                  <span className="leading-5">{text}</span>
-                  <ArrowUpRight size={14} className="ml-auto shrink-0 text-zinc-300 transition-colors group-hover:text-zinc-500 dark:text-zinc-700 dark:group-hover:text-zinc-400" />
+                  <Icon size={16} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
+                  {text}
                 </button>
               ))}
             </div>
             {allItems.length > 3 && (
               <button
                 onClick={handleRefresh}
-                className="mt-3 flex w-fit items-center gap-1.5 rounded-lg px-1 py-1 text-xs text-zinc-400 transition-colors hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+                className="mt-3 flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
               >
                 <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
                 换一换
@@ -149,26 +129,13 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
           </div>
         )}
 
-        {!isEmpty && (
-          <div className="mx-auto w-full max-w-3xl px-4 pb-40 pt-8 sm:px-6 sm:pt-10">
-            {state.messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
-            ))}
+        {state.messages.map((msg) => (
+          <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
+        ))}
 
-            {state.isLoading && (
-              <AnalysisProcess steps={state.traceSteps} live={state.phase !== "synthesizing"} />
-            )}
+        {state.isLoading && <AnalysisProcess steps={state.processSteps} live />}
 
-            {state.isLoading && activeResearchers.length > 0 && (
-              <div>
-                {activeResearchers.filter((researcher) => researcher.text).map((researcher) => (
-                  <ResearcherCard key={researcher.id} researcher={researcher} />
-                ))}
-                <SynthesisCard text={state.synthesis} loading={state.phase === "synthesizing"} />
-              </div>
-            )}
-          </div>
-        )}
+        {state.isLoading && <SynthesisCard text={state.synthesis} loading={state.isLoading} />}
       </div>
       <ChatInput onSend={sendMessage} onCancel={cancel} phase={state.phase} />
     </div>
