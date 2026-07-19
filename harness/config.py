@@ -1,7 +1,6 @@
 """Harness agent 配置：从仓库根 lucas.yaml 读取
 
-lucas.yaml 自 M2 起承载 agents.yaml 的 runtime + single_agent 段
-（manager/researchers 段不迁移，agents/ 旧链路仍读 agents.yaml，M6 才删除）。
+lucas.yaml 承载 runtime + single_agent 段；
 M5 起新增 wiki 段：wiki 知识模块的领域本体（行业列表、索引标题等）。
 """
 from dataclasses import dataclass, field
@@ -28,7 +27,6 @@ class AgentConfig:
     max_steps: int = 10
     allowed_tools: list[str] = field(default_factory=lambda: list(DEFAULT_ALLOWED_TOOLS))
     name: str = "Lucas"
-    prompt: str = "single-agent"
     agent_mode: str = "single"
 
 
@@ -48,7 +46,6 @@ def load_agent_config(config_path: str | Path | None = None) -> AgentConfig:
         max_steps=int(agent.get("max_steps", 10)),
         allowed_tools=list(agent.get("allowed_tools") or DEFAULT_ALLOWED_TOOLS),
         name=agent.get("name", "Lucas"),
-        prompt=agent.get("prompt", "single-agent"),
         agent_mode=runtime.get("agent_mode", "single"),
     )
 

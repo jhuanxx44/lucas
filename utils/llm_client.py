@@ -333,17 +333,3 @@ def create_client(
     if any(actual_model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
         return _OpenAICompatClient(model=actual_model, system_prompt=system_prompt)
     return _GeminiClient(model=actual_model, system_prompt=system_prompt, enable_thinking=enable_thinking)
-
-
-def create_client_from_agent(agent_config: dict) -> LLMClient:
-    """
-    从 agents.yaml 中的 agent 配置创建客户端
-
-    Args:
-        agent_config: agents.yaml 中单个 agent 的配置 dict
-    """
-    return create_client(
-        model=agent_config.get("model"),
-        provider=agent_config.get("provider"),
-        system_prompt=agent_config.get("system_prompt"),
-    )

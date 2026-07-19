@@ -54,7 +54,7 @@ def test_load_agent_config_defaults_when_file_missing(tmp_path):
 
 
 def test_repo_root_lucas_yaml_loads():
-    """仓库根的 lucas.yaml 是有效配置，且与 agents.yaml 迁移前的关键字段一致"""
+    """仓库根的 lucas.yaml 是有效配置，关键字段与默认允许工具集一致"""
     config = load_agent_config()
 
     assert config.provider == "deepseek"

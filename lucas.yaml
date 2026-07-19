@@ -1,13 +1,11 @@
 # Lucas harness 配置
-# 自 M2 起承载原 agents.yaml 的 runtime + single_agent 段；
-# manager/researchers 多 agent 段仍留在 agents.yaml（agents/ 旧链路在用，M6 删除）。
+# 承载 runtime + single_agent 段（M6 起 agents.yaml 与 agents/ 旧链路已删除）。
 runtime:
   agent_mode: single
 
 single_agent:
   name: Lucas
   provider: deepseek
-  prompt: single-agent
   expertise: 财务、行情、技术、宏观和行业综合分析
   enable_search: true
   data_types: [financials, quote, kline, north_flow, sector_flow]
