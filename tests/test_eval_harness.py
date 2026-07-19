@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 
 from evals.harness.grader import check_trace_integrity, grade_trial
-from evals.harness.models import AgentResult, RunLimits, TaskSpec, load_task
+from evals.harness.models import AgentResult, RunLimits, TaskSpec, load_suite, load_task
 from evals.harness.runner import run_trial
+from evals.harness.suite import run_suite
 from evals.harness.trace import TraceRecorder
 from evals.harness.validation import validate_task
 from evals.harness.workspace import TrialWorkspace
@@ -300,3 +301,65 @@ graders: {outcome: [], safety: [], process: []}
 
     with pytest.raises(ValueError, match="escapes task directory"):
         load_task(task_yaml)
+
+
+def test_load_suite_resolves_tasks(tmp_path):
+    suite = load_suite(PROJECT_ROOT / "evals" / "suites" / "smoke.yaml")
+
+    assert suite.id == "smoke-v1"
+    assert suite.version == 1
+    assert suite.tasks == ["READ-01", "EDIT-01"]
+    assert all((suite.tasks_root / task_id / "task.yaml").is_file() for task_id in suite.tasks)
+
+
+@pytest.mark.parametrize(
+    "content, match",
+    [
+        ("id: s\nversion: 1\ntasks: [READ-01]\nextra: true", "unknown fields"),
+        ("id: s\ntasks: [READ-01]", "missing fields"),
+        ("id: s\nversion: 1\ntasks: []", "at least one task"),
+        ("id: s\nversion: 1\ntasks: [READ-01, READ-01]", "unique"),
+        ("id: s\nversion: 1\ntasks: [NOPE-99]", "task not found"),
+    ],
+)
+def test_load_suite_rejects_invalid_files(tmp_path, content, match):
+    suites_dir = tmp_path / "suites"
+    suites_dir.mkdir()
+    suite_yaml = suites_dir / "bad.yaml"
+    suite_yaml.write_text(content, encoding="utf-8")
+    (tmp_path / "tasks" / "READ-01").mkdir(parents=True)
+    (tmp_path / "tasks" / "READ-01" / "task.yaml").write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=match):
+        load_suite(suite_yaml)
+
+
+@pytest.mark.asyncio
+async def test_run_suite_aggregates_trials(tmp_path):
+    summary = await run_suite(
+        PROJECT_ROOT / "evals" / "suites" / "smoke.yaml",
+        "oracle",
+        trials=2,
+        runs_root=tmp_path / "runs",
+    )
+
+    assert summary["runs_total"] == 4
+    assert summary["runs_passed"] == 4
+    assert summary["success_rate"] == 1.0
+    assert set(summary["by_task"]) == {"READ-01", "EDIT-01"}
+    for run in summary["runs"]:
+        run_dir = Path(run["run_dir"])
+        assert (run_dir / "manifest.json").is_file()
+        assert (run_dir / "trace.jsonl").is_file()
+        assert (run_dir / "result.json").is_file()
+
+
+@pytest.mark.asyncio
+async def test_run_suite_rejects_unknown_agent(tmp_path):
+    with pytest.raises(ValueError, match="unknown agent"):
+        await run_suite(
+            PROJECT_ROOT / "evals" / "suites" / "smoke.yaml",
+            "nope",
+            trials=1,
+            runs_root=tmp_path / "runs",
+        )

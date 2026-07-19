@@ -36,6 +36,18 @@ class TaskSpec:
 
 
 @dataclass(frozen=True)
+class SuiteSpec:
+    id: str
+    version: int
+    tasks: list[str]
+    suite_path: Path = field(repr=False, compare=False)
+
+    @property
+    def tasks_root(self) -> Path:
+        return self.suite_path.parent.parent / "tasks"
+
+
+@dataclass(frozen=True)
 class Trial:
     run_id: str
     task_id: str
@@ -123,6 +135,42 @@ def load_task(task_path: str | Path) -> TaskSpec:
     _reject_symlinks(task.fixture_dir)
     _reject_symlinks(task.reference_dir)
     return task
+
+
+def load_suite(suite_path: str | Path) -> SuiteSpec:
+    path = Path(suite_path).resolve()
+    if path.is_dir():
+        path = path / "suite.yaml"
+    if not path.is_file():
+        raise ValueError(f"suite file not found: {path}")
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("suite file must contain a mapping")
+
+    allowed = {"id", "version", "tasks"}
+    unknown = sorted(raw.keys() - allowed)
+    if unknown:
+        raise ValueError(f"suite file has unknown fields: {', '.join(unknown)}")
+    missing = sorted(allowed - raw.keys())
+    if missing:
+        raise ValueError(f"suite file missing fields: {', '.join(missing)}")
+
+    suite = SuiteSpec(
+        id=str(raw["id"]),
+        version=_positive_int(raw["version"], "version"),
+        tasks=_string_list(raw["tasks"], "tasks"),
+        suite_path=path,
+    )
+    if not suite.tasks:
+        raise ValueError("suite must contain at least one task")
+    if len(set(suite.tasks)) != len(suite.tasks):
+        raise ValueError("suite tasks must be unique")
+    for task_id in suite.tasks:
+        task_dir = suite.tasks_root / task_id
+        if not (task_dir / "task.yaml").is_file():
+            raise ValueError(f"suite task not found: {task_dir}")
+    return suite
 
 
 def _child_path(parent: Path, child: str) -> Path:

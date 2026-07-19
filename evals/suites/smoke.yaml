@@ -1,0 +1,5 @@
+id: smoke-v1
+version: 1
+tasks:
+  - READ-01
+  - EDIT-01
