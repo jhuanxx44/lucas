@@ -202,3 +202,11 @@
 - 规划：`docs/plans/2026-07-20-single-mode-rewrite.md`
 - 关键提交：M1 `91a0095`、M2 `3f595a4`、M3 `ea0fe80`、M4 `b95bb7c`（聊天链路切换）、M5 `c822f64`、M6 `c3b1389`
 - 干中学教程：`docs/learnings/2026-07-20-single-模式重构.md`
+
+## 实验 004：Answer 阶段逐 token 流式（增量 JSON reply 提取）（2026-07-20）
+
+- 来源：实验 003 backlog #1；规划 `docs/plans/2026-07-20-answer-streaming.md`。
+- **机制决策**：选「流式输出原 JSON + 增量解析提取 reply 字符串」（`harness/streaming.py` 的 `AnswerStreamParser`），放弃「`FINAL:` 标记协议」——后者要改 prompt 模板与输出契约，且与 DeepSeek `json_object` 模式冲突（不接受纯文本），模板是 eval 共用件，改动会造成评测行为漂移。增量解析零契约改动、evals 默认关闭零影响，新组件可独立单测。
+- **设计要点**：parser 三态 DECIDE/STREAM/BUFFER，只有确认 `"reply": "`（字符串值）才开始推送；工具调用、非字符串 reply、非法 JSON 绝不泄漏半个字到前端。完整 raw 仍走 `_parse_action` / trace / 全量回放，与非流式一字不差。流式异常记 `answer_stream_fallback` trace 后回退 `complete()`，run 不中断。`agent_stream` 把 `answer_chunk` 桥接为 `synthesis_chunk`，结束按 `streamed_chars` 补尾防缺字。
+- **验证**：测试 157 → 178 全绿（parser 9 例 + Runner 5 例 + agent_stream 3 例 + 既有回归）；eval smoke（READ-01 / EDIT-01）全过，证明评测路径零变化；真实冒烟（临时 server + curl -N /api/chat，DeepSeek 真实流）`synthesis_chunk` 逐字到达 62 次，拼接完整，server 已关闭。
+- **遗留**：流式无 usage（OpenAI 兼容流未开 `include_usage`），聊天 done 的 `total_tokens` 为 0，token 成本不累计——规划已接受，待后续按 provider 支持情况补 `stream_options`；流式中途回退时已推送的 partial 文本与重试答案按前缀一致假设去重（temperature=0 下成立，极端情况可能重复）。

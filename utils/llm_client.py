@@ -76,6 +76,7 @@ class LLMClient(abc.ABC):
     async def chat_stream(
         self,
         prompt: str,
+        response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
     ) -> "AsyncGenerator[str, None]":
@@ -145,6 +146,7 @@ class _GeminiClient(LLMClient):
     async def chat_stream(
         self,
         prompt: str,
+        response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
@@ -156,6 +158,7 @@ class _GeminiClient(LLMClient):
         contents.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
         _budget = thinking_budget if thinking_budget is not None else 24576
         config = types.GenerateContentConfig(
+            response_mime_type=response_mime_type,
             temperature=temperature if temperature is not None else 1.0,
             thinking_config=types.ThinkingConfig(
                 thinking_budget=_budget if self.enable_thinking else 0
@@ -252,6 +255,7 @@ class _OpenAICompatClient(LLMClient):
     async def chat_stream(
         self,
         prompt: str,
+        response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
@@ -266,6 +270,8 @@ class _OpenAICompatClient(LLMClient):
             "temperature": temperature if temperature is not None else 1.0,
             "stream": True,
         }
+        if response_mime_type == "application/json":
+            params["response_format"] = {"type": "json_object"}
         stream = await self._client.chat.completions.create(**params)
         buf = ""
         in_think = False

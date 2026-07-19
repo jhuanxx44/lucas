@@ -7,7 +7,7 @@ web/src/hooks/useChat.ts 严格对齐：
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
   status {message}                每个工具 step 完成
-  synthesis_chunk {text}          最终答案（事件级流式，整段一次推送）
+  synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
   researcher_done {id}            答案推送完成后
   done {total_tokens}             正常结束（AgentResult.usage 累计）
   error {message}                 异常 / 解析失败 / budget_exceeded / max_steps / timeout
@@ -109,32 +109,53 @@ async def chat_event_stream(
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
             runner.run(instruction, BUSINESS_TOOL_NAMES, limits,
-                       on_event=queue.put_nowait)
+                       on_event=queue.put_nowait, stream_answer=True)
         )
+
+        # answer_chunk 已推送的字符数；run 结束时若少于最终答案长度则补尾防缺字
+        streamed_chars = 0
+
+        def _forward(evt: dict) -> str | None:
+            nonlocal streamed_chars
+            kind = evt.get("kind")
+            if kind == "tool_step":
+                return _sse("status", {"message": _status_message(evt)})
+            if kind == "answer_chunk":
+                text = evt.get("text", "")
+                streamed_chars += len(text)
+                return _sse("synthesis_chunk", {"text": text})
+            if kind == "answer":
+                # Runner 权威计数（含流式回退前的部分推送）
+                streamed_chars = evt.get("streamed_chars", streamed_chars)
+            return None
 
         yield _sse("dispatch", {
             "researchers": [{"id": "single", "name": config.name}],
             "mode": "single",
         })
         yield _sse("researcher_start", {"id": "single", "name": config.name})
-        # 运行期间增量排出工具 step 事件；answer 事件以最终 AgentResult 为准，不重复推送
+        # 运行期间增量排出工具 step / answer_chunk 事件；
+        # answer 事件以最终 AgentResult 为准，不重复推送
         while not run_task.done():
             try:
                 evt = await asyncio.wait_for(queue.get(), timeout=0.05)
             except asyncio.TimeoutError:
                 continue
-            if evt.get("kind") == "tool_step":
-                yield _sse("status", {"message": _status_message(evt)})
+            out = _forward(evt)
+            if out is not None:
+                yield out
         result = run_task.result()
         while not queue.empty():
-            evt = queue.get_nowait()
-            if evt.get("kind") == "tool_step":
-                yield _sse("status", {"message": _status_message(evt)})
+            out = _forward(queue.get_nowait())
+            if out is not None:
+                yield out
 
         if result.finish_reason == "completed" and result.answer is not None:
             text = result.answer if isinstance(result.answer, str) else json.dumps(
                 result.answer, ensure_ascii=False)
-            yield _sse("synthesis_chunk", {"text": text})
+            if streamed_chars < len(text):
+                # 解析器保守缓冲（工具步/结构化 answer/回退）时整段或补尾推送
+                yield _sse("synthesis_chunk", {"text": text[streamed_chars:]})
             yield _sse("researcher_done", {"id": "single"})
             total_tokens = result.usage.total_tokens if result.usage else 0
             yield _sse("done", {"total_tokens": total_tokens})

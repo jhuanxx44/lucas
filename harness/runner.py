@@ -5,6 +5,7 @@ from typing import Callable
 
 from harness.model_adapter import ModelAdapter
 from harness.models import AgentResult, RunLimits, StepContext
+from harness.streaming import AnswerStreamParser
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
@@ -42,6 +43,7 @@ class AgentRunner:
         limits: RunLimits,
         trace: TraceRecorder | None = None,
         on_event: Callable[[dict], None] | None = None,
+        stream_answer: bool = False,
     ) -> AgentResult:
         """on_event：可选的 step 事件钩子（同步回调，零开销缺省）。
 
@@ -49,6 +51,13 @@ class AgentRunner:
         "observation"}（observation 截断为前 500 字符摘要）；
         answer 产出时回调 {"kind": "answer", "step", "answer"}。
         不改变任何终止语义，仅用于外部观察（如 SSE 桥）。
+
+        stream_answer=True 且 adapter 实现 complete_stream 且传了 on_event 时，
+        模型输出改走流式：AnswerStreamParser 确认是字符串 reply 后逐段回调
+        {"kind": "answer_chunk", "step", "text"}；完整 raw 仍走与非流式
+        一字不差的 _parse_action / trace / 全量回放逻辑，answer 事件额外带
+        streamed_chars（已推送字符数，供下游补尾）。默认 False，evals 零变化。
+        流式调用抛异常时记 trace 后回退 complete()，run 不中断。
         """
         context = StepContext(step_id="", instruction=instruction)
         last_failed_signature = None
@@ -94,7 +103,24 @@ class AgentRunner:
                 "step_id": context.step_id, "model_call_id": f"model-{step}",
             })
             started = time.monotonic()
-            raw, usage = await self.model.complete(prompt)
+            # 流式路径需 on_event 承接 answer_chunk；evals 默认走非流式 complete()
+            use_stream = (
+                stream_answer
+                and on_event is not None
+                and hasattr(self.model, "complete_stream")
+            )
+            stream_state = {"streamed": 0}
+            if use_stream:
+                try:
+                    raw, usage = await self._complete_streaming(
+                        prompt, step, on_event, stream_state)
+                except Exception as e:
+                    trace.record("answer_stream_fallback", {
+                        "step_id": context.step_id, "error": str(e)[:200],
+                    })
+                    raw, usage = await self.model.complete(prompt)
+            else:
+                raw, usage = await self.model.complete(prompt)
             duration_ms = (time.monotonic() - started) * 1000
             if usage is not None:
                 total_usage = usage if total_usage is None else total_usage.merge(usage)
@@ -136,7 +162,11 @@ class AgentRunner:
                 })
                 trace.record("step_finished", {"step_id": context.step_id})
                 if on_event is not None:
-                    on_event({"kind": "answer", "step": step, "answer": answer_text})
+                    event = {"kind": "answer", "step": step, "answer": answer_text}
+                    if use_stream:
+                        # 已推送字符数（含回退前部分推送），供下游补尾防缺字
+                        event["streamed_chars"] = stream_state["streamed"]
+                    on_event(event)
                 return AgentResult(
                     answer=answer_text, finish_reason="completed",
                     usage=total_usage, cost_usd=cost_usd,
@@ -204,6 +234,30 @@ class AgentRunner:
             finish_reason="max_steps", error="max steps exhausted",
             usage=total_usage, cost_usd=cost_usd,
         )
+
+    async def _complete_streaming(
+        self,
+        prompt: str,
+        step: int,
+        on_event: Callable[[dict], None],
+        stream_state: dict,
+    ) -> tuple[str, TokenUsage | None]:
+        """流式调用模型：原始 chunk 全量累积，文本 delta 经 parser 过滤后回调。
+
+        只有 AnswerStreamParser 确认是字符串 reply 才发 answer_chunk；
+        工具调用/结构化 answer/非法输出不发任何 chunk。流式无 usage，记 None。
+        """
+        parser = AnswerStreamParser()
+        parts: list[str] = []
+        async for chunk in self.model.complete_stream(prompt):
+            parts.append(chunk)
+            for delta in parser.feed(chunk):
+                stream_state["streamed"] += len(delta)
+                on_event({"kind": "answer_chunk", "step": step, "text": delta})
+        for delta in parser.finalize():
+            stream_state["streamed"] += len(delta)
+            on_event({"kind": "answer_chunk", "step": step, "text": delta})
+        return "".join(parts), None
 
     def _render(self, context: StepContext, allowed_tools: list[str]) -> str:
         labels = {"assistant": "【你】", "tool": "【工具】"}
