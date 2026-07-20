@@ -39,6 +39,17 @@ export interface ChatAction {
   value: string;
 }
 
+export interface ChatTraceStep {
+  id: string;
+  kind: "action" | "tool";
+  label: string;
+  status: "running" | "done" | "error";
+  step?: number;
+  tool?: string;
+  input?: Record<string, unknown>;
+  output?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -47,6 +58,7 @@ export interface ChatMessage {
   synthesis?: string;
   actions?: ChatAction[];
   processSteps?: string[];
+  traceSteps?: ChatTraceStep[];
 }
 
 export interface ChatSessionSummary {

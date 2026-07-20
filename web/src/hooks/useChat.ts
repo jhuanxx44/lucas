@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ResearcherState, ChatAction } from "@/types";
+import type { ChatMessage, ResearcherState, ChatAction, ChatTraceStep } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -13,6 +13,8 @@ interface ChatState {
   synthesis: string;
   actions: ChatAction[];
   processSteps: string[];
+  traceSteps: ChatTraceStep[];
+  activeQuestion: string | null;
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -26,6 +28,7 @@ type Action =
   | { type: "SYNTHESIS_CHUNK"; text: string }
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
+  | { type: "TRACE_STEP"; trace: ChatTraceStep }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage };
 
@@ -38,7 +41,9 @@ function reducer(state: ChatState, action: Action): ChatState {
         researchers: new Map(),
         synthesis: "",
         actions: [],
-        processSteps: ["已收到问题"],
+        processSteps: ["Lucas 收到问题"],
+        traceSteps: [{ id: nextId(), kind: "action", label: "Lucas 收到问题", status: "done" }],
+        activeQuestion: action.message.content,
         isLoading: true,
         phase: "dispatching",
       };
@@ -68,6 +73,8 @@ function reducer(state: ChatState, action: Action): ChatState {
     case "PROCESS_STEP":
       if (!action.step || state.processSteps.at(-1) === action.step) return state;
       return { ...state, processSteps: [...state.processSteps, action.step] };
+    case "TRACE_STEP":
+      return { ...state, traceSteps: [...state.traceSteps, action.trace] };
     case "DONE": {
       return {
         ...state,
@@ -75,6 +82,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         actions: [],
         isLoading: false,
         phase: "idle",
+        activeQuestion: null,
       };
     }
     case "ERROR":
@@ -85,6 +93,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         phase: "idle",
         actions: [],
         synthesis: "",
+        activeQuestion: null,
       };
     default:
       return state;
@@ -98,6 +107,8 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     synthesis: "",
     actions: [],
     processSteps: [],
+    traceSteps: [],
+    activeQuestion: null,
     isLoading: false,
     phase: "idle",
   };
@@ -128,6 +139,10 @@ export function useChat(
       role: "assistant",
       content: "错误: 已取消",
       processSteps: [...stateRef.current.processSteps, "任务已取消"],
+      traceSteps: [
+        ...stateRef.current.traceSteps,
+        { id: nextId(), kind: "action", label: "任务已取消", status: "error" },
+      ],
     };
     const messages = [...stateRef.current.messages, errorMessage];
     dispatch({ type: "ERROR", message: errorMessage });
@@ -145,13 +160,21 @@ export function useChat(
       const streamedResearchers = new Map<string, ResearcherState>();
       let streamedSynthesis = "";
       let streamedActions: ChatAction[] = [];
-      let streamedProcessSteps = ["已收到问题"];
+      let streamedProcessSteps = ["Lucas 收到问题"];
+      let streamedTraceSteps: ChatTraceStep[] = [
+        { id: nextId(), kind: "action", label: "Lucas 收到问题", status: "done" },
+      ];
       let completed = false;
 
       const appendProcessStep = (step: string) => {
         if (!step || streamedProcessSteps.at(-1) === step) return;
         streamedProcessSteps = [...streamedProcessSteps, step];
         dispatch({ type: "PROCESS_STEP", step });
+      };
+
+      const appendTraceStep = (trace: ChatTraceStep) => {
+        streamedTraceSteps = [...streamedTraceSteps, trace];
+        dispatch({ type: "TRACE_STEP", trace });
       };
 
       dispatch({ type: "USER_MESSAGE", message: userMessage });
@@ -172,17 +195,37 @@ export function useChat(
                 appendProcessStep(d.message);
                 break;
               case "dispatch":
-                appendProcessStep(
-                  `已选择研究员：${(data as { researchers: Array<{ name: string }> }).researchers.map((researcher) => researcher.name).join("、")}`
-                );
+                appendProcessStep("Lucas 开始分析");
+                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 开始分析", status: "done" });
                 dispatch({ type: "DISPATCH" });
                 onResearchTarget?.(question);
                 break;
               case "researcher_start":
-                appendProcessStep(`${d.name}开始分析`);
                 streamedResearchers.set(d.id, { id: d.id, name: d.name, status: "running", text: "" });
                 dispatch({ type: "RESEARCHER_START", id: d.id, name: d.name });
                 break;
+              case "tool_step": {
+                const toolStep = data as {
+                  step: number;
+                  tool: string;
+                  args: Record<string, unknown>;
+                  ok: boolean;
+                  output: string;
+                  message: string;
+                };
+                appendProcessStep(toolStep.message);
+                appendTraceStep({
+                  id: nextId(),
+                  kind: "tool",
+                  label: toolStep.ok ? `Lucas 调用 ${toolStep.tool}` : `Lucas 调用 ${toolStep.tool} 失败`,
+                  status: toolStep.ok ? "done" : "error",
+                  step: toolStep.step,
+                  tool: toolStep.tool,
+                  input: toolStep.args,
+                  output: toolStep.output,
+                });
+                break;
+              }
               case "researcher_chunk":
                 if (streamedResearchers.has(d.id)) {
                   const researcher = streamedResearchers.get(d.id)!;
@@ -191,7 +234,8 @@ export function useChat(
                 dispatch({ type: "RESEARCHER_CHUNK", id: d.id, text: d.text });
                 break;
               case "researcher_done":
-                appendProcessStep(`${streamedResearchers.get(d.id)?.name ?? d.id}完成分析`);
+                appendProcessStep("Lucas 完成分析");
+                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 完成分析", status: "done" });
                 if (streamedResearchers.has(d.id)) {
                   const researcher = streamedResearchers.get(d.id)!;
                   streamedResearchers.set(d.id, { ...researcher, status: "done" });
@@ -216,6 +260,7 @@ export function useChat(
                   synthesis: streamedSynthesis,
                   actions: streamedActions.length > 0 ? streamedActions : undefined,
                   processSteps: streamedProcessSteps,
+                  traceSteps: streamedTraceSteps,
                 };
                 const messages = [...previousMessages, userMessage, assistantMessage];
                 dispatch({ type: "DONE", message: assistantMessage });
@@ -226,11 +271,13 @@ export function useChat(
               case "error": {
                 completed = true;
                 appendProcessStep("处理失败");
+                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 分析失败", status: "error" });
                 const errorMessage: ChatMessage = {
                   id: nextId(),
                   role: "assistant",
                   content: `错误: ${d.message}`,
                   processSteps: streamedProcessSteps,
+                  traceSteps: streamedTraceSteps,
                 };
                 const messages = [...previousMessages, userMessage, errorMessage];
                 dispatch({ type: "ERROR", message: errorMessage });
@@ -244,11 +291,13 @@ export function useChat(
       } catch (e: unknown) {
         if (!completed && e instanceof Error && e.name !== "AbortError") {
           appendProcessStep("连接或处理失败");
+          appendTraceStep({ id: nextId(), kind: "action", label: "连接或处理失败", status: "error" });
           const errorMessage: ChatMessage = {
             id: nextId(),
             role: "assistant",
             content: `错误: ${e.message}`,
             processSteps: streamedProcessSteps,
+            traceSteps: streamedTraceSteps,
           };
           const messages = [...previousMessages, userMessage, errorMessage];
           dispatch({ type: "ERROR", message: errorMessage });

@@ -56,7 +56,7 @@ class AgentRunner:
         """on_event：可选的 step 事件钩子（同步回调，零开销缺省）。
 
         工具执行完成时回调 {"kind": "tool_step", "step", "tool", "args", "ok",
-        "observation"}（observation 截断为前 500 字符摘要）；
+        "observation"}；
         answer 产出时回调 {"kind": "answer", "step", "answer"}。
         不改变任何终止语义，仅用于外部观察（如 SSE 桥）。
 
@@ -291,7 +291,7 @@ class AgentRunner:
                     "tool": tool,
                     "args": args,
                     "ok": result.ok,
-                    "observation": observation[:500],
+                    "observation": observation,
                 })
         return AgentResult(
             finish_reason="max_steps", error="max steps exhausted",

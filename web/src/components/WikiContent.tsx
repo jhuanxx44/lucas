@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 import { fetchWikiPage, fetchRawFile, searchWiki } from "@/lib/api";
 import { processWikiLinks } from "@/lib/markdown";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
@@ -11,7 +11,11 @@ import type { WikiPage } from "@/types";
 const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20] as const;
 const DEFAULT_INDEX = 2; // 14px
 
-export function WikiContent() {
+interface WikiContentProps {
+  onClose: () => void;
+}
+
+export function WikiContent({ onClose }: WikiContentProps) {
   const { currentPath, navigateTo } = useWikiNavigation();
   const [page, setPage] = useState<WikiPage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,6 +81,14 @@ export function WikiContent() {
         {updated && (
           <span className="text-xs text-zinc-400 dark:text-zinc-500">更新: {updated}</span>
         )}
+        <button
+          aria-label="隐藏 Wiki"
+          title="隐藏 Wiki"
+          onClick={onClose}
+          className={`${btnClass} ml-auto`}
+        >
+          <X size={15} />
+        </button>
       </div>
       <article style={{ fontSize: `${FONT_SIZES[fontIndex]}px` }} className="prose max-w-none dark:prose-invert prose-headings:text-zinc-800 dark:prose-headings:text-zinc-200 prose-p:text-zinc-600 dark:prose-p:text-zinc-300 prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-strong:text-zinc-800 dark:prose-strong:text-zinc-200 prose-code:text-indigo-600 dark:prose-code:text-indigo-300 prose-td:text-zinc-600 dark:prose-td:text-zinc-300 prose-th:text-zinc-800 dark:prose-th:text-zinc-200">
         <ReactMarkdown

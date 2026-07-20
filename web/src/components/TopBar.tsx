@@ -1,14 +1,15 @@
-import { Search, Link2, Link2Off, Menu, Sun, Moon } from "lucide-react";
+import { Link2, Link2Off, Menu, Sun, Moon, PanelRight } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
 interface TopBarProps {
   linked: boolean;
   onToggleLink: () => void;
-  onSearch: (query: string) => void;
   onToggleNavigation: () => void;
+  traceOpen: boolean;
+  onToggleTrace: () => void;
 }
 
-export function TopBar({ linked, onToggleLink, onSearch, onToggleNavigation }: TopBarProps) {
+export function TopBar({ linked, onToggleLink, onToggleNavigation, traceOpen, onToggleTrace }: TopBarProps) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -22,9 +23,10 @@ export function TopBar({ linked, onToggleLink, onSearch, onToggleNavigation }: T
       </button>
       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">Lucas</span>
       <span className="hidden text-sm text-zinc-400 dark:text-zinc-500 sm:inline">投研认知的复利引擎</span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1">
         <button
           onClick={toggle}
+          aria-label={theme === "dark" ? "切换亮色模式" : "切换暗色模式"}
           className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title={theme === "dark" ? "切换亮色模式" : "切换暗色模式"}
         >
@@ -32,22 +34,22 @@ export function TopBar({ linked, onToggleLink, onSearch, onToggleNavigation }: T
         </button>
         <button
           onClick={onToggleLink}
+          aria-pressed={linked}
+          aria-label={linked ? "关闭 Wiki 联动" : "开启 Wiki 联动"}
           className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          title={linked ? "关闭联动" : "开启联动"}
+          title={linked ? "关闭 Wiki 联动" : "开启 Wiki 联动"}
         >
           {linked ? <Link2 size={16} /> : <Link2Off size={16} />}
         </button>
-        <div className="relative hidden md:block">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
-          <input
-            type="text"
-            placeholder="搜索 wiki 或提问..."
-            className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md pl-8 pr-3 py-1.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 w-64 focus:outline-none focus:border-indigo-500"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onSearch((e.target as HTMLInputElement).value);
-            }}
-          />
-        </div>
+        <button
+          aria-pressed={traceOpen}
+          aria-label={traceOpen ? "折叠右侧 Trace" : "展开右侧 Trace"}
+          onClick={onToggleTrace}
+          className={`p-1.5 rounded-md transition-colors ${traceOpen ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"}`}
+          title={traceOpen ? "折叠右侧 Trace" : "展开右侧 Trace"}
+        >
+          <PanelRight size={16} />
+        </button>
       </div>
     </div>
   );

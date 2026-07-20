@@ -6,6 +6,8 @@ import { WikiSidebar } from "@/components/WikiSidebar";
 import { SessionSidebar } from "@/components/SessionSidebar";
 import { WikiContent } from "@/components/WikiContent";
 import { ChatPanel } from "@/components/ChatPanel";
+import { TracePanel } from "@/components/TracePanel";
+import type { LiveTraceTurn } from "@/components/TracePanel";
 import { WikiNavigationContext } from "@/hooks/useWikiNavigation";
 import { ThemeContext, useThemeProvider } from "@/hooks/useTheme";
 import {
@@ -16,7 +18,6 @@ import {
   fetchWikiIndex,
   renameSession,
   replaceSessionMessages,
-  searchWiki,
 } from "@/lib/api";
 import type { ChatMessage, ChatSession, ChatSessionSummary } from "@/types";
 
@@ -44,6 +45,7 @@ export default function App() {
   const [linked, setLinked] = useState(true);
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(520);
+  const [traceWidth, setTraceWidth] = useState(360);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [sidebarKey, setSidebarKey] = useState(0);
   const [sidebarTab, setSidebarTab] = useState<"sessions" | "wiki">("sessions");
@@ -51,7 +53,10 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(true);
+  const [liveTraceTurn, setLiveTraceTurn] = useState<LiveTraceTurn | null>(null);
   const initialSessionPromise = useRef<ReturnType<typeof loadInitialSession> | null>(null);
+  const creatingSessionRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +80,11 @@ export default function App() {
   const handleRightResize = useCallback((delta: number) => {
     const maxW = Math.floor(window.innerWidth / 2);
     setRightWidth((w) => Math.max(300, Math.min(maxW, w - delta)));
+  }, []);
+
+  const handleTraceResize = useCallback((delta: number) => {
+    const maxW = Math.floor(window.innerWidth / 2);
+    setTraceWidth((w) => Math.max(280, Math.min(maxW, w - delta)));
   }, []);
 
   const navigateTo = useCallback((path: string) => {
@@ -102,26 +112,40 @@ export default function App() {
     setSidebarKey((k) => k + 1);
   }, []);
 
-  const handleSearch = useCallback(async (query: string) => {
-    const results = await searchWiki(query);
-    if (results.length > 0) {
-      setCurrentPath(results[0].path);
-    }
-  }, []);
-
   const handleCreateSession = useCallback(async () => {
-    const created = await createSession();
-    setSessions((current) => [toSummary(created), ...current]);
-    setActiveSession(created);
+    setCurrentPath(null);
+    setLiveTraceTurn(null);
     setSidebarTab("sessions");
     setMobileNavigationOpen(false);
-  }, []);
+
+    if (activeSession?.messages.length === 0) return;
+
+    const existingEmpty = sessions.find((session) => session.message_count === 0);
+    if (existingEmpty) {
+      if (existingEmpty.id !== activeSession?.id) {
+        setActiveSession(await fetchSession(existingEmpty.id));
+      }
+      return;
+    }
+
+    if (creatingSessionRef.current) return;
+    creatingSessionRef.current = true;
+    try {
+      const created = await createSession();
+      setSessions((current) => [toSummary(created), ...current]);
+      setActiveSession(created);
+    } finally {
+      creatingSessionRef.current = false;
+    }
+  }, [activeSession?.id, activeSession?.messages.length, sessions]);
 
   const handleSelectSession = useCallback(async (sessionId: string) => {
     if (sessionId === activeSession?.id) {
       setMobileNavigationOpen(false);
       return;
     }
+    setCurrentPath(null);
+    setLiveTraceTurn(null);
     setActiveSession(await fetchSession(sessionId));
     setMobileNavigationOpen(false);
   }, [activeSession?.id]);
@@ -139,12 +163,16 @@ export default function App() {
     const remaining = sessions.filter((session) => session.id !== sessionId);
     if (remaining.length === 0) {
       const created = await createSession();
+      setCurrentPath(null);
+      setLiveTraceTurn(null);
       setSessions([toSummary(created)]);
       setActiveSession(created);
       return;
     }
     setSessions(remaining);
     if (activeSession?.id === sessionId) {
+      setCurrentPath(null);
+      setLiveTraceTurn(null);
       setActiveSession(await fetchSession(remaining[0].id));
     }
   }, [activeSession?.id, sessions]);
@@ -160,15 +188,23 @@ export default function App() {
     ]);
   }, [activeSessionId]);
 
+  const hideEmptyChatForWiki = Boolean(
+    currentPath
+      && activeSession
+      && activeSession.messages.length === 0
+      && !liveTraceTurn
+  );
+
   return (
     <ThemeContext.Provider value={themeCtx}>
       <WikiNavigationContext.Provider value={{ currentPath, navigateTo, linked }}>
-        <div className="h-screen flex flex-col bg-white text-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
+        <div className="flex h-[100dvh] flex-col bg-white text-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
           <TopBar
             linked={linked}
             onToggleLink={() => setLinked((v) => !v)}
-            onSearch={handleSearch}
             onToggleNavigation={() => setMobileNavigationOpen((open) => !open)}
+            traceOpen={traceOpen}
+            onToggleTrace={() => setTraceOpen((open) => !open)}
           />
           {mobileNavigationOpen && (
             <button
@@ -196,7 +232,7 @@ export default function App() {
                   Wiki
                 </button>
               </div>
-              <div className={`flex-1 overflow-hidden ${sidebarTab === "wiki" ? "overflow-y-auto p-3" : "p-2"}`}>
+              <div className={`flex-1 overflow-hidden ${sidebarTab === "wiki" ? "wiki-scrollbar overflow-y-auto p-3" : "p-2"}`}>
                 {sidebarTab === "wiki" ? (
                   <WikiSidebar refreshKey={sidebarKey} />
                 ) : (
@@ -212,21 +248,23 @@ export default function App() {
               </div>
             </div>
             <div className="hidden md:block">
-              <ResizableDivider onResize={handleLeftResize} />
+              <ResizableDivider label="调整导航栏宽度" onResize={handleLeftResize} />
             </div>
             {currentPath && (
               <>
                 <div className="hidden flex-1 overflow-y-auto p-4 md:block">
-                  <WikiContent />
+                  <WikiContent onClose={() => setCurrentPath(null)} />
                 </div>
-                <div className="hidden md:block">
-                  <ResizableDivider onResize={handleRightResize} />
-                </div>
+                {!hideEmptyChatForWiki && (
+                  <div className="hidden md:block">
+                    <ResizableDivider label="调整 Wiki 和对话宽度" onResize={handleRightResize} />
+                  </div>
+                )}
               </>
             )}
             <div
               style={currentPath ? { "--chat-width": `${rightWidth}px` } as CSSProperties : undefined}
-              className={`${currentPath ? "flex-1 md:w-[var(--chat-width)] md:flex-none md:shrink-0" : "flex-1"} flex flex-col overflow-hidden border-l border-zinc-200 dark:border-zinc-800`}
+              className={`${currentPath ? "flex-1 md:w-[var(--chat-width)] md:flex-none md:shrink-0" : "flex-1"} ${hideEmptyChatForWiki ? "flex md:hidden" : "flex"} flex-col overflow-hidden border-l border-zinc-200 dark:border-zinc-800`}
             >
               {activeSession ? (
                 <ChatPanel
@@ -235,6 +273,7 @@ export default function App() {
                   onMessagesCommitted={handleMessagesCommitted}
                   onResearchTarget={handleResearchTarget}
                   onResearchDone={handleResearchDone}
+                  onLiveTraceChange={setLiveTraceTurn}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
@@ -242,6 +281,27 @@ export default function App() {
                 </div>
               )}
             </div>
+            {traceOpen && (
+              <>
+                <div className="hidden xl:block">
+                  <ResizableDivider label="调整 Trace 宽度" onResize={handleTraceResize} />
+                </div>
+                <button
+                  aria-label="关闭 Trace 面板"
+                  onClick={() => setTraceOpen(false)}
+                  className="fixed inset-0 top-12 z-30 bg-black/30 xl:hidden"
+                />
+                <div
+                  style={{ "--trace-width": `${traceWidth}px` } as CSSProperties}
+                  className="fixed bottom-0 right-0 top-12 z-40 w-[min(92vw,380px)] border-l border-zinc-200 shadow-2xl dark:border-zinc-800 xl:static xl:z-auto xl:w-[var(--trace-width)] xl:shrink-0 xl:shadow-none"
+                >
+                  <TracePanel
+                    messages={activeSession?.messages ?? []}
+                    liveTurn={liveTraceTurn}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </WikiNavigationContext.Provider>

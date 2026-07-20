@@ -6,7 +6,8 @@ web/src/hooks/useChat.ts 严格对齐：
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
-  status {message}                每个工具 step 完成
+  tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
+             ok, output, message} 结构化输入输出
   synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
   researcher_done {id}            答案推送完成后
   done {total_tokens}             正常结束（AgentResult.usage 累计）
@@ -84,7 +85,7 @@ def _status_message(evt: dict) -> str:
     if len(hint) > 60:
         hint = hint[:60] + "…"
     suffix = "" if evt.get("ok") else "（失败）"
-    return f"调用 {evt.get('tool')}: {hint}{suffix}"
+    return f"Lucas 调用 {evt.get('tool')}: {hint}{suffix}"
 
 
 def _error_message(result: AgentResult) -> str:
@@ -133,7 +134,14 @@ async def chat_event_stream(
             nonlocal streamed_chars
             kind = evt.get("kind")
             if kind == "tool_step":
-                return _sse("status", {"message": _status_message(evt)})
+                return _sse("tool_step", {
+                    "step": evt.get("step"),
+                    "tool": evt.get("tool"),
+                    "args": evt.get("args") or {},
+                    "ok": bool(evt.get("ok")),
+                    "output": evt.get("observation", ""),
+                    "message": _status_message(evt),
+                })
             if kind == "answer_chunk":
                 text = evt.get("text", "")
                 streamed_chars += len(text)

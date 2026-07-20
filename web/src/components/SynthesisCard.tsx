@@ -11,21 +11,20 @@ export function SynthesisCard({ text, loading }: SynthesisCardProps) {
   if (!text && !loading) return null;
 
   return (
-    <div className="border border-indigo-300/40 dark:border-indigo-500/30 rounded-lg overflow-hidden mt-2">
-      <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10">
-        <span>🧠</span>
-        <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">综合分析</span>
-        {loading && <Loader2 size={12} className="animate-spin text-indigo-500 dark:text-indigo-400 ml-auto" />}
+    <div className="mt-4 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+      <div className="flex items-center gap-2 py-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        {loading && <Loader2 size={12} className="animate-spin" />}
+        <span>{loading ? "Lucas 正在整理结论" : "Lucas 的结论"}</span>
       </div>
       {text && (
-        <div className="px-3 pb-3 pt-1 text-sm prose prose-sm max-w-none dark:prose-invert prose-p:text-zinc-600 dark:prose-p:text-zinc-300 prose-headings:text-zinc-800 dark:prose-headings:text-zinc-200">
+        <div className="prose prose-zinc mt-3 max-w-none text-[15px] dark:prose-invert prose-p:leading-7 prose-p:text-zinc-700 dark:prose-p:text-zinc-300">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {text}
           </ReactMarkdown>
         </div>
       )}
       {!text && loading && (
-        <div className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">等待研究员完成...</div>
+        <div className="py-2 text-xs text-zinc-400 dark:text-zinc-500">正在等待分析结果</div>
       )}
     </div>
   );

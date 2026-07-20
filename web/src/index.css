@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+.wiki-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.wiki-scrollbar:hover {
+  scrollbar-color: rgb(161 161 170 / 0.55) transparent;
+}
+
+.wiki-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.wiki-scrollbar::-webkit-scrollbar-track,
+.wiki-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.wiki-scrollbar:hover::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(161 161 170 / 0.55);
+}
+
+.dark .wiki-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgb(113 113 122 / 0.7);
+}
+
 html {
   font-size: 17px;
 }

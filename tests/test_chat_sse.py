@@ -110,12 +110,18 @@ async def test_agent_stream_full_event_sequence(tmp_path):
     events = await _collect("查一下茅台", model=model, workspace=tmp_path)
 
     assert [e for e, _ in events] == [
-        "dispatch", "researcher_start", "status", "synthesis_chunk", "researcher_done", "done",
+        "dispatch", "researcher_start", "tool_step", "synthesis_chunk", "researcher_done", "done",
     ]
     assert events[0][1] == {"researchers": [{"id": "single", "name": "Lucas"}], "mode": "single"}
     assert events[1][1] == {"id": "single", "name": "Lucas"}
-    assert "wiki_recall" in events[2][1]["message"]
-    assert "贵州茅台" in events[2][1]["message"]
+    assert events[2][1] == {
+        "step": 1,
+        "tool": "wiki_recall",
+        "args": {"query": "贵州茅台"},
+        "ok": True,
+        "output": "[wiki_recall] status=ok\n（wiki 知识库为空，没有可召回的页面）",
+        "message": "Lucas 调用 wiki_recall: 贵州茅台",
+    }
     assert events[3][1] == {"text": "最终答案"}
     assert events[4][1] == {"id": "single"}
     assert events[5][1] == {"total_tokens": 430}
@@ -182,7 +188,7 @@ async def test_agent_stream_max_steps_yields_error(tmp_path):
     assert kinds[0] == "dispatch"
     assert kinds[1] == "researcher_start"
     assert kinds[-1] == "error"
-    assert kinds.count("status") == 10
+    assert kinds.count("tool_step") == 10
     assert "步骤达到上限" in events[-1][1]["message"]
 
 

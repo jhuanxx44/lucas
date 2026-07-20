@@ -258,7 +258,7 @@ async def test_agent_stream_incremental_synthesis_chunks(tmp_path):
 
 
 async def test_agent_stream_tool_step_then_streamed_answer(tmp_path):
-    """工具 step 的 status 先于 answer 的增量 chunk；工具步不产生 synthesis_chunk"""
+    """结构化工具 step 先于 answer 的增量 chunk；工具步不产生 synthesis_chunk"""
     (tmp_path / "wiki").mkdir()
     model = FakeStreamModel([
         json.dumps({"action": "tool", "tool": "wiki_recall",
@@ -268,8 +268,8 @@ async def test_agent_stream_tool_step_then_streamed_answer(tmp_path):
     events = await _collect("查一下", model, tmp_path)
 
     kinds = [e for e, _ in events]
-    assert kinds.index("status") < kinds.index("synthesis_chunk")
-    assert kinds.count("status") == 1
+    assert kinds.index("tool_step") < kinds.index("synthesis_chunk")
+    assert kinds.count("tool_step") == 1
     chunks = [d["text"] for e, d in events if e == "synthesis_chunk"]
     assert "".join(chunks) == "答案在这里"
 

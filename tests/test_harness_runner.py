@@ -91,6 +91,27 @@ async def test_full_loop_tool_then_answer(tmp_path):
     assert events[7]["data"]["tool_call_id"] == "call-1"
 
 
+async def test_tool_step_event_keeps_full_observation_for_trace_ui(tmp_path):
+    """产品 Trace 面板需要工具真实输出，Runner 事件不能再截成 500 字摘要。"""
+    content = "x" * 800
+    (tmp_path / "long.txt").write_text(content)
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "long.txt"}}),
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    trace = _trace(tmp_path)
+    streamed_events = []
+
+    await _runner(tmp_path, model, trace).run(
+        "read long file", ["read_file"], LIMITS, trace,
+        on_event=streamed_events.append,
+    )
+
+    tool_step = next(event for event in streamed_events if event["kind"] == "tool_step")
+    assert content in tool_step["observation"]
+    assert len(tool_step["observation"]) > 500
+
+
 async def test_history_replays_model_raw_output(tmp_path):
     """全量回放：第二轮 prompt 同时包含第一轮模型的原始输出和工具 observation"""
     (tmp_path / "config.yaml").write_text("provider: deepseek\ntimeout: 10\n")

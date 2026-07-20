@@ -1,10 +1,11 @@
 import { useCallback, useRef } from "react";
 
 interface ResizableDividerProps {
+  label: string;
   onResize: (delta: number) => void;
 }
 
-export function ResizableDivider({ onResize }: ResizableDividerProps) {
+export function ResizableDivider({ label, onResize }: ResizableDividerProps) {
   const startX = useRef(0);
 
   const onMouseDown = useCallback(
@@ -40,11 +41,14 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
   return (
     <div
       role="separator"
+      aria-label={label}
       aria-orientation="vertical"
       tabIndex={0}
-      className="w-px bg-zinc-200 dark:bg-zinc-800 hover:bg-indigo-500 focus:bg-indigo-500 cursor-col-resize transition-colors shrink-0 outline-none"
+      className="group relative h-full w-2 shrink-0 cursor-col-resize outline-none"
       onMouseDown={onMouseDown}
       onKeyDown={onKeyDown}
-    />
+    >
+      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-zinc-200 transition-colors group-hover:bg-indigo-500 group-focus:bg-indigo-500 dark:bg-zinc-800" />
+    </div>
   );
 }

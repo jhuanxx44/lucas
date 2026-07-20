@@ -41,7 +41,6 @@ export function SessionSidebar({
   const [menuId, setMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const startRename = (session: ChatSessionSummary) => {
     setMenuId(null);
@@ -78,7 +77,6 @@ export function SessionSidebar({
               <div className="space-y-0.5">
                 {group.items.map((session) => {
                   const selected = session.id === activeSessionId;
-                  const confirmingDelete = confirmDeleteId === session.id;
                   return (
                     <div
                       key={session.id}
@@ -103,22 +101,6 @@ export function SessionSidebar({
                           <button onClick={() => setEditingId(null)} title="取消重命名" className="p-1 text-zinc-400">
                             <X size={13} />
                           </button>
-                        </div>
-                      ) : confirmingDelete ? (
-                        <div className="flex w-full items-center justify-between gap-2 px-2 text-xs">
-                          <span className="text-red-500">确认删除？</span>
-                          <div className="flex gap-1">
-                            <button onClick={() => setConfirmDeleteId(null)} className="px-1.5 py-1 text-zinc-500">取消</button>
-                            <button
-                              onClick={() => {
-                                setConfirmDeleteId(null);
-                                onDelete(session.id);
-                              }}
-                              className="px-1.5 py-1 font-medium text-red-500"
-                            >
-                              删除
-                            </button>
-                          </div>
                         </div>
                       ) : (
                         <>
@@ -145,7 +127,7 @@ export function SessionSidebar({
                               <button
                                 onClick={() => {
                                   setMenuId(null);
-                                  setConfirmDeleteId(session.id);
+                                  onDelete(session.id);
                                 }}
                                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
                               >
