@@ -3,6 +3,8 @@
 web_search / stock_* 用 monkeypatch 替换真实网络与数据 provider；
 wiki_recall 用临时 wiki 目录 fixture 验证索引优先、截断与全文 fallback。
 """
+from pathlib import Path
+
 import pytest
 
 from harness.tools.base import ToolResult
@@ -18,6 +20,8 @@ EXTERNAL_TOOL_SPECS = [
     STOCK_KLINE_SPEC,
     WIKI_RECALL_SPEC,
 ]
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 async def _execute(tmp_path, spec, name, args, allowed=None):
@@ -246,6 +250,33 @@ async def test_wiki_recall_missing_wiki_dir(tmp_path):
 async def test_wiki_recall_bad_args(tmp_path):
     result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": ""})
     assert result.status == "invalid_input"
+
+
+@pytest.mark.parametrize(
+    ("task_id", "query", "expected_paths"),
+    [
+        ("WIKI-01", "澄海精密 2025 年第四季度一次良率", ["companies/机械设备/澄海精密.md"]),
+        ("WIKI-02", "688559 2025 年度现金分红方案", ["notes/688559-2025年度分红公告.md"]),
+        (
+            "WIKI-03",
+            "凌波设备与远川装备 2025 年末标准设备年产能",
+            ["companies/机械设备/凌波设备.md", "companies/机械设备/远川装备.md"],
+        ),
+    ],
+)
+async def test_wiki_eval_fixtures_recall_expected_pages(task_id, query, expected_paths):
+    workspace = PROJECT_ROOT / "evals" / "tasks" / task_id / "fixture"
+
+    result = await _execute(
+        workspace,
+        WIKI_RECALL_SPEC,
+        "wiki_recall",
+        {"query": query, "limit": 3},
+    )
+
+    assert result.status == "ok"
+    for expected_path in expected_paths:
+        assert expected_path in result.observation
 
 
 # ---------- 白名单 ----------

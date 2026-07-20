@@ -10,7 +10,7 @@ memory/
 .superpowers/
 .playwright-mcp/
 web/.vite
-wiki/
+/wiki/
 raw/
 ingested/
 reports/

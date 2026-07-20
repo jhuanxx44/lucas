@@ -1,0 +1,40 @@
+id: WIKI-02
+title: 从未索引公告页面提取事实
+instruction: |
+  根据本地知识库回答：股票代码 688559 对应公司记录的 2025 年度现金分红方案是什么？
+  不要修改任何文件。
+  返回一个 JSON 对象，只包含一个字段：
+  - cash_dividend_per_10_shares: 每 10 股派发的现金红利金额（元，浮点数）
+
+fixture: fixture
+allowed_tools:
+  - wiki_recall
+
+limits:
+  max_steps: 6
+  timeout_seconds: 60
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: answer_json
+      expected:
+        cash_dividend_per_10_shares: 8.4
+      exact: true
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["**"]
+      required: true
+
+  process:
+    - type: allowed_tools
+      tools: [wiki_recall]
+      required: true
+
+    - type: max_steps
+      value: 6
+      required: true
+
+tags: [wiki, business, retrieval, unindexed]
