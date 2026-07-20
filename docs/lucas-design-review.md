@@ -68,14 +68,17 @@ Evidence
 - 旧报告和新报告没有时间权重。
 - 召回结果没有 score、来源路径、更新时间，模型不知道该信谁。
 
-建议优先做语义检索，而不是继续扩大 prompt：
+建议优先改善知识访问，而不是继续扩大 prompt。但不预设专用召回一定优于 Agent 组合基础工具：等 Evaluation Harness 稳定后，先对照受限只读 `list_files + search + read_file` 与当前 `wiki_recall`。
 
-- 对 wiki 页面、报告结论、raw/ingested 资料做 embedding。
+- 用固定 fixture/query 和相同模型、预算比较答案正确率、无依据作答率、步骤、Token、延迟和上下文长度。
+- 如果基础工具组合持平或更优且成本可接受，删除 `wiki_recall`，避免维护重复能力。
+- 只有当前专用召回已证明有价值、但失败主要来自排序质量时，才对标题、分类和正文 chunk 实验“精确实体规则 + BM25”。
+- 只有 BM25 后无词汇重叠的同义改写仍是主要失败来源时，才考虑 embedding/混合检索。
 - 召回时支持 metadata filter：公司、行业、概念、时间、资料类型。
 - 每个召回片段返回 `score`、`path`、`updated_at`、`source_type`。
 - 对过旧结论加时间衰减，避免旧观点和新事实同权。
 
-这是 P0 级能力。没有可靠检索，多 Agent 只是在不可靠上下文上并行发挥。
+该实验不阻塞当前 Harness 阶段；没有可靠评估前，不提前建设索引或向量基础设施。
 
 ### 3. raw 目录语义不干净
 

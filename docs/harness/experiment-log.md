@@ -151,7 +151,7 @@
 
 - **M1 结构解耦**：`RunLimits/AgentResult/StepContext` 与 `TraceRecorder` 从 evals 上移/复制到 `harness/models.py`、`harness/trace.py`，Runner 解除对 `evals.harness.*` 的 import，trace 参数改为可选（产品路径可关 trace）。纯移动，无行为变化。
 - **M2 产品化缺口**：`ToolHandler` 支持 `async def`（registry.execute 改 async，同步 handler 兼容）；`ModelAdapter.complete()` 返回 `(text, usage)`，Runner 累计 TokenUsage 写进 AgentResult，`max_cost_usd` 开始被消费（超预算以 `budget_exceeded` 终止；约定 `max_cost_usd <= 0` 视为不限）；新增 `harness/config.py::load_agent_config()` 从 `lucas.yaml` 读配置，eval adapter 与 server 共用。
-- **M3 业务工具注册**：`harness/tools/business.py` 注册 `web_search`（薄包 utils）、`stock_quote`/`stock_kline`（按 provider 方法粒度拆，不做 LLM 前置提取股票代码）、`wiki_recall`（索引优先召回，wiki 解析核心上移 `utils/wiki_core.py` 供 server 与 harness 共同 import，先 index.md 匹配再全文 fallback）。
+- **M3 业务工具注册**：工具现按职责拆到 `harness/tools/generic/` 与 `harness/tools/business/`；`web_search` 薄包 utils，`stock_quote`/`stock_kline` 按 provider 方法粒度拆（不做 LLM 前置提取股票代码），`wiki_recall` 索引优先召回（wiki 解析核心在 `utils/wiki_core.py`，先 index.md 匹配再全文 fallback）。
 - **M4 新聊天链路**：`server/services/agent_stream.py` 以 Runner `on_event` 钩子把 run 过程映射为既有 SSE 事件——run 开始固定发 `researcher_start {id: "single"}`、每个工具 step 发 `status`、answer 作为 `synthesis_chunk` 推送、`researcher_done`/`done {total_tokens}`、异常发 `error`。取舍：事件级流式而非逐 token（JSON-per-step 协议下模型输出必须完整才能解析，逐 token 与协议天然冲突，本版接受）。`dispatch` 最初停发，review 发现前端 wiki 联动依赖它后已补发（`c95e00c`）；`actions` 不再发送（前端缺省行为正常）。前端零改动。
 - **M5 wiki 知识模块重建**：`server/services/knowledge.py` 重写，保留旧实现的 7 条设计思想（四层存储边界、来源与页面分离的声明式溯源、Plan→Compile 两段式、写入前确定性校验+备份、增量更新语义、收录两段确认、索引优先召回）；丢弃 A 股硬编码、字符串拼装 index.md、手写 frontmatter 扫描等实现细节。报告 sidecar 机制不迁移（reports/ 归档层整体未接回，见 backlog）。
 - **M6 删除旧代码**：删 `agents/` 全目录、`utils/verify.py`、`agents.yaml`、`migrate_to_workspace.py` 及 6 个直接测 agents 的测试文件，合计 -4135 行；`grep -r "from agents\|import agents"` 零命中。
@@ -170,14 +170,14 @@
 | 产品 single path 与 Eval Adapter 调用同一个 AgentRunner，不维护影子实现（接入顺序 1 / 目标） | ✅ server 的 agent_stream 与 evals adapter 都装配同一个 `harness.AgentRunner` + `load_agent_config()` |
 | 现有业务测试不回退 | ✅ 143 测试全绿，wiki 约束测试（存储边界等）已迁移到新模块 |
 | 真实执行可生成同 schema 的 trace（脱敏后 replay） | ⚠️ 部分：trace schema 统一且 Runner 支持，产品路径默认关 trace；脱敏与保留策略未做（对应接入顺序 6，未启动） |
-| 通用 Harness 不 import 投研业务模块 | ✅ `harness/` 不 import server/evals；业务工具在 `harness/tools/business.py` 注册，核心模型无业务概念 |
+| 通用 Harness 核心不依赖投研业务模块 | ✅ Runner/ToolRuntime 不 import 具体工具；业务工具在 `harness/tools/business/`，由 server/evals 装配 |
 | 业务 adapter 可自行注册工具、context provider 和 validator | ⚠️ 部分：工具注册已通用化；context provider / validator 挂点未建（留 Phase 2/3） |
 | 被实验否定的机制不因产品已有类似代码而强行接入 | ✅ Planner/Validator 未提前实现，仅登记 backlog 与探针任务（READ-02 / LIST-01） |
 
 ### Backlog（按优先级不分先后登记）
 
 1. answer 阶段逐 token 流式（answer 无工具调用，可安全 stream；目前是事件级）
-2. embedding 召回替换 wiki_recall 的子串匹配
+2. Evaluation Harness 稳定后做 Wiki 访问策略消融：A=限制在 `wiki/` 的只读 `list_files+search+read_file`，B=当前 `wiki_recall`，C=仅在 B 已证明有价值但排序不足时实现 BM25。以答案正确率/无依据作答率为主，比较步骤、Token、延迟和上下文；A 持平或更优且成本可接受时允许直接删除 `wiki_recall`，embedding 仅在 BM25 后按失败归因考虑
 3. wiki 写入改 patch/event sourcing（`docs/lucas-design-review.md` 的建议；本版保留整页覆盖写）
 4. Planner 实验（READ-02 探针驱动，Phase 2）
 5. Validator 实验（LIST-01 指代错误 + READ-02 T3 无依据作答两个驱动案例，Phase 3）
@@ -193,7 +193,7 @@
 
 ### Review 与端到端验证（2026-07-20 补充）
 
-- 系统 review（全 diff + 前端契约逐字段核对）发现 1🔴5🟠，已全部修复于 `c95e00c`：dispatch 事件补发（wiki 联动回归）、runner 强制 `timeout_seconds`（finish_reason=timeout）、客户端断开 cancel run、写入前代码强制 sources 溯源、聊天白名单显式 BUSINESS_TOOL_NAMES、classify/ingest HTTP 层错误收尾；测试增至 **157 个**。
+- 系统 review（全 diff + 前端契约逐字段核对）发现 1🔴5🟠，已全部修复于 `c95e00c`：dispatch 事件补发（wiki 联动回归）、runner 强制 `timeout_seconds`（finish_reason=timeout）、客户端断开 cancel run、写入前代码强制 sources 溯源、聊天白名单显式列出工具名、classify/ingest HTTP 层错误收尾；测试增至 **157 个**。
 - E2E 验证（真实 LLM + git worktree 隔离写路径）：聊天 SSE 事件序列、多轮 history、wiki_recall 召回、wiki 只读端点结构、sessions CRUD、classify/ingest 全流程（契约/落盘/sources 强制/索引重建/幂等）全部通过；项目根真实数据零污染。
 - E2E 追加修复：异常路径不再外抛 provider 英文报错与掩码 key（统一中文兜底）。
 

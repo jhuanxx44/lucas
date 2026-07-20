@@ -23,7 +23,7 @@ truncated = (offset + len(sliced)) < len(content)  # 还有剩余 → true
 
 ### 修改的文件
 
-- `harness/tools/filesystem.py:27-48` — Harness 层 `read_file`
+- `harness/tools/generic/filesystem.py` — Harness 层 `read_file`
 - `agents/tools.py:76-110` — Agent 层 `ToolKit.read_file`
 - `tests/test_harness_runner.py` — 新增 `test_read_file_offset_paginates` 和 `test_read_file_offset_at_end`
 

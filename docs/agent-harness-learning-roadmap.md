@@ -88,7 +88,7 @@ model -> tool -> observation -> model -> ... -> finish
 
 建议把通用 Harness 与现有 Lucas 业务能力分开：
 
-> 2026-07-20 更新：single 模式重构（M1–M6）完成后，`agents/` 旧业务链路（Manager + researcher DAG）已删除；产品聊天链路与 eval adapter 均直接使用 `harness/AgentRunner`，业务工具经 `harness/tools/business.py` 注册。下表中的 `agents/` 一行及"Manager 作为 adapter/consumer"的表述仅为历史快照。
+> 2026-07-20 更新：single 模式重构（M1–M6）完成后，`agents/` 旧业务链路（Manager + researcher DAG）已删除；产品聊天链路与 eval adapter 均直接使用 `harness/AgentRunner`，业务工具经 `harness/tools/business/` 注册。下表中的 `agents/` 一行及"Manager 作为 adapter/consumer"的表述仅为历史快照。
 
 ```text
 harness/              Agent Harness 通用运行时
@@ -1249,6 +1249,24 @@ Phase 0 已要求产品 single path 与 Eval Adapter 共用最小 Runner。本�
 6. trace 完成脱敏和保留策略后，再记录真实产品 run；不把真实用户数据复制进 eval fixture。
 7. 最后才实验 single vs multi 和动态 replan。
 
+### 候选业务实验：Wiki 访问策略消融
+
+当前 `wiki_recall` 是“jieba 关键词提取 + 索引字段匹配 + 正文子串评分”，但专用召回工具未必优于 Agent 自主组合基础文件工具。等 Evaluation Harness 的任务治理、trace 和指标足够稳定后，比较以下策略，而不是预设必须升级 `wiki_recall`：
+
+- **A：基础文件工具**：只提供限制在 `wiki/` 范围内的只读 `list_files + search + read_file`，由 Agent 自主查看索引、换关键词、定位和分页阅读。
+- **B：当前专用工具**：只提供现有 `wiki_recall`。
+- **C：BM25 专用工具**：仅当 B 已证明专用召回有价值、但失败主要来自排序质量时，才实现“精确实体规则 + 标题/分类/正文 chunk BM25”。
+
+实验要求：
+
+1. 固定 Wiki fixture 与查询集，覆盖公司名/股票代码精确查询、不知道文件位置、多关键词与同义改写、相似干扰页、正文深处信息、跨页面综合和无答案场景。
+2. 三组使用相同模型、fixture、最终任务、步骤/Token/成本预算和 outcome grader；不要求固定工具调用路径。
+3. 以环境最终答案为主要验收，比较成功率、无依据作答率、步骤、Token、延迟和上下文字符数；同时用 trace 解释目标页面是否被发现/读取，B/C 额外记录 Recall@K 与 MRR。
+4. 如果 A 的正确率和稳定性持平或更好且成本可接受，删除 `wiki_recall`；如果 B 明显提高成功率、稳定性或效率，保留专用工具；只有 B 有价值但排序不足时才进入 C。
+5. 如果 BM25 后失败仍主要来自没有词汇重叠的同义改写，再评估 embedding 或混合检索，不提前引入向量基础设施。
+
+若实现索引，它属于派生产物，不写入 `raw/`；需记录源页面 hash/mtime，并提供确定性重建和过期检测。该实验当前只登记，不主动实施。
+
 ### 验收
 
 - 现有业务测试不回退。
@@ -1271,8 +1289,12 @@ harness/
   tools/
     base.py
     registry.py
-    filesystem.py
-    search.py
+    generic/
+      filesystem.py
+      web_search.py
+    business/
+      stock.py
+      wiki.py
     process.py
     mcp.py
   policies/             # 到对应实验再增加

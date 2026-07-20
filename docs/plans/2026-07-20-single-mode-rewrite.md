@@ -20,7 +20,7 @@
 
 - 不实现 Phase 2 的 Planner、Phase 3 的 Validator/Revision 机制（留好挂点即可）。
 - 不做多用户（`user_id` 恒 default 维持现状，但删掉 `workspaces/` 迁移残留）。
-- 不把子串召回升级为 embedding（记入 backlog）。
+- 不在本轮升级 Wiki 召回；等 Evaluation Harness 稳定后，先比较受限只读文件工具组合与当前 `wiki_recall`。专用工具未证明收益时允许删除，只有证明有价值但排序不足时才实验 BM25，再按失败归因决定是否考虑 embedding。
 - 不改 SSE 事件协议和 Wiki API 字段（前端零改动是硬约束）。
 
 ## 1. 总体策略
@@ -98,7 +98,7 @@ lucas.yaml                                     # 替代 agents.yaml（删 manage
 - 新 `harness/config.py`：`load_agent_config()` 从 `lucas.yaml` 读 `single_agent` 段（provider/model/max_steps/allowed_tools 默认值）。eval adapter 与 server 都用它，解除对 `agents.config` 的依赖。
 - **验收**：新增测试——异步工具在一个 run 内被 await 执行；usage 进入结果；adapter 不再 import `agents`。
 
-### M3 业务工具注册（`harness/tools/business.py`）
+### M3 业务工具注册（现位于 `harness/tools/business/`）
 
 首批三个工具（按 roadmap"不一次迁完全部能力"）：
 
@@ -140,7 +140,7 @@ lucas.yaml                                     # 替代 agents.yaml（删 manage
 ### M7 收尾
 
 - README、AGENTS.md 引用更新；`docs/harness/experiment-log.md` 记录本次重构（作为 Phase 9 提前启动的实验记录）。
-- backlog 登记：embedding 召回、wiki patch/event sourcing、Planner 实验（READ-02 探针）、Validator（LIST-01 驱动）、中止机制、超时层级。
+- backlog 登记：Evaluation Harness 稳定后做 Wiki 访问策略消融（受限只读文件工具 vs 当前 `wiki_recall`，允许删除专用工具；仅在必要时追加 BM25/embedding）、wiki patch/event sourcing、Planner 实验（READ-02 探针）、Validator（LIST-01 驱动）、中止机制、超时层级。
 
 ## 5. 风险与对策
 
