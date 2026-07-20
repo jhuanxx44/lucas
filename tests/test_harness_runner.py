@@ -618,19 +618,22 @@ async def test_zero_budget_means_unlimited(tmp_path):
 
 # ---------- 超时 ----------
 
-async def test_timeout_terminates_after_step(tmp_path):
-    """每步结束后检查总超时：超过 timeout_seconds 后以 timeout 终止，不再开始下一步"""
+async def test_timeout_cancels_model_call_at_deadline(tmp_path):
+    """总 deadline 必须中断当前模型调用，而不是等当前 step 自己返回。"""
+    cancelled = asyncio.Event()
+
     class SlowModel:
         def __init__(self):
             self.prompts: list[str] = []
 
         async def complete(self, prompt: str):
             self.prompts.append(prompt)
-            await asyncio.sleep(0.05)
-            return json.dumps({"action": "tool", "tool": "read_file",
-                               "args": {"path": "a.txt"}}), None
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
 
-    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
     model = SlowModel()
     trace = _trace(tmp_path)
     limits = RunLimits(max_steps=5, timeout_seconds=0.01)
@@ -638,12 +641,82 @@ async def test_timeout_terminates_after_step(tmp_path):
 
     assert result.finish_reason == "timeout"
     assert "timeout" in result.error
-    # 第一步已执行，第二步未开始
+    assert cancelled.is_set()
     assert len(model.prompts) == 1
     events = _events(trace)
     assert len([e for e in events if e["event"] == "step_started"]) == 1
     timeout_event = next(e for e in events if e["event"] == "timeout")
     assert timeout_event["data"]["timeout_seconds"] == 0.01
+
+
+async def test_timeout_cancels_tool_call_at_deadline(tmp_path):
+    """总 deadline 同样必须中断挂起的工具 handler。"""
+    cancelled = asyncio.Event()
+
+    async def hanging_tool(workspace, args):
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    spec = ToolSpec(
+        name="hang", description="hang", args_description="{}", handler=hanging_tool,
+    )
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "hang", "args": {}}),
+    ])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace, [spec]).run(
+        "t", ["hang"], RunLimits(max_steps=3, timeout_seconds=0.01), trace,
+    )
+
+    assert result.finish_reason == "timeout"
+    assert cancelled.is_set()
+    assert any(event["event"] == "timeout" for event in _events(trace))
+
+
+async def test_provider_timeout_before_run_deadline_is_not_misclassified(tmp_path):
+    class ProviderTimeoutModel:
+        async def complete(self, prompt: str):
+            raise TimeoutError("provider request timed out")
+
+    trace = _trace(tmp_path)
+    with pytest.raises(TimeoutError, match="provider request timed out"):
+        await _runner(tmp_path, ProviderTimeoutModel(), trace).run(
+            "t", [], RunLimits(max_steps=3, timeout_seconds=30), trace,
+        )
+
+    assert not any(event["event"] == "timeout" for event in _events(trace))
+
+
+async def test_runner_truncates_single_and_total_tool_observations(tmp_path):
+    """工具输出必须受单次和全 run observation 预算约束。"""
+    from harness.runner import MAX_OBSERVATION_CHARS, MAX_TOTAL_OBSERVATION_CHARS
+
+    def large_tool(workspace, args):
+        return ToolResult(status="ok", observation="x" * (MAX_OBSERVATION_CHARS * 2))
+
+    spec = ToolSpec(
+        name="large", description="large", args_description="{}", handler=large_tool,
+    )
+    model = FakeModel([
+        json.dumps({"action": "tool", "tool": "large", "args": {"n": index}})
+        for index in range(MAX_TOTAL_OBSERVATION_CHARS // MAX_OBSERVATION_CHARS)
+    ] + [json.dumps({"action": "answer", "reply": "done"})])
+    trace = _trace(tmp_path)
+    result = await _runner(tmp_path, model, trace, [spec]).run(
+        "t", ["large"], RunLimits(max_steps=5, timeout_seconds=30), trace,
+    )
+
+    assert result.finish_reason == "completed"
+    finished = [event for event in _events(trace)
+                if event["event"] == "tool_call_finished"]
+    assert finished
+    assert all(event["data"]["observation_chars"] <= MAX_OBSERVATION_CHARS
+               for event in finished)
+    assert finished[-1]["data"]["total_observation_chars"] <= MAX_TOTAL_OBSERVATION_CHARS
+    assert "truncated" in model.prompts[1]
 
 
 async def test_zero_timeout_means_unlimited(tmp_path):

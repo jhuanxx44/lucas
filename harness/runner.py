@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -9,6 +10,13 @@ from harness.streaming import AnswerStreamParser
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
+
+MAX_OBSERVATION_CHARS = 16_000
+MAX_TOTAL_OBSERVATION_CHARS = 48_000
+
+
+class _RunDeadlineExceeded(Exception):
+    pass
 
 
 class _NullTrace:
@@ -65,27 +73,49 @@ class AgentRunner:
         total_usage: TokenUsage | None = None
         cost_usd = 0.0
         run_started = time.monotonic()
+        deadline = (
+            run_started + limits.timeout_seconds
+            if limits.timeout_seconds and limits.timeout_seconds > 0 else None
+        )
         artifacts: Path | None = None
         if trace is not None:
             artifacts = trace.path.parent / "artifacts"
             artifacts.mkdir(exist_ok=True)
         else:
             trace = _NullTrace()
+
+        async def await_before_deadline(awaitable):
+            if deadline is None:
+                return await awaitable
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                if hasattr(awaitable, "close"):
+                    awaitable.close()
+                raise _RunDeadlineExceeded
+            try:
+                return await asyncio.wait_for(awaitable, timeout=remaining)
+            except TimeoutError as e:
+                if time.monotonic() >= deadline:
+                    raise _RunDeadlineExceeded from e
+                raise
+
+        def timeout_result(phase: str) -> AgentResult:
+            elapsed = time.monotonic() - run_started
+            trace.record("timeout", {
+                "step_id": context.step_id,
+                "phase": phase,
+                "elapsed_seconds": round(elapsed, 3),
+                "timeout_seconds": limits.timeout_seconds,
+            })
+            return AgentResult(
+                finish_reason="timeout",
+                error=f"elapsed {elapsed:.1f}s exceeded timeout {limits.timeout_seconds}s",
+                usage=total_usage, cost_usd=cost_usd,
+            )
+
         for step in range(1, limits.max_steps + 1):
-            # 每步结束后（下一步开始前）检查总超时；None 或 <=0 表示不限制（与 max_cost_usd 约定一致）
-            if limits.timeout_seconds and limits.timeout_seconds > 0 and step > 1:
-                elapsed = time.monotonic() - run_started
-                if elapsed > limits.timeout_seconds:
-                    trace.record("timeout", {
-                        "step_id": context.step_id,
-                        "elapsed_seconds": round(elapsed, 3),
-                        "timeout_seconds": limits.timeout_seconds,
-                    })
-                    return AgentResult(
-                        finish_reason="timeout",
-                        error=f"elapsed {elapsed:.1f}s exceeded timeout {limits.timeout_seconds}s",
-                        usage=total_usage, cost_usd=cost_usd,
-                    )
+            if deadline is not None and time.monotonic() >= deadline:
+                return timeout_result("between_steps")
             context.step_id = f"step-{step}"
             trace.record("step_started", {"step_id": context.step_id})
             prompt = self._render(context, allowed_tools)
@@ -110,17 +140,24 @@ class AgentRunner:
                 and hasattr(self.model, "complete_stream")
             )
             stream_state = {"streamed": 0}
-            if use_stream:
-                try:
-                    raw, usage = await self._complete_streaming(
-                        prompt, step, on_event, stream_state)
-                except Exception as e:
-                    trace.record("answer_stream_fallback", {
-                        "step_id": context.step_id, "error": str(e)[:200],
-                    })
-                    raw, usage = await self.model.complete(prompt)
-            else:
-                raw, usage = await self.model.complete(prompt)
+            try:
+                if use_stream:
+                    try:
+                        raw, usage = await await_before_deadline(
+                            self._complete_streaming(prompt, step, on_event, stream_state))
+                    except _RunDeadlineExceeded:
+                        return timeout_result("model_call")
+                    except Exception as e:
+                        trace.record("answer_stream_fallback", {
+                            "step_id": context.step_id, "error": str(e)[:200],
+                        })
+                        raw, usage = await await_before_deadline(
+                            self.model.complete(prompt))
+                else:
+                    raw, usage = await await_before_deadline(
+                        self.model.complete(prompt))
+            except _RunDeadlineExceeded:
+                return timeout_result("model_call")
             duration_ms = (time.monotonic() - started) * 1000
             if usage is not None:
                 total_usage = usage if total_usage is None else total_usage.merge(usage)
@@ -197,12 +234,37 @@ class AgentRunner:
                     error=f"cost {cost_usd:.4f} USD exceeded budget {limits.max_cost_usd} USD",
                     usage=total_usage, cost_usd=cost_usd,
                 )
+            if total_observation_chars >= MAX_TOTAL_OBSERVATION_CHARS:
+                trace.record("observation_budget_exceeded", {
+                    "step_id": context.step_id,
+                    "total_observation_chars": total_observation_chars,
+                    "max_total_observation_chars": MAX_TOTAL_OBSERVATION_CHARS,
+                })
+                trace.record("step_finished", {"step_id": context.step_id})
+                return AgentResult(
+                    finish_reason="error",
+                    error="tool observation budget exhausted",
+                    usage=total_usage, cost_usd=cost_usd,
+                )
             call_id = f"call-{step}"
             trace.record("tool_call_started", {
                 "tool_call_id": call_id, "tool": tool, "args": args,
             })
-            result = await self.tools.execute(tool, args, allowed_tools)
-            observation = _format_observation(tool, result)
+            try:
+                result = await await_before_deadline(
+                    self.tools.execute(tool, args, allowed_tools))
+            except _RunDeadlineExceeded:
+                return timeout_result("tool_call")
+            full_observation = _format_observation(tool, result)
+            remaining_observation_chars = (
+                MAX_TOTAL_OBSERVATION_CHARS - total_observation_chars
+            )
+            observation, was_truncated = _truncate_observation(
+                full_observation,
+                min(MAX_OBSERVATION_CHARS, remaining_observation_chars),
+            )
+            if was_truncated:
+                result.truncated = True
             total_observation_chars += len(observation)
             if result.ok:
                 trace.record("tool_call_finished", {
@@ -210,6 +272,7 @@ class AgentRunner:
                     "observation_chars": len(observation),
                     "total_observation_chars": total_observation_chars,
                     "observation": observation,
+                    "truncated": result.truncated,
                 })
                 last_failed_signature = None
             else:
@@ -315,6 +378,16 @@ def _parse_action(raw: str) -> dict | None:
 
 
 def _format_observation(tool: str, result) -> str:
-    # 截断由工具自身负责（如 read_file 的 max_chars），Runner 不做二次截断
     suffix = " [truncated]" if result.truncated else ""
     return f"[{tool}] status={result.status}{suffix}\n{result.observation}"
+
+
+def _truncate_observation(text: str, limit: int) -> tuple[str, bool]:
+    if len(text) <= limit:
+        return text, False
+    marker = "\n…[tool observation truncated]"
+    if limit <= 0:
+        return "", True
+    if limit <= len(marker):
+        return marker[:limit], True
+    return text[:limit - len(marker)] + marker, True
