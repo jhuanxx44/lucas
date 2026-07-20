@@ -9,6 +9,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { TracePanel } from "@/components/TracePanel";
 import type { LiveTraceTurn } from "@/components/TracePanel";
 import { WikiNavigationContext } from "@/hooks/useWikiNavigation";
+import { useAutoHideScrollbars } from "@/hooks/useAutoHideScrollbars";
 import { ThemeContext, useThemeProvider } from "@/hooks/useTheme";
 import {
   createSession,
@@ -42,6 +43,7 @@ async function loadInitialSession() {
 
 export default function App() {
   const themeCtx = useThemeProvider();
+  useAutoHideScrollbars();
   const [linked, setLinked] = useState(true);
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(520);
@@ -232,7 +234,7 @@ export default function App() {
                   Wiki
                 </button>
               </div>
-              <div className={`flex-1 overflow-hidden ${sidebarTab === "wiki" ? "wiki-scrollbar overflow-y-auto p-3" : "p-2"}`}>
+              <div className={`flex-1 overflow-hidden ${sidebarTab === "wiki" ? "overflow-y-auto p-3" : "p-2"}`}>
                 {sidebarTab === "wiki" ? (
                   <WikiSidebar refreshKey={sidebarKey} />
                 ) : (
