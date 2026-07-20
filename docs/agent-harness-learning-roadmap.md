@@ -48,7 +48,8 @@ model -> tool -> observation -> model -> ... -> finish
 7. prompt、context、tool call、错误、validation、revision 和产物 trace。
 8. 无后端依赖的本地 HTML replay。
 9. baseline、planner、planner-validator、context-selection、context-compression 等逐项可归因对比。
-10. 每次机制升级都有实验结论，而不只是代码提交。
+10. 至少选择一个真实业务能力完成 Skill 按需加载实验；只有证明成功率、工具选择或 Context 成本有收益，才接入产品路径。
+11. 每次机制升级都有实验结论，而不只是代码提交。
 
 ## 4. 设计原则
 
@@ -451,6 +452,7 @@ Direct loop 适合作为 Phase 0 的 `baseline` 行为参考，但不建议直�
   -> Context selection，再单独实验 compression
   -> 接 MCP
   -> 按失败案例扩充 capability/regression/holdout
+  -> 在接回产品阶段实验并按需引入业务 Skill
 ```
 
 原因是：没有 run、trace 和 grader 时，Memory、Context 或 Planner 的改动都无法证明是否改善；没有 timeout、取消、输出上限和清理时，baseline 本身也不可信。
@@ -1247,7 +1249,32 @@ Phase 0 已要求产品 single path 与 Eval Adapter 共用最小 Runner。本�
 4. 只有 Validator 实验通过，才把现有 verify 作为 deterministic validation 的输入案例。
 5. 在低风险 direct/research 任务灰度启用被保留的 policy，并与 baseline 对照。
 6. trace 完成脱敏和保留策略后，再记录真实产品 run；不把真实用户数据复制进 eval fixture。
-7. 最后才实验 single vs multi 和动态 replan。
+7. ToolRuntime、Context 选择和业务 capability grader 稳定后，再实验业务 Skill 的发现与按需加载。
+8. 最后才实验 single vs multi 和动态 replan。
+
+### 业务 Skill 接入原则与时机
+
+Lucas 在合适阶段需要接入与真实业务相关的 Skill，但 Skill 不进入最小 Runner 的必选核心，也不作为整理 prompt 的目录别名。这里的 Skill 指一组可被 Agent 发现并按需加载的业务过程知识：短描述用于选择，详细指令只在命中后进入 Context；实际执行仍通过受权限控制的 Tool/Service 完成。
+
+Skill 形态的 ReAct Loop 保持最小扩展：模型每轮在 `load_skill | tool | answer` 中选择一种动作；`load_skill` 只把选中 Skill 的详细指令加入本次运行后续 Context，然后回到原有 tool loop。已加载 Skill 不重复加载，也不能扩大 `allowed_tools`，因此 Skill 负责“如何做”的过程知识，ToolRuntime 继续负责“能否做”的执行与权限。
+
+开始 Skill 实验前必须同时满足：
+
+1. 最小 Runner、ToolRuntime 权限边界、Trace 和 Evaluation Harness 已稳定，能判断 Skill 是否真的改善 outcome。
+2. 已有真实业务任务反复需要一组工具和步骤，且失败证据指向主 prompt 膨胀、工具选择错误或过程知识缺失，而不是先假设需要 Skill。
+3. 该业务能力已有固定 fixture、确定性 grader 和不使用 Skill 的 baseline。
+
+最小 Skill 形态只包含 `name`、短 `description`、版本、详细指令路径和关联工具名。Skill 说明不能授予权限；实际可用工具仍由本次 `allowed_tools` 与 ToolRuntime 共同决定。涉及写入、外部副作用或人工确认的流程，必须封装在高层 Tool/Service 中并由代码保证校验、暂停/确认和幂等，不能只写进 Skill 指令。
+
+首轮实验比较相同模型、工具、环境和预算下的三组：
+
+- **A：常驻业务说明**：详细业务说明始终注入主 prompt。
+- **B：仅原子工具**：不提供 Skill，只提供 Tool schema。
+- **C：Skill 按需加载**：初始只提供 Skill 短描述，选择后再加载详细指令。
+
+主要比较任务成功率、Skill 选择准确率、错误工具调用、prompt/context token、步骤、延迟和成本，并通过 trace 记录候选、选择、加载和关联工具调用。C 只有在多次 trial 中相对 A/B 有稳定收益时才接入产品；否则保留实验结论，不为了形式完整而建设 Skill 框架。
+
+首个候选是 `wiki-ingestion`：Skill 描述“何时收录、先分类再确认、确认后才能写入”的业务流程；对 Agent 只暴露 `classify_source` 与 `ingest_source` 两个高层 Tool，`wiki-plan.md` 和 `wiki-compile.md` 继续作为 `KnowledgeService` 的内部 prompt。后续是否增加股票研究、财务核验等 Skill，由真实失败案例和 capability task 决定，不预先铺开。
 
 ### 候选业务实验：Wiki 访问策略消融
 
@@ -1273,6 +1300,7 @@ Phase 0 已要求产品 single path 与 Eval Adapter 共用最小 Runner。本�
 - Lucas 的一次真实执行可以生成同 schema 的 trace；replay 只消费允许保留的脱敏字段。
 - 通用 Harness 不 import 投研业务模块。
 - 业务 adapter 可以自行注册工具、context provider 和 validator。
+- 至少一个真实业务能力完成 Skill 按需加载对照实验；通过门槛的 Skill 才进入产品路径。
 - 被实验否定的机制不因产品已有类似代码而强行接入。
 
 ## 8. 建议目录结构
@@ -1402,7 +1430,7 @@ infrastructure
 | M4 自修正实验 | Phase 3 | Validator/Revision 与四类恢复指标 |
 | M5 Context + MCP | Phase 4—5 | 通过门控的 context selection/compression 与一个 MCP 对照实验 |
 | M6 Eval Lab | Phase 6—7 | suite 治理、稳定 trace schema、按需 HTML replay |
-| M7 连续实验 | Phase 8—9 | 逐项消融结论和产品中受控应用 |
+| M7 连续实验 | Phase 8—9 | 逐项消融结论、至少一个业务 Skill 对照实验和产品中受控应用 |
 
 ## 11. 风险与控制
 
@@ -1481,6 +1509,7 @@ smoke baseline 冻结后，再加入业务 capability；两层 baseline 都可�
 - 每个进入下一阶段的机制都有至少 3 trials/task 的成对对比报告，并根据方差增加 trial。
 - 有代表性成功与失败 replay。
 - 有明确记录哪些机制改善成功率，哪些只增加成本。
+- 至少一个真实业务能力完成 Skill 按需加载实验，并记录接入或不接入的证据结论。
 - Lucas 产品 single path 与 Eval Adapter 复用同一 AgentRunner、ToolRuntime 和 TraceRecorder。
 
 达到这些标准后，Lucas 才真正从“带工具的固定工作流”进化为一个可以持续实验、测量和复盘的 Agent Harness。
