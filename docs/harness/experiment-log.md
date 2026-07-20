@@ -186,7 +186,7 @@
 8. reports/ 层归档恢复（sidecar 未随 M5 迁移，需重新设计）
 9. wiki 更新的丢失段落检测从警告升级为拒绝写入（待实践验证误报率）
 10. `workspaces/` 残留 5.9MB 用户数据待用户确认处置
-11. 业务工具 eval task（web_search/stock_quote/wiki_recall 的固定 task + 确定性 grader，需真实 LLM key 跑 baseline 对照）
+11. 剩余业务工具 eval task（web_search/stock_quote/stock_kline 的离线固定 task + 确定性 grader；wiki_recall 首版已见实验 005）
 12. 行业页等编译校验失败时让模型重试一轮（E2E 实测：LLM 生成缺 frontmatter 的页面被校验跳过后永久缺失）
 13. wiki search snippet 剥离 frontmatter、404 文案中文化（E2E 体验项）
 14. ingest status 文案与实际落盘路径对齐（`company/X` vs `companies/{行业}/X.md`，仅展示层）
@@ -210,3 +210,100 @@
 - **设计要点**：parser 三态 DECIDE/STREAM/BUFFER，只有确认 `"reply": "`（字符串值）才开始推送；工具调用、非字符串 reply、非法 JSON 绝不泄漏半个字到前端。完整 raw 仍走 `_parse_action` / trace / 全量回放，与非流式一字不差。流式异常记 `answer_stream_fallback` trace 后回退 `complete()`，run 不中断。`agent_stream` 把 `answer_chunk` 桥接为 `synthesis_chunk`，结束按 `streamed_chars` 补尾防缺字。
 - **验证**：测试 157 → 178 全绿（parser 9 例 + Runner 5 例 + agent_stream 3 例 + 既有回归）；eval smoke（READ-01 / EDIT-01）全过，证明评测路径零变化；真实冒烟（临时 server + curl -N /api/chat，DeepSeek 真实流）`synthesis_chunk` 逐字到达 62 次，拼接完整，server 已关闭。
 - **遗留**：流式无 usage（OpenAI 兼容流未开 `include_usage`），聊天 done 的 `total_tokens` 为 0，token 成本不累计——规划已接受，待后续按 provider 支持情况补 `stream_options`；流式中途回退时已推送的 partial 文本与重试答案按前缀一致假设去重（temperature=0 下成立，极端情况可能重复）。
+
+## 实验 005：Wiki 业务工具首轮 Eval（2026-07-20）
+
+### 假设
+
+在固定离线 Wiki fixture 中，当前 single Agent 能稳定使用 `wiki_recall` 完成三档任务：已索引单页事实提取、未索引页面事实提取、两个公司页面的事实综合。主要验收环境最终答案，不把“索引优先/全文 fallback”等内部路径写进 outcome grader。
+
+### 实现
+
+- 新增 `business-capability-v1` suite，包含 WIKI-01、WIKI-02、WIKI-03。
+- 三题只授权真实生产 `wiki_recall`，使用虚构且唯一的事实与确定性 `answer_json` grader，全程禁止修改 fixture。
+- 增加 fixture 可召回性测试，分别确认目标公司页、未索引公告页和两个比较页面能被生产工具发现。
+- known-bad/Oracle 校验 3/3 通过，证明错误答案会失败、reference 会通过。
+
+### 真实模型结果
+
+当前 DeepSeek 配置、temperature=0，每题 3 trials：
+
+| 任务 | 成功率 | 步数 | 工具调用 | 观察 |
+|---|---:|---:|---:|---|
+| WIKI-01 | 3/3 | 全部 2 步 | 全部 1 次 | 正确提取 97.3，但每次 observation 都带回 3 个页面 |
+| WIKI-02 | 3/3 | 全部 2 步 | 全部 1 次 | 2 次只返回目标公告，1 次同时返回相似公司页 |
+| WIKI-03 | 3/3 | 2/2/3 步 | 1/1/2 次 | 两次宽查询一次带回目标页与干扰页，一次分别查询两家公司 |
+
+- 总体：9/9，19 steps，10 次工具调用。
+- Token：14,127 total，平均约 1,570/run。
+- 估算成本：$0.045894 total。
+- 产物：`runs/business-capability-v1-20260720-202535-d8d7f0f1/`。
+
+### 结论
+
+1. 保留三题作为首版 Wiki 业务 smoke/capability：它们证明当前 Agent 能调用工具、理解 observation 并输出正确结构化答案。
+2. 9/9 不能证明召回质量已经足够好。WIKI-01 与 WIKI-03 的稀疏 fixture 加上默认 `limit=3`，使目标页和干扰页经常被一起返回；成功部分来自候选集很小。
+3. WIKI-02 是三题中区分度最好的一题，稳定证明未索引公告能被发现，但仍需增加更多数字相似的干扰公告。
+4. 当前不调整任务和召回算法。后续出现区分度不足时，优先扩充干扰页、收紧相同口径和增加无答案场景，再决定是否进入文件工具 vs `wiki_recall` 的访问策略消融。
+
+## 实验 006：Wiki 专用工具 vs 基础文件工具首轮对照（2026-07-20）
+
+### 假设与边界
+
+复用实验 005 的 WIKI-01～03、fixture、模型、temperature、步数和 outcome grader，只把可用工具从 `wiki_recall` 换成 `list_files + search + read_file`，观察 Agent 是否仍能完成任务以及额外成本。原 task 和 suite 不修改，filesystem-only 通过运行时覆盖形成一次性对照。
+
+### 结果
+
+| Variant | 成功率 | Steps | Tool calls | Tokens | 估算成本 |
+|---|---:|---:|---:|---:|---:|
+| `wiki_recall` | 9/9 | 19 | 10 | 14,127 | $0.045894 |
+| filesystem-only | 8/9 | 38 | 29 | 33,969 | $0.100798 |
+
+分任务结果：WIKI-01 3/3、WIKI-02 3/3、WIKI-03 2/3。filesystem-only 相比专用工具步骤翻倍、工具调用约 2.9 倍、Token 约 2.4 倍、估算成本约 2.2 倍。
+
+唯一失败 run 中，模型先用绝对路径 `/` 调 `search` 被拒绝，随后 `list_files` 的根节点显示临时工作区目录名；模型误把该目录名再次拼进相对路径，两次读取不存在的 `lucas-eval-.../wiki/index.md`，最终触发重复失败保护。失败归因是工具 observation 的路径语义与模型路径理解，而不是 Wiki 内容缺失。
+
+### 判分说明
+
+首次运行时原 task 的 process grader 仍只允许 `wiki_recall`，导致原始 summary 把 filesystem 调用标成违规。正式结果基于同一批原始 9 个模型 run，用 filesystem-only 的 allowed-tools policy 重新判分；模型输出、trace 和 outcome 均未改变。中途为确认执行状态额外产生的两个 WIKI-03 run 不纳入统计。
+
+正式产物：`runs/wiki-filesystem-only-20260720-203508-7a3bdbed/filesystem-summary.json`。
+
+### 结论
+
+1. 基础文件工具具备完成当前三类 Wiki 任务的能力，但效率和稳定性暂时弱于 `wiki_recall`。
+2. 当前证据支持保留 `wiki_recall`，但只有三道小 fixture 任务，尚不足以决定长期架构。
+3. 下一轮若继续该实验，优先修正 `list_files` 根节点展示造成的路径歧义，并扩充相似干扰页；随后重跑同一对照，区分工具 UX 缺陷与专用召回的真实收益。
+
+## 实验 007：Wiki 关键词责任归属（jieba vs AI 显式关键词）（2026-07-20）
+
+### 假设
+
+当前 Agent 已经能在 tool call 中给出高质量查询，让模型直接提供结构化 `keywords[]`、工具不再使用 jieba，可能保留“公司全名、时间、指标”等完整短语，提高候选 Precision，同时保持任务成功率。
+
+### 单变量实现
+
+- A `jieba`：现有 `wiki_recall({query, limit})`。
+- B `ai-keywords`：实验用同名 ToolSpec，协议为 `wiki_recall({keywords: string[], limit})`；工具不再分词。
+- 两组共用同一索引匹配、全文评分、安全检查、页面截断、任务、fixture、模型、temperature、limit 和 grader。
+- WIKI-01～03 各 3 trials，按 trial 交错运行；候选 Precision/Recall 根据 tool observation 中的页面路径确定性计算。
+
+### 结果
+
+| Variant | 成功率 | Steps | Tool calls | Precision mean | Recall mean | Tokens | 估算成本 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| jieba | 9/9 | 18 | 9 | 0.611 | 1.0 | 13,215 | $0.042130 |
+| AI 显式关键词 | 9/9 | 18 | 9 | 0.500 | 1.0 | 13,706 | $0.046062 |
+
+分任务 Precision：WIKI-01 两组均为 0.333；WIKI-03 两组均为 0.667；WIKI-02 jieba 平均 0.833，AI 显式关键词为 0.500。
+
+AI 版确实保留了 `澄海精密`、`2025年第四季度`、`一次良率` 等短语，但模型也稳定加入 `2025`、`现金分红`、`年产能` 等宽泛词；当前评分是任一关键词命中即得分，并在索引结果不足时继续补到 `limit`，所以宽泛词让更多干扰页进入候选。WIKI-02 中 AI 版三次都返回目标公告和无关公司页，且两次额外臆造了公司名“海目星”；jieba 版两次仅用股票代码查询，只返回目标公告。
+
+### 结论与处置
+
+1. 假设被证伪：单独删除 jieba、把关键词责任交给 AI，没有提高成功率或候选精度，反而增加约 3.7% Token 和 9.3% 估算成本。
+2. 当前主要问题不是分词，而是 `OR` 式低门槛计分和“尽量补满 limit”的返回策略；关键词越多，噪音越容易增加。
+3. 产品继续保留现有 jieba 版本。仅为实验新增的 AI-keywords ToolSpec、协议和核心分支已删除，不留下未使用机制。
+4. 若继续优化，下一个单变量应是候选阈值/停止补位策略，而不是再次更换关键词提取器。
+
+实验产物：`runs/wiki-keyword-ab-20260720-210948-0b2d7985/summary.json`，包含两组完整 prompt、tool args、observation 和 trace。
