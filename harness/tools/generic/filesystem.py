@@ -1,6 +1,8 @@
+import re
 from pathlib import Path
 
 from harness.tools.base import ToolResult, ToolSpec
+from utils.path_safety import resolve_within
 
 
 def _resolve_in_workspace(workspace: Path, relative: str) -> Path | None:
@@ -10,14 +12,7 @@ def _resolve_in_workspace(workspace: Path, relative: str) -> Path | None:
     candidate = Path(relative)
     if candidate.is_absolute():
         return None
-    try:
-        resolved = (workspace / candidate).resolve()
-    except OSError:
-        return None
-    root = workspace.resolve()
-    if resolved != root and root not in resolved.parents:
-        return None
-    return resolved
+    return resolve_within(workspace, workspace / candidate, strict=False)
 
 
 def read_file(workspace: Path, args: dict) -> ToolResult:
@@ -155,7 +150,12 @@ def list_files(workspace: Path, args: dict) -> ToolResult:
         """列出 directory 的直接子项；depth 为子项所在层级（从 1 开始）"""
         nonlocal count, truncated_listing
         try:
-            children = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+            def sort_key(path: Path) -> tuple[int, str]:
+                if path.is_symlink():
+                    return 2, path.name
+                return (0 if path.is_dir() else 1), path.name
+
+            children = sorted(directory.iterdir(), key=sort_key)
         except OSError:
             return
         for child in children:
@@ -164,6 +164,9 @@ def list_files(workspace: Path, args: dict) -> ToolResult:
                 return
             count += 1
             indent = "  " * depth
+            if child.is_symlink():
+                lines.append(f"{indent}🔗 {child.name}（已跳过 symlink）")
+                continue
             if child.is_dir():
                 try:
                     n = sum(1 for _ in child.iterdir())
@@ -183,6 +186,103 @@ def list_files(workspace: Path, args: dict) -> ToolResult:
     if truncated_listing:
         lines.append(f"... 条目超过 {LIST_FILES_MAX_ENTRIES}，已截断")
     return ToolResult(status="ok", observation="\n".join(lines))
+
+
+MAX_FILE_BYTES = 2 * 1024 * 1024  # 单文件超过 2MB 跳过
+MAX_TOTAL_RESULTS = 50            # 全部文件合计命中上限
+
+
+def search(workspace: Path, args: dict) -> ToolResult:
+    query = args.get("query")
+    if not isinstance(query, str) or not query:
+        return ToolResult(status="invalid_input", error_code="bad_args",
+                          observation="query must be a non-empty string")
+    raw_path = args.get("path")
+    if raw_path in (None, ""):
+        root = workspace.resolve()
+    else:
+        root = _resolve_in_workspace(workspace, raw_path)
+        if root is None:
+            return ToolResult(status="denied", error_code="path_escape",
+                              observation="path escapes workspace")
+        if not root.exists():
+            return ToolResult(status="error", error_code="not_found",
+                              observation=f"path not found: {raw_path}")
+    max_results = args.get("max_results", 10)
+    if not isinstance(max_results, int) or max_results <= 0:
+        max_results = 10
+
+    # 默认字面搜索；仅 re: 前缀且正则合法时按正则处理，否则回退字面
+    regex = None
+    if query.startswith("re:"):
+        try:
+            regex = re.compile(query[3:])
+        except re.error:
+            regex = None
+    if regex is not None:
+        is_match = regex.search
+    else:
+        def is_match(line: str, _needle=query) -> bool:
+            return _needle in line
+
+    if root.is_file():
+        candidates = [root]
+    else:
+        candidates = sorted(root.rglob("*"))
+
+    ws_root = workspace.resolve()
+    hits: list[tuple[str, int, str]] = []  # (相对路径, 字符偏移, 上下文)
+    skipped: list[str] = []
+    truncated_total = False
+
+    for path in candidates:
+        if len(hits) >= MAX_TOTAL_RESULTS:
+            truncated_total = True
+            break
+        if path.is_symlink():
+            continue
+        safe_path = resolve_within(ws_root, path, strict=True)
+        if safe_path is None or not safe_path.is_file():
+            continue
+        try:
+            if safe_path.stat().st_size > MAX_FILE_BYTES:
+                skipped.append(str(safe_path.relative_to(ws_root)))
+                continue
+            content = safe_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        lines = content.split("\n")
+        offsets = []
+        pos = 0
+        for line in lines:
+            offsets.append(pos)
+            pos += len(line) + 1
+        for index, line in enumerate(lines):
+            if len(hits) >= MAX_TOTAL_RESULTS:
+                truncated_total = True
+                break
+            if not is_match(line):
+                continue
+            context_start = max(0, index - 1)
+            context_end = min(len(lines), index + 2)
+            snippet = "\n".join(lines[context_start:context_end])
+            rel = str(safe_path.relative_to(ws_root))
+            hits.append((rel, offsets[index], snippet))
+        if truncated_total:
+            break
+
+    hits.sort(key=lambda hit: (hit[0], hit[1]))
+    shown = hits[:max_results]
+    header = f"找到 {len(hits)} 处匹配:"
+    body = [f"{rel} [chars {offset}] {snippet}" for rel, offset, snippet in shown]
+    lines_out = [header, *body]
+    if len(hits) > max_results:
+        lines_out.append(f"... 仅显示前 {max_results} 处（共 {len(hits)} 处）")
+    if truncated_total:
+        lines_out.append(f"... 结果达到上限 {MAX_TOTAL_RESULTS}，可能还有更多匹配")
+    if skipped:
+        lines_out.append(f"已跳过超过 2MB 的文件: {', '.join(skipped)}")
+    return ToolResult(status="ok", observation="\n".join(lines_out))
 
 
 READ_FILE_SPEC = ToolSpec(
@@ -211,4 +311,11 @@ WRITE_FILE_SPEC = ToolSpec(
     description="在工作区内新建文件并整体写入内容；文件已存在时默认拒绝，需 overwrite: true 才覆盖",
     args_description='{"path": "相对工作区的文件路径", "content": "完整文件内容", "overwrite": 可选，传 true 才允许覆盖已存在文件}',
     handler=write_file,
+)
+
+SEARCH_SPEC = ToolSpec(
+    name="search",
+    description="在工作区内搜索文本（默认字面匹配；query 以 re: 开头时按正则处理）",
+    args_description='{"query": "搜索字符串，re: 前缀表示正则", "path": "可选，相对工作区的子目录或文件，默认整个工作区", "max_results": 可选，默认 10}',
+    handler=search,
 )

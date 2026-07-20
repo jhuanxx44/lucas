@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from utils.stock_data import TDXMCPProvider
+from utils.stock_data import AKShareProvider, TDXMCPProvider
+
+
+def test_stock_providers_route_beijing_exchange_codes():
+    assert AKShareProvider()._code_prefix("920001") == "bj920001"
+    assert TDXMCPProvider()._market("920001") == 2
 
 
 class FallbackProvider:

@@ -7,6 +7,8 @@ import re
 
 import yaml
 
+from utils.path_safety import resolve_within
+
 _LINK_RE = re.compile(r'-\s+\[([^\]]+)\]\(([^)]+)\)(?:\s*—\s*(.+))?')
 _WIKI_LINK_RE = re.compile(r'\[\[([^\]]+)\]\]')
 
@@ -186,11 +188,8 @@ def parse_index_entries(index_path: str) -> list[dict]:
 
 def _resolve_in_wiki(wiki_dir: str, rel_path: str) -> str | None:
     """把 wiki 相对路径解析为绝对路径；越出 wiki_dir 的返回 None（防索引条目逃逸）。"""
-    base = os.path.abspath(wiki_dir)
-    full = os.path.abspath(os.path.normpath(os.path.join(base, rel_path)))
-    if full != base and os.path.commonpath([base, full]) != base:
-        return None
-    return full
+    resolved = resolve_within(wiki_dir, os.path.join(wiki_dir, rel_path), strict=True)
+    return str(resolved) if resolved is not None else None
 
 
 def _read_page(wiki_dir: str, rel_path: str, max_chars: int) -> dict | None:
@@ -223,7 +222,8 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
     seen: set[str] = set()
 
     # ── Step 1: 索引条目匹配（条目名 + 分类名） ──
-    index_entries = parse_index_entries(os.path.join(wiki_dir, "index.md"))
+    index_path = _resolve_in_wiki(wiki_dir, "index.md")
+    index_entries = parse_index_entries(index_path) if index_path is not None else []
     scored_entries = []
     for entry in index_entries:
         search_text = f"{entry['name']} {entry['section']}"
@@ -249,12 +249,20 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
     # ── Step 2: 全文 fallback（索引命中不足 limit 时） ──
     if len(pages) < limit:
         scored_files = []
-        for root, _, files in os.walk(wiki_dir):
+        for root, dirs, files in os.walk(wiki_dir):
+            dirs[:] = [name for name in dirs
+                       if not os.path.islink(os.path.join(root, name))]
             for fname in files:
                 if not fname.endswith(".md") or fname in ("index.md", "glossary.md"):
                     continue
-                full = os.path.join(root, fname)
-                norm = os.path.abspath(full)
+                candidate = os.path.join(root, fname)
+                if os.path.islink(candidate):
+                    continue
+                rel = os.path.relpath(candidate, wiki_dir)
+                full = _resolve_in_wiki(wiki_dir, rel)
+                if full is None:
+                    continue
+                norm = full
                 if norm in seen:
                     continue
                 try:
@@ -271,14 +279,16 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
                     if kw in content[:2000]:
                         score += 1
                 if score > 0:
-                    rel = os.path.relpath(full, wiki_dir)
                     scored_files.append((score, name, rel, content))
         scored_files.sort(key=lambda x: x[0], reverse=True)
 
         for score, name, rel, content in scored_files:
             if len(pages) >= limit:
                 break
-            seen.add(os.path.abspath(os.path.join(wiki_dir, rel)))
+            resolved = _resolve_in_wiki(wiki_dir, rel)
+            if resolved is None:
+                continue
+            seen.add(resolved)
             pages.append({
                 "name": name,
                 "path": rel,

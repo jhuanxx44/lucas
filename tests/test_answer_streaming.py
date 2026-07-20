@@ -12,7 +12,7 @@ from harness.runner import AgentRunner, load_prompt_template
 from harness.streaming import AnswerStreamParser
 from harness.trace import TraceRecorder, read_trace
 from harness.tools.registry import ToolRuntime
-from harness.tools.filesystem import READ_FILE_SPEC
+from harness.tools.generic.filesystem import READ_FILE_SPEC
 
 LIMITS = RunLimits(max_steps=5, timeout_seconds=30)
 PROMPT = load_prompt_template(

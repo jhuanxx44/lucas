@@ -24,7 +24,9 @@ from harness.config import load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
-from harness.tools.business import BUSINESS_TOOL_NAMES, BUSINESS_TOOL_SPECS
+from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
+from harness.tools.business.wiki import WIKI_RECALL_SPEC
+from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.llm_client import create_client
 
@@ -35,6 +37,18 @@ _PROMPT_PATH = _PROJECT_ROOT / "prompts" / "harness" / "tool-loop.md"
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 120.0
+_CHAT_TOOL_SPECS = [
+    WEB_SEARCH_SPEC,
+    STOCK_QUOTE_SPEC,
+    STOCK_KLINE_SPEC,
+    WIKI_RECALL_SPEC,
+]
+_CHAT_TOOL_NAMES = [spec.name for spec in _CHAT_TOOL_SPECS]
+
+
+def _resolve_chat_tool_names(configured: list[str]) -> list[str]:
+    """配置白名单与产品已注册工具取交集，保持配置顺序。"""
+    return [name for name in configured if name in _CHAT_TOOL_NAMES]
 
 
 def _sse(event: str, data: dict) -> str:
@@ -99,16 +113,16 @@ async def chat_event_stream(
         if model_adapter is None:
             client = create_client(provider=config.provider, model=config.model)
             model_adapter = LLMClientAdapter(client, temperature=config.temperature)
-        # 聊天链路只挂业务工具（只读取数）：工具注册与白名单都用 BUSINESS_TOOL_*，
-        # 与 lucas.yaml 的 allowed_tools 无关；wiki 根 = 工作区/wiki，由 server 侧装配传入
-        tools = ToolRuntime(workspace or _PROJECT_ROOT, BUSINESS_TOOL_SPECS)
+        # 产品聊天显式装配四个只读研究工具；wiki 根 = 工作区/wiki。
+        tools = ToolRuntime(workspace or _PROJECT_ROOT, _CHAT_TOOL_SPECS)
+        allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
         runner = AgentRunner(model_adapter, tools, load_prompt_template(_PROMPT_PATH))
         instruction = _render_history(history) + f"用户问题：{question}"
         limits = RunLimits(max_steps=config.max_steps, timeout_seconds=_TIMEOUT_SECONDS)
 
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
-            runner.run(instruction, BUSINESS_TOOL_NAMES, limits,
+            runner.run(instruction, allowed_tools, limits,
                        on_event=queue.put_nowait, stream_answer=True)
         )
 

@@ -8,13 +8,13 @@ from harness.models import RunLimits
 from harness.trace import TraceRecorder, read_trace
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.base import ToolResult, ToolSpec
-from harness.tools.filesystem import (
+from harness.tools.generic.filesystem import (
     APPLY_PATCH_SPEC,
     LIST_FILES_SPEC,
     READ_FILE_SPEC,
+    SEARCH_SPEC,
     WRITE_FILE_SPEC,
 )
-from harness.tools.search import SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.token_tracker import TokenUsage
 
@@ -232,6 +232,18 @@ def test_read_file_symlink_escape_denied(tmp_path):
     assert result.status == "denied"
 
 
+def test_search_skips_symlink_to_file_outside_workspace(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-search-secret.txt"
+    outside.write_text("OUTSIDE-SEARCH-SECRET", encoding="utf-8")
+    (tmp_path / "link.txt").symlink_to(outside)
+
+    result = _execute(tmp_path, SEARCH_SPEC, "search", {"query": "OUTSIDE-SEARCH-SECRET"})
+
+    assert result.status == "ok"
+    assert "OUTSIDE-SEARCH-SECRET" not in result.observation
+    assert "找到 0 处匹配" in result.observation
+
+
 def test_read_file_truncates(tmp_path):
     (tmp_path / "big.txt").write_text("x" * 20000, encoding="utf-8")
     result = _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": "big.txt"})
@@ -406,6 +418,20 @@ def test_list_files_tree_with_sizes(tmp_path):
     assert "📄 config.yaml (128B)" in result.observation
     assert "📁 sub/ (2 项)" in result.observation
     assert "📄 x.txt (5B)" in result.observation
+
+
+def test_list_files_does_not_traverse_symlink_directory_outside_workspace(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-dir"
+    outside.mkdir()
+    (outside / "hidden.txt").write_text("secret", encoding="utf-8")
+    (tmp_path / "linked-dir").symlink_to(outside, target_is_directory=True)
+
+    result = _execute(tmp_path, LIST_FILES_SPEC, "list_files", {"max_depth": 2})
+
+    assert result.status == "ok"
+    assert "hidden.txt" not in result.observation
+    assert "linked-dir" in result.observation
+    assert "已跳过 symlink" in result.observation
 
 
 def test_list_files_max_depth_limits_expansion(tmp_path):

@@ -8,12 +8,11 @@ from pathlib import Path
 
 import yaml
 
-from harness.tools.business import BUSINESS_TOOL_NAMES
 from utils.providers import get_provider_model
 
 DEFAULT_ALLOWED_TOOLS = [
     "read_file", "apply_patch", "list_files", "search", "write_file",
-    *BUSINESS_TOOL_NAMES,
+    "web_search", "stock_quote", "stock_kline", "wiki_recall",
 ]
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "lucas.yaml"

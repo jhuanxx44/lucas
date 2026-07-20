@@ -61,3 +61,11 @@ def test_repo_root_lucas_yaml_loads():
     assert config.model == get_provider_model("deepseek")
     assert config.temperature == 0.0
     assert set(config.allowed_tools) == set(DEFAULT_ALLOWED_TOOLS)
+
+
+def test_product_chat_intersects_config_with_registered_tools():
+    from server.services.agent_stream import _resolve_chat_tool_names
+
+    assert _resolve_chat_tool_names([
+        "read_file", "wiki_recall", "unknown", "web_search",
+    ]) == ["wiki_recall", "web_search"]

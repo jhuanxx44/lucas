@@ -1,4 +1,4 @@
-"""harness/tools/business.py 业务工具测试
+"""harness/tools 下的通用联网搜索与投研业务工具测试
 
 web_search / stock_* 用 monkeypatch 替换真实网络与数据 provider；
 wiki_recall 用临时 wiki 目录 fixture 验证索引优先、截断与全文 fallback。
@@ -6,15 +6,18 @@ wiki_recall 用临时 wiki 目录 fixture 验证索引优先、截断与全文 f
 import pytest
 
 from harness.tools.base import ToolResult
-from harness.tools.business import (
-    BUSINESS_TOOL_SPECS,
-    STOCK_KLINE_SPEC,
-    STOCK_QUOTE_SPEC,
-    WEB_SEARCH_SPEC,
-    WIKI_RECALL_SPEC,
-)
+from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
+from harness.tools.business.wiki import WIKI_RECALL_SPEC
+from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.stock_data import KlineBar, QuoteData
+
+EXTERNAL_TOOL_SPECS = [
+    WEB_SEARCH_SPEC,
+    STOCK_QUOTE_SPEC,
+    STOCK_KLINE_SPEC,
+    WIKI_RECALL_SPEC,
+]
 
 
 async def _execute(tmp_path, spec, name, args, allowed=None):
@@ -30,7 +33,7 @@ async def test_web_search_happy_path(tmp_path, monkeypatch):
         assert max_results == 5
         return "1. [贵州茅台一季报](https://example.com/q1)\n   营收增长"
 
-    monkeypatch.setattr("harness.tools.business._web_search", fake_search)
+    monkeypatch.setattr("harness.tools.generic.web_search._web_search", fake_search)
     result = await _execute(tmp_path, WEB_SEARCH_SPEC, "web_search",
                             {"query": "贵州茅台 2026 一季报"})
     assert result.status == "ok"
@@ -41,7 +44,7 @@ async def test_web_search_empty_result_is_error(tmp_path, monkeypatch):
     async def fake_search(query, max_results=5):
         return ""
 
-    monkeypatch.setattr("harness.tools.business._web_search", fake_search)
+    monkeypatch.setattr("harness.tools.generic.web_search._web_search", fake_search)
     result = await _execute(tmp_path, WEB_SEARCH_SPEC, "web_search", {"query": "x"})
     assert result.status == "error"
     assert result.error_code == "search_failed"
@@ -51,7 +54,7 @@ async def test_web_search_exception_is_error_not_raised(tmp_path, monkeypatch):
     async def fake_search(query, max_results=5):
         raise ConnectionError("network down")
 
-    monkeypatch.setattr("harness.tools.business._web_search", fake_search)
+    monkeypatch.setattr("harness.tools.generic.web_search._web_search", fake_search)
     result = await _execute(tmp_path, WEB_SEARCH_SPEC, "web_search", {"query": "x"})
     assert result.status == "error"
     assert "network down" in result.observation
@@ -68,9 +71,11 @@ class _FakeProvider:
     def __init__(self, quote=None, bars=None):
         self._quote = quote
         self._bars = bars or []
+        self.quote_calls = []
         self.kline_calls = []
 
     async def get_quote(self, code):
+        self.quote_calls.append(code)
         return self._quote
 
     async def get_kline(self, code, period="daily", count=30):
@@ -92,7 +97,7 @@ def _bars(n=3):
 
 async def test_stock_quote_happy_path(tmp_path, monkeypatch):
     provider = _FakeProvider(quote=_quote())
-    monkeypatch.setattr("harness.tools.business.get_provider", lambda: provider)
+    monkeypatch.setattr("harness.tools.business.stock.get_provider", lambda: provider)
     result = await _execute(tmp_path, STOCK_QUOTE_SPEC, "stock_quote",
                             {"code": "600519.SH"})
     assert result.status == "ok"
@@ -102,21 +107,32 @@ async def test_stock_quote_happy_path(tmp_path, monkeypatch):
 
 async def test_stock_quote_provider_none_is_error(tmp_path, monkeypatch):
     provider = _FakeProvider(quote=None)
-    monkeypatch.setattr("harness.tools.business.get_provider", lambda: provider)
+    monkeypatch.setattr("harness.tools.business.stock.get_provider", lambda: provider)
     result = await _execute(tmp_path, STOCK_QUOTE_SPEC, "stock_quote", {"code": "600519"})
     assert result.status == "error"
     assert result.error_code == "quote_unavailable"
 
 
 async def test_stock_quote_rejects_bad_code(tmp_path):
-    for bad in ("600519.SZ", "abcde", "6005190", {"x": 1}):
+    for bad in ("600519.SZ", "920001.SZ", "123456", "abcde", "6005190", {"x": 1}):
         result = await _execute(tmp_path, STOCK_QUOTE_SPEC, "stock_quote", {"code": bad})
         assert result.status == "invalid_input", bad
 
 
+async def test_stock_quote_accepts_beijing_exchange_code(tmp_path, monkeypatch):
+    provider = _FakeProvider(quote=_quote("920001"))
+    monkeypatch.setattr("harness.tools.business.stock.get_provider", lambda: provider)
+
+    result = await _execute(tmp_path, STOCK_QUOTE_SPEC, "stock_quote",
+                            {"code": "920001.BJ"})
+
+    assert result.status == "ok"
+    assert provider.quote_calls == ["920001"]
+
+
 async def test_stock_kline_happy_path(tmp_path, monkeypatch):
     provider = _FakeProvider(bars=_bars(5))
-    monkeypatch.setattr("harness.tools.business.get_provider", lambda: provider)
+    monkeypatch.setattr("harness.tools.business.stock.get_provider", lambda: provider)
     result = await _execute(tmp_path, STOCK_KLINE_SPEC, "stock_kline",
                             {"code": "000001.SZ", "period": "weekly", "count": 5})
     assert result.status == "ok"
@@ -126,7 +142,7 @@ async def test_stock_kline_happy_path(tmp_path, monkeypatch):
 
 async def test_stock_kline_empty_is_error(tmp_path, monkeypatch):
     provider = _FakeProvider(bars=[])
-    monkeypatch.setattr("harness.tools.business.get_provider", lambda: provider)
+    monkeypatch.setattr("harness.tools.business.stock.get_provider", lambda: provider)
     result = await _execute(tmp_path, STOCK_KLINE_SPEC, "stock_kline", {"code": "600519"})
     assert result.status == "error"
     assert result.error_code == "kline_unavailable"
@@ -194,6 +210,33 @@ async def test_wiki_recall_skips_index_entries_escaping_wiki(tmp_path):
     assert "没有" in result.observation  # 无合法命中
 
 
+async def test_wiki_recall_skips_symlink_page_escaping_wiki(tmp_path):
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-wiki-secret.md"
+    outside.write_text("AlphaEscape 外部秘密", encoding="utf-8")
+    (wiki / "leak.md").symlink_to(outside)
+
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
+                            {"query": "AlphaEscape"})
+
+    assert result.status == "ok"
+    assert "外部秘密" not in result.observation
+
+
+async def test_wiki_recall_denies_wiki_root_symlink_escape(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-wiki"
+    outside.mkdir()
+    (outside / "secret.md").write_text("RootEscape 外部秘密", encoding="utf-8")
+    (tmp_path / "wiki").symlink_to(outside, target_is_directory=True)
+
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
+                            {"query": "RootEscape"})
+
+    assert result.status == "denied"
+    assert result.error_code == "path_escape"
+
+
 async def test_wiki_recall_missing_wiki_dir(tmp_path):
     result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "茅台"})
     assert result.status == "ok"
@@ -208,7 +251,7 @@ async def test_wiki_recall_bad_args(tmp_path):
 # ---------- 白名单 ----------
 
 async def test_business_tools_denied_when_not_in_whitelist(tmp_path):
-    for spec in BUSINESS_TOOL_SPECS:
+    for spec in EXTERNAL_TOOL_SPECS:
         tools = ToolRuntime(tmp_path, [spec])
         result = await tools.execute(spec.name, {"query": "x", "code": "600519"}, [])
         assert result.status == "denied", spec.name
@@ -217,8 +260,8 @@ async def test_business_tools_denied_when_not_in_whitelist(tmp_path):
 
 # ---------- adapter 装配 ----------
 
-async def test_adapter_registers_business_tools_by_default(tmp_path):
-    """任务白名单只给 read_file 时，业务工具仍默认全开并真实执行"""
+async def test_adapter_executes_explicitly_allowed_business_tool(tmp_path):
+    """任务白名单显式允许业务工具时，adapter 注册并真实执行。"""
     import json
     from evals.harness.adapters.lucas_single import LucasSingleAgent
     from harness.models import RunLimits
@@ -239,7 +282,45 @@ async def test_adapter_registers_business_tools_by_default(tmp_path):
 
     adapter = LucasSingleAgent(model_adapter=FakeModel())
     trace = TraceRecorder(tmp_path / "trace.jsonl", "run-test")
-    result = await adapter.run("查公告", tmp_path, ["read_file"],
+    result = await adapter.run("查公告", tmp_path, ["read_file", "wiki_recall"],
                                RunLimits(max_steps=5, timeout_seconds=30), trace)
     assert result.finish_reason == "completed"
     assert result.answer == "done"
+
+
+async def test_adapter_does_not_force_business_tools_into_task_whitelist(tmp_path):
+    """注册工具不等于授权；task 未允许的业务工具必须被 ToolRuntime 拒绝。"""
+    import json
+    from evals.harness.adapters.lucas_single import LucasSingleAgent
+    from harness.models import RunLimits
+    from harness.trace import TraceRecorder, read_trace
+
+    _wiki_fixture(tmp_path)
+
+    class FakeModel:
+        def __init__(self):
+            self.responses = [
+                json.dumps({"action": "tool", "tool": "wiki_recall",
+                            "args": {"query": "600519 分红"}}),
+                json.dumps({"action": "answer", "reply": "工具不可用"}),
+            ]
+
+        async def complete(self, prompt):
+            return self.responses.pop(0), None
+
+    adapter = LucasSingleAgent(model_adapter=FakeModel())
+    trace_path = tmp_path / "trace.jsonl"
+    result = await adapter.run(
+        "查公告", tmp_path, ["read_file"],
+        RunLimits(max_steps=5, timeout_seconds=30),
+        TraceRecorder(trace_path, "run-test"),
+    )
+
+    assert result.finish_reason == "completed"
+    errors = [event for event in read_trace(trace_path)
+              if event["event"] == "tool_call_error"]
+    assert errors[0]["data"] == {
+        "tool_call_id": "call-1",
+        "status": "denied",
+        "error_code": "tool_not_allowed",
+    }

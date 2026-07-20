@@ -93,9 +93,11 @@ class StockDataProvider(ABC):
 class AKShareProvider(StockDataProvider):
 
     def _code_prefix(self, code: str) -> str:
-        """300/00 开头 → sz，6 开头 → sh"""
+        """沪深北股票代码转腾讯/AKShare symbol 前缀。"""
         if code.startswith("6"):
             return f"sh{code}"
+        if code.startswith(("4", "8", "92")):
+            return f"bj{code}"
         return f"sz{code}"
 
     async def get_quote(self, code: str) -> Optional[QuoteData]:
@@ -232,7 +234,7 @@ class TDXMCPProvider(StockDataProvider):
         """tdx-mcp 市场代码：0=深圳，1=上海，2=北交所。"""
         if code.startswith("6"):
             return 1
-        if code.startswith(("4", "8")):
+        if code.startswith(("4", "8", "92")):
             return 2
         return 0
 
