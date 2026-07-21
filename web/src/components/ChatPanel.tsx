@@ -148,14 +148,14 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
               <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
             ))}
 
-            {state.isLoading && <AnalysisProcess steps={state.processSteps} live />}
+            {state.isLoading && <AnalysisProcess steps={state.traceSteps} live />}
 
             {state.isLoading && activeResearchers.length > 0 && (
               <div>
                 {activeResearchers.filter((researcher) => researcher.text).map((researcher) => (
                   <ResearcherCard key={researcher.id} researcher={researcher} />
                 ))}
-                <SynthesisCard text={state.synthesis} loading={state.isLoading} />
+                <SynthesisCard text={state.synthesis} loading={state.phase === "synthesizing"} />
               </div>
             )}
           </div>

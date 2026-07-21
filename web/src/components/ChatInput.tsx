@@ -5,7 +5,7 @@ import type { ChatPhase } from "@/hooks/useChat";
 const PHASE_LABEL: Record<ChatPhase, string> = {
   idle: "",
   dispatching: "正在派发任务…",
-  researching: "研究员分析中…",
+  researching: "",
   synthesizing: "正在综合分析…",
 };
 
@@ -32,7 +32,7 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white/95 to-transparent px-3 pb-3 pt-10 dark:from-zinc-950 dark:via-zinc-950/95 sm:px-6 sm:pb-5">
       <div className="pointer-events-auto mx-auto w-full max-w-3xl">
-        {loading && (
+        {loading && PHASE_LABEL[phase] && (
           <div className="mb-2 flex items-center gap-2 px-2">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
