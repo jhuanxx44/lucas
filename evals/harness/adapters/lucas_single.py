@@ -38,8 +38,9 @@ class LucasSingleAgent:
         limits: RunLimits,
         trace: TraceRecorder,
     ) -> AgentResult:
-        # 注册全部工具（超集）：评测含 READ/EDIT/WRITE 等框架级文件操作能力，
-        # 线上聊天只开放研究工具。每题由 task.yaml 的 allowed_tools 逐题收窄。
+        # 注册全部工具（超集）：评测含 READ/EDIT/WRITE 等框架级文件操作能力。
+        # 线上聊天也开放这些工具，但写工具经 wiki/ 边界收窄（见 server/services/
+        # agent_stream.py 的 _guard_wiki_write）。每题由 task.yaml 的 allowed_tools 逐题收窄。
         # 详见 evals/tasks/README.md「与线上聊天的关系」。
         tools = ToolRuntime(workspace, [
             READ_FILE_SPEC,

@@ -6,8 +6,9 @@ web/src/hooks/useChat.ts 严格对齐：
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
-  thought {step, text}            模型原生思考通道（reasoning_content）逐段增量，
-                                  展示为过程 thought；不进最终答案
+  summary {step, text}            模型每步生成的一句话用户旁白（action JSON 的
+                                  summary 字段），展示为过程摘要；不进最终答案。
+                                  模型原生 reasoning 草稿仅记入 trace，不再推送前端
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
   synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
@@ -20,6 +21,8 @@ actions 不再发送（前端缺省行为正常）。
 import asyncio
 import json
 import logging
+from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -27,16 +30,60 @@ from harness.config import build_single_system_prompt, load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
+from harness.tools.base import ToolResult
 from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
 from harness.tools.business.wiki import WIKI_RECALL_SPEC
+from harness.tools.generic.filesystem import (
+    APPLY_PATCH_SPEC,
+    LIST_FILES_SPEC,
+    READ_FILE_SPEC,
+    SEARCH_SPEC,
+    WRITE_FILE_SPEC,
+)
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.llm_client import create_client
+from utils.path_safety import resolve_within
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PROMPT_PATH = _PROJECT_ROOT / "prompts" / "harness" / "agent-loop.md"
+
+
+def _guard_wiki_write(handler):
+    """聊天链路的写入策略：只允许改动 wiki/ 知识库。
+
+    聊天工作区根 = 项目根，未加限制的写工具会碰到 raw/（不可变原始输入）、
+    .git、harness 代码等。写操作统一收窄到 wiki/ 目录内。读操作不受限。
+    """
+    def guarded(workspace: Path, args: dict) -> ToolResult:
+        rel = args.get("path")
+        if not isinstance(rel, str) or not rel or Path(rel).is_absolute():
+            return ToolResult(status="denied", error_code="write_scope",
+                              observation="写入被拒绝：只能修改 wiki/ 知识库下的文件")
+        ws_root = workspace.resolve()
+        wiki_root = ws_root / "wiki"
+        target = resolve_within(ws_root, ws_root / rel, strict=False)
+        if target is None or (target != wiki_root and wiki_root not in target.parents):
+            return ToolResult(status="denied", error_code="write_scope",
+                              observation="写入被拒绝：只能修改 wiki/ 知识库下的文件")
+        return handler(workspace, args)
+    return guarded
+
+
+# 写工具限定 wiki/；读工具（read_file/list_files/search）跨工作区只读，无需 guard。
+_WIKI_WRITE_FILE_SPEC = replace(
+    WRITE_FILE_SPEC,
+    description="在 wiki/ 知识库内新建或整体写入文件（仅限 wiki/ 目录）；"
+                "文件已存在时默认拒绝，需 overwrite: true 才覆盖",
+    handler=_guard_wiki_write(WRITE_FILE_SPEC.handler),
+)
+_WIKI_APPLY_PATCH_SPEC = replace(
+    APPLY_PATCH_SPEC,
+    description="对 wiki/ 知识库内文件做精确字符串替换（仅限 wiki/ 目录；old 必须唯一出现）",
+    handler=_guard_wiki_write(APPLY_PATCH_SPEC.handler),
+)
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 120.0
@@ -45,6 +92,11 @@ _CHAT_TOOL_SPECS = [
     STOCK_QUOTE_SPEC,
     STOCK_KLINE_SPEC,
     WIKI_RECALL_SPEC,
+    READ_FILE_SPEC,
+    LIST_FILES_SPEC,
+    SEARCH_SPEC,
+    _WIKI_WRITE_FILE_SPEC,
+    _WIKI_APPLY_PATCH_SPEC,
 ]
 _CHAT_TOOL_NAMES = [spec.name for spec in _CHAT_TOOL_SPECS]
 
@@ -118,7 +170,8 @@ async def chat_event_stream(
         allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
         if model_adapter is None:
             # 工具说明渲染进 system prompt（稳定指令层），user prompt 只留每轮变化内容。
-            system_prompt = build_single_system_prompt(tools.describe(allowed_tools))
+            system_prompt = build_single_system_prompt(
+                tools.describe(allowed_tools), current_date=date.today().isoformat())
             client = create_client(provider=config.provider, model=config.model,
                                    system_prompt=system_prompt)
             model_adapter = LLMClientAdapter(client, temperature=config.temperature)
@@ -147,8 +200,8 @@ async def chat_event_stream(
                     "output": evt.get("observation", ""),
                     "message": _status_message(evt),
                 })
-            if kind == "thought":
-                return _sse("thought", {
+            if kind == "summary":
+                return _sse("summary", {
                     "step": evt.get("step"),
                     "text": evt.get("text", ""),
                 })

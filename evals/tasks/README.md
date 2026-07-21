@@ -13,6 +13,7 @@
 | [`LIST-01`](LIST-01/task.yaml) | `capability` | 递归盘点 YAML 文件，返回总数以及最大文件的路径和字节数 | 目录遍历、统计与比较 |
 | [`EDIT-02`](EDIT-02/task.yaml) | `capability` | 在存在两个同名配置项时，只修改 `[server]` 段的 timeout，并返回 server/client 的最终值 | 消歧、局部精确编辑 |
 | [`WRITE-01`](WRITE-01/task.yaml) | `capability` | 在 Wiki 中新建指定笔记，写入要求的标题和 IDM 说明，不修改已有文件 | 新建文件、内容约束、修改范围控制 |
+| [`WRITE-02`](WRITE-02/task.yaml) | `capability` | 把给定营收数据真正写入已有公司档案的财务概况节，只在回复里声称"已更新"不算通过 | 反"幻觉式完成"：改动必须落盘、局部编辑、修改范围控制 |
 | [`WIKI-01`](WIKI-01/task.yaml) | `business-capability` | 从已索引公司页面回答澄海精密的产线一次良率 | Wiki 单页事实召回 |
 | [`WIKI-02`](WIKI-02/task.yaml) | `business-capability` | 从未索引公告页面回答股票代码 688559 对应公司的现金分红方案 | Wiki 未索引内容召回 |
 | [`WIKI-03`](WIKI-03/task.yaml) | `business-capability` | 综合两个公司页面，比较年产能并计算差值 | Wiki 多页召回、信息综合与计算 |
