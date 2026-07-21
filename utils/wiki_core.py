@@ -222,11 +222,48 @@ def _read_page(wiki_dir: str, rel_path: str, max_chars: int) -> dict | None:
     }
 
 
-def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000) -> list[dict]:
+_SUMMARY_MAX_CHARS = 80
+
+
+def _summarize_page(wiki_dir: str, rel_path: str) -> str:
+    """零成本页面摘要：frontmatter(type/tags) 优先，退回正文首段截断。
+
+    不调 LLM。给 agent 一句话判断该页是否值得 read_file 读正文。
+    """
+    full = _resolve_in_wiki(wiki_dir, rel_path)
+    if full is None or not os.path.isfile(full):
+        return ""
+    try:
+        page = parse_wiki_page(full)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return ""
+    fm = page.get("frontmatter") or {}
+    bits = []
+    if fm.get("type"):
+        bits.append(str(fm["type"]))
+    tags = fm.get("tags")
+    if isinstance(tags, list) and tags:
+        bits.append("、".join(str(t) for t in tags[:6]))
+    if bits:
+        return " · ".join(bits)[:_SUMMARY_MAX_CHARS]
+    # 无 frontmatter：取正文首个非空行
+    for line in (page.get("content") or "").splitlines():
+        line = line.strip().lstrip("#").strip()
+        if line:
+            return line[:_SUMMARY_MAX_CHARS]
+    return ""
+
+
+def recall_wiki(
+    wiki_dir: str, query: str, limit: int = 3, min_score: int = 2,
+) -> list[dict]:
     """索引优先召回：先 index.md 条目关键词匹配，不足再全文子串 fallback。
 
-    返回最多 limit 个页面: [{"name", "path", "section", "content", "truncated"}, ...]，
-    content 截断至 max_chars。
+    只返回相关文件的定位信息（progressive disclosure）：
+    [{"name", "path", "section", "summary"}, ...]，正文由调用方用 read_file 另取。
+
+    min_score 是相关性门槛：总分低于它的候选不返回；全部低于门槛则返回空列表，
+    让工具能明确回答"没找到"，而不是塞一个蹭中宽泛词的无关页。
     """
     keywords = extract_keywords(query)
     if not keywords:
@@ -244,21 +281,23 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
         score = sum(1 for kw in keywords if kw in search_text)
         if entry["name"] and entry["name"] in query:
             score += 2  # 条目名直接出现在查询里，强信号且不依赖分词结果
-        if score > 0:
+        if score >= min_score:
             scored_entries.append((score, entry))
     scored_entries.sort(key=lambda x: x[0], reverse=True)
 
     for _, entry in scored_entries:
         if len(pages) >= limit:
             break
-        page = _read_page(wiki_dir, entry["path"], max_chars)
-        if page is None:
-            continue
         full = _resolve_in_wiki(wiki_dir, entry["path"])
-        if full in seen:
+        if full is None or not os.path.isfile(full) or full in seen:
             continue
         seen.add(full)
-        pages.append({**page, "name": entry["name"], "section": entry["section"]})
+        pages.append({
+            "name": entry["name"],
+            "path": entry["path"],
+            "section": entry["section"],
+            "summary": _summarize_page(wiki_dir, entry["path"]),
+        })
 
     # ── Step 2: 全文 fallback（索引命中不足 limit 时） ──
     if len(pages) < limit:
@@ -274,10 +313,7 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
                     continue
                 rel = os.path.relpath(candidate, wiki_dir)
                 full = _resolve_in_wiki(wiki_dir, rel)
-                if full is None:
-                    continue
-                norm = full
-                if norm in seen:
+                if full is None or full in seen:
                     continue
                 try:
                     with open(full, "r", encoding="utf-8") as f:
@@ -292,11 +328,11 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
                         score += 3
                     if kw in content[:2000]:
                         score += 1
-                if score > 0:
-                    scored_files.append((score, name, rel, content))
+                if score >= min_score:
+                    scored_files.append((score, name, rel))
         scored_files.sort(key=lambda x: x[0], reverse=True)
 
-        for score, name, rel, content in scored_files:
+        for _, name, rel in scored_files:
             if len(pages) >= limit:
                 break
             resolved = _resolve_in_wiki(wiki_dir, rel)
@@ -307,8 +343,7 @@ def recall_wiki(wiki_dir: str, query: str, limit: int = 3, max_chars: int = 3000
                 "name": name,
                 "path": rel,
                 "section": "",
-                "content": content[:max_chars],
-                "truncated": len(content) > max_chars,
+                "summary": _summarize_page(wiki_dir, rel),
             })
 
     return pages

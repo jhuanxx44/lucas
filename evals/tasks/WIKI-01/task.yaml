@@ -9,9 +9,10 @@ instruction: |
 fixture: fixture
 allowed_tools:
   - wiki_recall
+  - read_file
 
 limits:
-  max_steps: 5
+  max_steps: 6
   timeout_seconds: 60
   max_cost_usd: 0
 
@@ -30,11 +31,11 @@ graders:
 
   process:
     - type: allowed_tools
-      tools: [wiki_recall]
+      tools: [wiki_recall, read_file]
       required: true
 
     - type: max_steps
-      value: 5
+      value: 6
       required: true
 
 tags: [wiki, business, retrieval, single-page]

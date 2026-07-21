@@ -348,3 +348,35 @@ AI 版确实保留了 `澄海精密`、`2025年第四季度`、`一次良率` �
 1. 机制在确定性层成立并已进入产品链路（chat 走同一 `AgentRunner`）。
 2. 待补：用真实 key 跑 `LOOP-01`（含博通式场景）多 trial，确认软收尾足够；若模型收到强指令仍打转，再升级为硬收尾（跳出工具循环、禁用工具单独发 final-answer prompt）。
 3. 本护栏是第二道防线（兜底）。第一道防线（`wiki_recall` 摘要化 + 相关性阈值 + 分词级命中透明，治本，对应实验 007 预告的候选阈值方向）作为下一轮独立实验。
+
+## 实验 009：wiki_recall 摘要化（progressive disclosure）（2026-07-21）
+
+### 假设
+
+博通打转的根因在工具侧：`wiki_recall` 一次灌整页正文，且 OR 计分把"博通 光通信"里"光通信"蹭中的无关行业页当 `status=ok` 返回，模型读完发现不对又换词重查。把工具从"灌正文"改成"返回相关文件路径 + 一句话摘要，正文交给 read_file"（progressive disclosure），配总分阈值过滤低噪音，预期：(a) 单次 observation 体积大幅下降；(b) 模型看摘要就能判断页面是否相关，不再被无关正文误导横跳；(c) 仍能完成需要正文事实的任务（WIKI-01~03）。
+
+### 开源调研依据
+
+四路一手源码印证该方向是业界主流：aider repo map（返回符号摘要非正文，`repomap.py`）、Claude Code（Glob 只返路径、Read 独立且限行）、LlamaIndex `SimilarityPostprocessor` / LangChain `score_threshold`（相关性阈值过滤、宁可空返回不返回噪音、每条带分数）。关键教训：摘要用现成结构信号（frontmatter/metadata），不实时调 LLM 生成。
+
+### 单变量实现
+
+- `utils/wiki_core.py`：新增 `_summarize_page`（零成本：frontmatter type/tags 优先，退回正文首行截断 80 字）；`recall_wiki` 返回结构从 `{name,path,section,content,truncated}` 改为 `{name,path,section,summary}`，去掉 `max_chars`、新增 `min_score=2` 相关性门槛（低于门槛不返回，全过滤返回空列表让工具能明确说"没找到"）。
+- `harness/tools/business/wiki.py`：输出改为"路径 + 摘要"列表，路径补 `wiki/` 前缀（recall 相对 wiki 根、read_file 相对工作区根，须对齐，否则 agent 拿路径 read_file 会 file not found）；spec description 说明"只返回路径和摘要，正文用 read_file 读取"。
+- `prompts/harness/agent-loop.md`：补两步协作说明（recall 给地图 → read_file 取正文；摘要都不相关则据此作答，勿反复检索）。
+- WIKI-01~03：`allowed_tools` 增加 `read_file`（否则摘要化后无法取正文、任务变不可解），`max_steps` 相应上调（+1~2 步给 read_file）。
+
+### 结果（确定性层）
+
+- 新增契约测试 `test_wiki_recall_path_is_readable_by_read_file`：recall 返回的每个路径都能被同一 workspace 的 read_file 直接读到正文——守住"给地图→取正文"链路闭合（防 wiki/ 前缀缺失）。
+- 工具单测改为断言列表+摘要形态、正文不出现在召回结果里；可召回性参数化测试仍通过（`wiki/` 前缀下 `companies/...md` 仍是子串，目标页仍进候选）。
+- 阈值验证：WIKI-01~03 目标页仍全部命中；查库中不存在公司（星云半导体/泸州老窖）时不再灌正文，只以摘要形式返回宽泛词蹭中的行业页，agent 可据摘要判断"非目标"。
+- 全量 208 passed。
+
+**未完成（诚实标注）**：真实模型 trial 需 `DEEPSEEK_API_KEY`，当前环境无此密钥。因此两个关键问题未用真实 trial 验证：(1) 模型能否稳定走通"recall 看摘要 → read_file 取正文"两步（纯列表形态下这是硬要求，若模型拿到列表不去 read，WIKI 任务成功率可能不升反降）；(2) 摘要形态是否真的消除博通式横跳。确定性层已证明工具契约与链路正确，但两步协作的模型侧稳定性待测。
+
+### 结论与后续
+
+1. 工具改造在确定性层成立并进入产品链路（chat 与 evals 共用 `recall_wiki`）。
+2. 待补：真实 key 跑 WIKI-01~03 对比改造前后成功率/步骤/token（预期步骤+1~2、单步 observation 大降、总 token 下降），并跑博通式场景确认横跳消除。
+3. 阈值目前是简单总分门槛：查具体公司但宽泛行业词蒙中（星云半导体命中"半导体"行业页）仍会进候选，靠摘要形态让 agent 自行判断而非靠阈值挡住。若真实 trial 显示 agent 仍被干扰，再引入"分词级命中透明"（区分度高的词必须命中）。
