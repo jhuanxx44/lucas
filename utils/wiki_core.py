@@ -255,15 +255,16 @@ def _summarize_page(wiki_dir: str, rel_path: str) -> str:
 
 
 def recall_wiki(
-    wiki_dir: str, query: str, limit: int = 3, min_score: int = 2,
+    wiki_dir: str, query: str, limit: int = 3, min_score: int = 1,
 ) -> list[dict]:
     """索引优先召回：先 index.md 条目关键词匹配，不足再全文子串 fallback。
 
     只返回相关文件的定位信息（progressive disclosure）：
     [{"name", "path", "section", "summary"}, ...]，正文由调用方用 read_file 另取。
 
-    min_score 是相关性门槛：总分低于它的候选不返回；全部低于门槛则返回空列表，
-    让工具能明确回答"没找到"，而不是塞一个蹭中宽泛词的无关页。
+    min_score 是相关性门槛：总分低于它的候选不返回。默认 1，即"凡关键词匹配就返回"，
+    交给 agent 看摘要自行判断相关性（摘要形态已足以过滤无关页，无需工具端卡阈值）。
+    召回质量（板块结构/语义相关）作为专项优化单列。
     """
     keywords = extract_keywords(query)
     if not keywords:

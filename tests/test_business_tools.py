@@ -281,13 +281,13 @@ async def test_wiki_recall_bad_args(tmp_path):
     assert result.status == "invalid_input"
 
 
-async def test_wiki_recall_below_threshold_only_returns_locators(tmp_path):
+async def test_wiki_recall_absent_company_returns_only_locators(tmp_path):
     """查库中不存在的公司：即使宽泛词蹭中某页，也只以路径+摘要返回，
 
     agent 据摘要即可判断"这些都不是目标公司"，不会被灌一整页无关正文误导。
     """
     _wiki_fixture(tmp_path)
-    # "五粮液"是索引条目名，但查询问的是不存在的"泸州老窖"，只有"白酒"这类宽泛词可能蹭中
+    # 查询问的是不存在的"泸州老窖"，只有"白酒"这类宽泛词可能蹭中已有页面
     result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
                             {"query": "泸州老窖 2025 年报"})
     assert result.status == "ok"
