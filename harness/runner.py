@@ -11,8 +11,8 @@ from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
 
-MAX_OBSERVATION_CHARS = 16_000
-MAX_TOTAL_OBSERVATION_CHARS = 48_000
+MAX_OBSERVATION_CHARS = 32_000
+MAX_TOTAL_OBSERVATION_CHARS = 240_000
 
 
 class _RunDeadlineExceeded(Exception):

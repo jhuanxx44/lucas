@@ -83,12 +83,14 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
   const handleScroll = () => {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    // 距底 <80px 视为贴底跟随；用户手动上滑离开后置 false，滚回底部再恢复。
     isNearBottom.current = scrollHeight - scrollTop - clientHeight < 80;
   };
 
+  // 内容增长时平滑滚到底，但仅在用户仍贴底时才滚，不抢占正在上滑查看历史的动作。
   useEffect(() => {
     if (scrollRef.current && isNearBottom.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [state.messages, state.researchers, state.synthesis]);
 
@@ -148,7 +150,9 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
               <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
             ))}
 
-            {state.isLoading && <AnalysisProcess steps={state.traceSteps} live />}
+            {state.isLoading && (
+              <AnalysisProcess steps={state.traceSteps} live={state.phase !== "synthesizing"} />
+            )}
 
             {state.isLoading && activeResearchers.length > 0 && (
               <div>

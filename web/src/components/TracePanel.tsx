@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Wrench, X } from "lucide-react";
 import type { ChatMessage, ChatTraceStep } from "@/types";
 
@@ -135,6 +136,28 @@ function TraceStep({ step }: { step: ChatTraceStep }) {
 export function TracePanel({ messages, liveTurn }: TracePanelProps) {
   const turns = buildTurns(messages, liveTurn);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // 是否处于「贴底跟随」状态；用户手动上滚离开底部时置 false，滚回底部再恢复。
+  const stickToBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // 距底 <=24px 视为贴底，容忍亚像素与惯性滚动的抖动。
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom <= 24;
+  };
+
+  // trace 内容变化时自动滚到底，但仅在用户没有主动上滑（仍贴底）时才滚，避免抢占滚动。
+  // 依赖内容长度指纹：新增步骤、live 步骤增长都会触发。
+  const contentFingerprint = turns.reduce((sum, turn) => sum + turn.steps.length, turns.length);
+  useEffect(() => {
+    if (!stickToBottomRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [contentFingerprint]);
+
   return (
     <aside className="flex h-full w-full flex-col bg-zinc-50 dark:bg-zinc-900/70">
       <div className="flex h-11 shrink-0 items-center border-b border-zinc-200 px-3 dark:border-zinc-800">
@@ -152,7 +175,7 @@ export function TracePanel({ messages, liveTurn }: TracePanelProps) {
           <Download size={15} />
         </button>
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 space-y-3 overflow-y-auto p-3">
         {turns.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-xs text-zinc-400 dark:text-zinc-500">
             <Wrench size={20} className="mb-2 opacity-60" />

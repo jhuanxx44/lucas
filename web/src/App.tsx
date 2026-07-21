@@ -44,7 +44,7 @@ async function loadInitialSession() {
 export default function App() {
   const themeCtx = useThemeProvider();
   useAutoHideScrollbars();
-  const [linked, setLinked] = useState(true);
+  const [linked, setLinked] = useState(false);
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(520);
   const [traceWidth, setTraceWidth] = useState(360);

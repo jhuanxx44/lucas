@@ -6,7 +6,7 @@ const PHASE_LABEL: Record<ChatPhase, string> = {
   idle: "",
   dispatching: "正在派发任务…",
   researching: "",
-  synthesizing: "正在综合分析…",
+  synthesizing: "",
 };
 
 interface ChatInputProps {
