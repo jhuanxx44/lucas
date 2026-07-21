@@ -265,10 +265,31 @@ class KnowledgeService:
     def _prompt(self, name: str) -> str:
         return load_prompt_template(os.path.join(self._prompts_dir, f"{name}.md"))
 
+    def _existing_industries(self) -> list[str]:
+        """wiki 已有的行业分类：companies/ 下的子目录名。
+
+        让 classify 看到实际已录入的分类（如"光通信"），优先收敛到已有分类，
+        而不是每次新造近义词造成同类分散。
+        """
+        companies_dir = os.path.join(self._wiki_dir, "companies")
+        if not os.path.isdir(companies_dir):
+            return []
+        cats = []
+        for cat in sorted(os.listdir(companies_dir)):
+            cat_path = os.path.join(companies_dir, cat)
+            if os.path.isdir(cat_path) and not cat.startswith(".") and cat != "未分类":
+                cats.append(cat)
+        return cats
+
     def _industries_text(self) -> str:
-        if not self._config.industries:
+        # 配置本体 + wiki 已有分类去重合并（保序：本体在前，新出现的已有分类在后）
+        merged = list(self._config.industries)
+        for cat in self._existing_industries():
+            if cat not in merged:
+                merged.append(cat)
+        if not merged:
             return "（未配置，自行判断行业名称）"
-        return "、".join(self._config.industries)
+        return "、".join(merged)
 
     # ── classify ─────────────────────────────────────────
 

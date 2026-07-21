@@ -159,6 +159,20 @@ async def test_classify_source_end_to_end(tmp_path):
     assert "电子、新能源" in client.calls[0]["prompt"]
 
 
+async def test_classify_prompt_includes_existing_wiki_categories(tmp_path):
+    """classify 候选 = 配置本体 + wiki 已有分类，让 LLM 收敛到已存在的分类。"""
+    client = FakeClient(['{"title": "t", "industry": "光通信", "company": "中际旭创", "confidence": "high", "alternatives": []}'])
+    service = _service(tmp_path, client)  # config 只有 电子、新能源
+    # wiki 里已存在"光通信"分类（config 本体里没有）
+    (Path(service._wiki_dir) / "companies" / "光通信").mkdir(parents=True)
+
+    await service.classify_source("中际旭创光模块业务……")
+
+    prompt = client.calls[0]["prompt"]
+    assert "电子" in prompt and "新能源" in prompt  # 配置本体
+    assert "光通信" in prompt  # wiki 已有分类被合并进候选
+
+
 # ── plan JSON 校验 ─────────────────────────────────────────
 
 
