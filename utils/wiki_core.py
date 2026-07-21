@@ -50,6 +50,19 @@ def parse_wiki_index(wiki_dir: str) -> dict:
         name = fname.replace(".md", "")
         return name.split("_", 1)[1] if "_" in name else name
 
+    def _scan_root(label: str):
+        # 兜底：扫描 wiki 根目录下未归类的散落 .md 文件（排除 index/glossary），
+        # 保证任何写入 wiki 的文件都能在侧栏可见，不会"消失"。
+        items = []
+        for fname in sorted(os.listdir(wiki_dir)):
+            if not fname.endswith(".md") or fname in ("index.md", "glossary.md"):
+                continue
+            if not os.path.isfile(os.path.join(wiki_dir, fname)):
+                continue
+            items.append({"name": fname.replace(".md", ""), "path": fname})
+        if items:
+            sections.append({"title": label, "items": items})
+
     _scan_grouped("companies", "公司档案")
     _scan_flat("industries", "行业概览")
     _scan_flat("concepts", "概念/主题")
@@ -59,6 +72,7 @@ def parse_wiki_index(wiki_dir: str) -> dict:
         sections.append({"title": "术语表", "items": [{"name": "A股术语表", "path": "glossary.md"}]})
 
     _scan_grouped("reports", "分析报告", name_transform=_report_name)
+    _scan_root("未归类")
 
     return {"sections": sections}
 
