@@ -86,27 +86,42 @@ def test_bare_json_answer_no_chunks():
 # ---------- Runner 集成 ----------
 
 class FakeStreamModel:
-    """complete / complete_stream 双通道；响应可以是 str 或 Exception（模拟中途失败）"""
+    """complete / complete_stream 双通道。
+
+    每个响应可以是：
+    - str：content（chunk_size 切分，模拟逐 token 到达）
+    - {"reasoning": "...", "content": "..."}：先逐段产出 reasoning，再产出 content
+    - Exception：模拟中途失败
+    complete_stream 产出 (kind, text)，与真实 adapter 一致。
+    """
 
     def __init__(self, responses: list, chunk_size: int = 4):
         self.responses = list(responses)
         self.chunk_size = chunk_size
         self.prompts: list[str] = []
 
+    def _content_of(self, item) -> str:
+        return item["content"] if isinstance(item, dict) else item
+
     async def complete(self, prompt: str):
         self.prompts.append(prompt)
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
-        return item, None
+        return self._content_of(item), None
 
     async def complete_stream(self, prompt: str):
         self.prompts.append(prompt)
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
-        for i in range(0, len(item), self.chunk_size):
-            yield item[i:i + self.chunk_size]
+        if isinstance(item, dict):
+            reasoning = item.get("reasoning", "")
+            for i in range(0, len(reasoning), self.chunk_size):
+                yield "reasoning", reasoning[i:i + self.chunk_size]
+        content = self._content_of(item)
+        for i in range(0, len(content), self.chunk_size):
+            yield "content", content[i:i + self.chunk_size]
 
 
 def _runner(tmp_path: Path, model) -> AgentRunner:
@@ -213,6 +228,76 @@ async def test_streaming_history_replay_identical(tmp_path):
     assert "【工具】[read_file] status=ok" in model.prompts[1]
 
 
+async def test_reasoning_emits_thought_before_answer(tmp_path):
+    """原生 reasoning 段 → thought 事件，早于 answer_chunk；答案不含思考"""
+    reply = "白酒行业"
+    model = FakeStreamModel([{
+        "reasoning": "先判断这属于哪个行业，应该是白酒。",
+        "content": json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False),
+    }], chunk_size=3)
+    events: list[dict] = []
+    result = await _runner(tmp_path, model).run(
+        "t", ["read_file"], LIMITS, _trace(tmp_path),
+        on_event=events.append, stream_answer=True,
+    )
+
+    assert result.answer == reply
+    kinds = [e["kind"] for e in events]
+    assert "thought" in kinds and "answer_chunk" in kinds
+    assert kinds.index("thought") < kinds.index("answer_chunk")
+    thought = "".join(e["text"] for e in events if e["kind"] == "thought")
+    assert thought == "先判断这属于哪个行业，应该是白酒。"
+    # 思考不泄漏进答案
+    answer_chunks = "".join(e["text"] for e in events if e["kind"] == "answer_chunk")
+    assert answer_chunks == reply
+
+
+async def test_reasoning_not_in_raw_replay(tmp_path):
+    """含 reasoning 的流式轮：下一轮 prompt 的 raw 只含 content，不含思考"""
+    (tmp_path / "a.txt").write_text("hi", encoding="utf-8")
+    first_content = json.dumps({"action": "tool", "tool": "read_file",
+                                "args": {"path": "a.txt"}}, ensure_ascii=False)
+    model = FakeStreamModel([
+        {"reasoning": "我需要先读文件确认内容。", "content": first_content},
+        json.dumps({"action": "answer", "reply": "done"}),
+    ])
+    await _runner(tmp_path, model).run(
+        "t", ["read_file"], LIMITS, _trace(tmp_path),
+        on_event=lambda e: None, stream_answer=True,
+    )
+
+    # 回放里是干净的 content JSON，思考文本不进历史
+    assert f"【你】{first_content}" in model.prompts[1]
+    assert "我需要先读文件" not in model.prompts[1]
+
+
+async def test_reasoning_only_tool_call_no_answer_chunk(tmp_path):
+    """reasoning + 工具调用（content 为 tool JSON）：产 thought，不产 answer_chunk"""
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    model = FakeStreamModel([
+        {"reasoning": "读一下这个文件。",
+         "content": json.dumps({"action": "tool", "tool": "read_file",
+                                "args": {"path": "a.txt"}})},
+        json.dumps({"action": "answer", "reply": "看完了"}),
+    ])
+    events: list[dict] = []
+    await _runner(tmp_path, model).run(
+        "t", ["read_file"], LIMITS, _trace(tmp_path),
+        on_event=events.append, stream_answer=True,
+    )
+
+    first_round = []
+    for e in events:
+        if e["kind"] == "tool_step":
+            first_round.append(e)
+            break
+        first_round.append(e)
+    # 第一轮（工具调用）里有 thought，但没有 answer_chunk
+    kinds = [e["kind"] for e in first_round]
+    assert "thought" in kinds
+    assert "answer_chunk" not in kinds
+
+
 # ---------- agent_stream 契约 ----------
 
 def _parse_sse(chunks: list[str]) -> list[tuple[str, dict]]:
@@ -283,3 +368,21 @@ async def test_agent_stream_buffered_answer_tail_fill(tmp_path):
     chunks = [d["text"] for e, d in events if e == "synthesis_chunk"]
     assert len(chunks) == 1
     assert json.loads(chunks[0]) == {"y2022": 2606}
+
+
+async def test_agent_stream_thought_event(tmp_path):
+    """reasoning 段经 SSE 桥 → thought 事件，早于 synthesis_chunk"""
+    reply = "白酒行业"
+    model = FakeStreamModel([{
+        "reasoning": "这是白酒龙头。",
+        "content": json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False),
+    }], chunk_size=3)
+    events = await _collect("茅台是什么行业", model, tmp_path)
+
+    kinds = [e for e, _ in events]
+    assert "thought" in kinds
+    assert kinds.index("thought") < kinds.index("synthesis_chunk")
+    thought = "".join(d["text"] for e, d in events if e == "thought")
+    assert thought == "这是白酒龙头。"
+    synth = "".join(d["text"] for e, d in events if e == "synthesis_chunk")
+    assert synth == reply

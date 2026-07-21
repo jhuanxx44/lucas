@@ -6,6 +6,8 @@ web/src/hooks/useChat.ts 严格对齐：
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
+  thought {step, text}            模型原生思考通道（reasoning_content）逐段增量，
+                                  展示为过程 thought；不进最终答案
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
   synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
@@ -144,6 +146,11 @@ async def chat_event_stream(
                     "ok": bool(evt.get("ok")),
                     "output": evt.get("observation", ""),
                     "message": _status_message(evt),
+                })
+            if kind == "thought":
+                return _sse("thought", {
+                    "step": evt.get("step"),
+                    "text": evt.get("text", ""),
                 })
             if kind == "answer_chunk":
                 text = evt.get("text", "")

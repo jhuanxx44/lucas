@@ -305,16 +305,25 @@ class AgentRunner:
         on_event: Callable[[dict], None],
         stream_state: dict,
     ) -> tuple[str, TokenUsage | None]:
-        """流式调用模型：原始 chunk 全量累积，文本 delta 经 parser 过滤后回调。
+        """流式调用模型：区分模型原生的思考通道与答案通道。
 
-        只有 AnswerStreamParser 确认是字符串 reply 才发 answer_chunk；
-        工具调用/结构化 answer/非法输出不发任何 chunk。流式无 usage，记 None。
+        - reasoning 段：逐段回调 {"kind":"thought"}，展示为过程思考；不进 raw。
+        - content 段：累积为 raw（喂 _parse_action / 全量回放），并经
+          AnswerStreamParser 提取字符串 reply 后回调 answer_chunk。
+          工具调用/结构化 answer/非法输出不发 answer_chunk。
+        流式无 usage，记 None。
         """
         parser = AnswerStreamParser()
         parts: list[str] = []
-        async for chunk in self.model.complete_stream(prompt):
-            parts.append(chunk)
-            for delta in parser.feed(chunk):
+        async for kind, text in self.model.complete_stream(prompt):
+            if kind == "reasoning":
+                # 原生思考通道：逐段推送为过程 thought，不进 raw（不影响动作解析与回放）
+                if text:
+                    on_event({"kind": "thought", "step": step, "text": text})
+                continue
+            # content 段：累积为 raw（喂 _parse_action / 全量回放），并经 parser 提取 reply
+            parts.append(text)
+            for delta in parser.feed(text):
                 stream_state["streamed"] += len(delta)
                 on_event({"kind": "answer_chunk", "step": step, "text": delta})
         for delta in parser.finalize():

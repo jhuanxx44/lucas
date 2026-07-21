@@ -1,4 +1,4 @@
-import { Braces, Check, ChevronRight, Circle, Download, Loader2, Wrench, X } from "lucide-react";
+import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Wrench, X } from "lucide-react";
 import type { ChatMessage, ChatTraceStep } from "@/types";
 
 export interface LiveTraceTurn {
@@ -82,10 +82,21 @@ function StepIcon({ step }: { step: ChatTraceStep }) {
   if (step.status === "running") return <Loader2 size={13} className="animate-spin text-indigo-500" />;
   if (step.status === "error") return <X size={13} className="text-rose-500" />;
   if (step.kind === "tool") return <Wrench size={13} className="text-amber-500" />;
+  if (step.kind === "thought") return <Brain size={13} className="text-zinc-400" />;
   return <Check size={13} className="text-emerald-500" />;
 }
 
 function TraceStep({ step }: { step: ChatTraceStep }) {
+  if (step.kind === "thought") {
+    // 过程思考：灰色斜体，多行文本按原样展示（对齐 Codex 的 reasoning 样式）
+    return (
+      <div className="flex gap-2 py-1 text-xs italic leading-relaxed text-zinc-400 dark:text-zinc-500">
+        <Brain size={13} className="mt-0.5 shrink-0" />
+        <span className="whitespace-pre-wrap break-words">{step.label}</span>
+      </div>
+    );
+  }
+
   if (step.kind !== "tool") {
     return (
       <div className="flex items-center gap-2 py-1.5 text-xs text-zinc-600 dark:text-zinc-400">

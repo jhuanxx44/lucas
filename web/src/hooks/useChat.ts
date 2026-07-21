@@ -29,6 +29,7 @@ type Action =
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
   | { type: "TRACE_STEP"; trace: ChatTraceStep }
+  | { type: "THOUGHT_DELTA"; step: number; text: string; id: string }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage };
 
@@ -75,6 +76,21 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, processSteps: [...state.processSteps, action.step] };
     case "TRACE_STEP":
       return { ...state, traceSteps: [...state.traceSteps, action.trace] };
+    case "THOUGHT_DELTA": {
+      // 同一 step 的思考 delta 累积成一条 trace step；换 step 或首段则新建
+      const last = state.traceSteps.at(-1);
+      if (last && last.kind === "thought" && last.step === action.step) {
+        const traceSteps = state.traceSteps.slice(0, -1);
+        traceSteps.push({ ...last, label: last.label + action.text });
+        return { ...state, traceSteps };
+      }
+      return {
+        ...state,
+        traceSteps: [...state.traceSteps, {
+          id: action.id, kind: "thought", label: action.text, status: "done", step: action.step,
+        }],
+      };
+    }
     case "DONE": {
       return {
         ...state,
@@ -177,6 +193,25 @@ export function useChat(
         dispatch({ type: "TRACE_STEP", trace });
       };
 
+      const appendThoughtDelta = (step: number, text: string) => {
+        // 与 reducer 一致：同 step 思考 delta 累积成一条，供最终提交的消息复用
+        const last = streamedTraceSteps.at(-1);
+        if (last && last.kind === "thought" && last.step === step) {
+          streamedTraceSteps = [
+            ...streamedTraceSteps.slice(0, -1),
+            { ...last, label: last.label + text },
+          ];
+          dispatch({ type: "THOUGHT_DELTA", step, text, id: last.id });
+        } else {
+          const id = nextId();
+          streamedTraceSteps = [
+            ...streamedTraceSteps,
+            { id, kind: "thought", label: text, status: "done", step },
+          ];
+          dispatch({ type: "THOUGHT_DELTA", step, text, id });
+        }
+      };
+
       dispatch({ type: "USER_MESSAGE", message: userMessage });
 
       const history = previousMessages.map((m) => ({
@@ -204,6 +239,11 @@ export function useChat(
                 streamedResearchers.set(d.id, { id: d.id, name: d.name, status: "running", text: "" });
                 dispatch({ type: "RESEARCHER_START", id: d.id, name: d.name });
                 break;
+              case "thought": {
+                const t = data as { step: number; text: string };
+                if (t.text) appendThoughtDelta(t.step, t.text);
+                break;
+              }
               case "tool_step": {
                 const toolStep = data as {
                   step: number;

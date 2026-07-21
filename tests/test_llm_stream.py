@@ -41,7 +41,7 @@ async def test_gemini_chat_stream_awaits_sdk_stream():
     async for chunk in client.chat_stream(prompt="hi"):
         result.append(chunk)
 
-    assert result == ["你好", "世界"]
+    assert result == [("content", "你好"), ("content", "世界")]
 
 
 @pytest.mark.asyncio
@@ -51,14 +51,17 @@ async def test_openai_chat_stream_yields_chunks():
     mock_chunk_1 = MagicMock()
     mock_chunk_1.choices = [MagicMock()]
     mock_chunk_1.choices[0].delta.content = "你好"
+    mock_chunk_1.choices[0].delta.reasoning_content = None
 
     mock_chunk_2 = MagicMock()
     mock_chunk_2.choices = [MagicMock()]
     mock_chunk_2.choices[0].delta.content = "世界"
+    mock_chunk_2.choices[0].delta.reasoning_content = None
 
     mock_chunk_end = MagicMock()
     mock_chunk_end.choices = [MagicMock()]
     mock_chunk_end.choices[0].delta.content = None
+    mock_chunk_end.choices[0].delta.reasoning_content = None
 
     async def mock_stream():
         for chunk in (mock_chunk_1, mock_chunk_2, mock_chunk_end):
@@ -73,8 +76,8 @@ async def test_openai_chat_stream_yields_chunks():
             async for chunk in client.chat_stream(prompt="hi"):
                 chunks.append(chunk)
 
-            assert "你好" in chunks
-            assert "世界" in chunks
+            assert ("content", "你好") in chunks
+            assert ("content", "世界") in chunks
 
 
 @pytest.mark.asyncio
@@ -84,6 +87,7 @@ async def test_openai_chat_stream_strips_think_tags():
     mock_chunk = MagicMock()
     mock_chunk.choices = [MagicMock()]
     mock_chunk.choices[0].delta.content = "<think>internal reasoning</think>visible text"
+    mock_chunk.choices[0].delta.reasoning_content = None
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
         with patch("openai.AsyncOpenAI"):
@@ -96,7 +100,7 @@ async def test_openai_chat_stream_strips_think_tags():
             async for chunk in client.chat_stream(prompt="hi"):
                 chunks.append(chunk)
 
-            assert chunks == ["visible text"]
+            assert chunks == [("content", "visible text")]
 
 
 @pytest.mark.asyncio
@@ -106,6 +110,7 @@ async def test_openai_chat_stream_skips_empty_after_strip():
     mock_chunk = MagicMock()
     mock_chunk.choices = [MagicMock()]
     mock_chunk.choices[0].delta.content = "<think>only thinking</think>"
+    mock_chunk.choices[0].delta.reasoning_content = None
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
         with patch("openai.AsyncOpenAI"):
@@ -119,3 +124,33 @@ async def test_openai_chat_stream_skips_empty_after_strip():
                 chunks.append(chunk)
 
             assert chunks == []
+
+
+@pytest.mark.asyncio
+async def test_openai_chat_stream_separates_reasoning_content():
+    """DeepSeek 原生 reasoning_content → ("reasoning", ...)；content → ("content", ...)"""
+    from utils.llm_client import _OpenAICompatClient
+
+    think_chunk = MagicMock()
+    think_chunk.choices = [MagicMock()]
+    think_chunk.choices[0].delta.content = None
+    think_chunk.choices[0].delta.reasoning_content = "先判断行业。"
+
+    answer_chunk = MagicMock()
+    answer_chunk.choices = [MagicMock()]
+    answer_chunk.choices[0].delta.content = "白酒行业"
+    answer_chunk.choices[0].delta.reasoning_content = None
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
+        with patch("openai.AsyncOpenAI"):
+            client = _OpenAICompatClient(model="deepseek-v4-flash", system_prompt=None)
+            async def mock_stream():
+                for chunk in (think_chunk, answer_chunk):
+                    yield chunk
+            client._client.chat.completions.create = AsyncMock(return_value=mock_stream())
+
+            chunks = []
+            async for chunk in client.chat_stream(prompt="hi"):
+                chunks.append(chunk)
+
+    assert chunks == [("reasoning", "先判断行业。"), ("content", "白酒行业")]

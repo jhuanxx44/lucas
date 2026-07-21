@@ -79,7 +79,13 @@ class LLMClient(abc.ABC):
         response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
-    ) -> "AsyncGenerator[str, None]":
+    ) -> "AsyncGenerator[Tuple[str, str], None]":
+        """产出 (kind, text)：kind 为 "reasoning"（思考）或 "content"（答案）。
+
+        思考走模型原生的独立通道（如 DeepSeek 的 reasoning_content），
+        与答案分离，由上层分别展示为过程 thought 和最终回答。
+        无原生 reasoning 的实现只产出 "content"。
+        """
         ...
 
 
@@ -169,7 +175,7 @@ class _GeminiClient(LLMClient):
         )
         async for chunk in stream:
             if chunk.text:
-                yield chunk.text
+                yield "content", chunk.text
 
 
 class _OpenAICompatClient(LLMClient):
@@ -258,7 +264,14 @@ class _OpenAICompatClient(LLMClient):
         response_mime_type: str = "text/plain",
         temperature: Optional[float] = None,
         thinking_budget: Optional[int] = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[Tuple[str, str], None]:
+        """产出 (kind, text)：
+
+        - ("reasoning", ...)：模型原生独立思考通道（DeepSeek reasoning_content），
+          逐 delta 直接透传，与答案分离。
+        - ("content", ...)：答案文本，沿用 <think> 内联标签剥离作为兜底
+          （部分模型把思考塞进 content 而非 reasoning_content）。
+        """
         messages = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
@@ -276,8 +289,14 @@ class _OpenAICompatClient(LLMClient):
         buf = ""
         in_think = False
         async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                buf += chunk.choices[0].delta.content
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            reasoning = getattr(delta, "reasoning_content", None)
+            if reasoning:
+                yield "reasoning", reasoning
+            if delta.content:
+                buf += delta.content
                 while True:
                     if in_think:
                         end = buf.find("</think>")
@@ -293,19 +312,19 @@ class _OpenAICompatClient(LLMClient):
                                 # partial tag — hold back
                                 safe = buf[:buf.rfind("<")]
                                 if safe:
-                                    yield safe
+                                    yield "content", safe
                                 buf = buf[len(safe):]
                             else:
                                 if buf:
-                                    yield buf
+                                    yield "content", buf
                                 buf = ""
                             break
                         if start > 0:
-                            yield buf[:start]
+                            yield "content", buf[:start]
                         buf = buf[start + 7:]
                         in_think = True
         if buf and not in_think:
-            yield buf
+            yield "content", buf
 
 
 def create_client(

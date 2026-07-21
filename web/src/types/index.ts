@@ -41,7 +41,7 @@ export interface ChatAction {
 
 export interface ChatTraceStep {
   id: string;
-  kind: "action" | "tool";
+  kind: "action" | "tool" | "thought";
   label: string;
   status: "running" | "done" | "error";
   step?: number;
