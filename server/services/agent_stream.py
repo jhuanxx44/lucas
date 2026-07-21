@@ -21,7 +21,7 @@ import logging
 from pathlib import Path
 from typing import AsyncGenerator
 
-from harness.config import load_agent_config
+from harness.config import build_single_system_prompt, load_agent_config
 from harness.model_adapter import LLMClientAdapter
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
@@ -34,7 +34,7 @@ from utils.llm_client import create_client
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_PROMPT_PATH = _PROJECT_ROOT / "prompts" / "harness" / "tool-loop.md"
+_PROMPT_PATH = _PROJECT_ROOT / "prompts" / "harness" / "agent-loop.md"
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 120.0
@@ -111,12 +111,15 @@ async def chat_event_stream(
     run_task: asyncio.Task | None = None
     try:
         config = load_agent_config()
-        if model_adapter is None:
-            client = create_client(provider=config.provider, model=config.model)
-            model_adapter = LLMClientAdapter(client, temperature=config.temperature)
         # 产品聊天显式装配四个只读研究工具；wiki 根 = 工作区/wiki。
         tools = ToolRuntime(workspace or _PROJECT_ROOT, _CHAT_TOOL_SPECS)
         allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
+        if model_adapter is None:
+            # 工具说明渲染进 system prompt（稳定指令层），user prompt 只留每轮变化内容。
+            system_prompt = build_single_system_prompt(tools.describe(allowed_tools))
+            client = create_client(provider=config.provider, model=config.model,
+                                   system_prompt=system_prompt)
+            model_adapter = LLMClientAdapter(client, temperature=config.temperature)
         runner = AgentRunner(model_adapter, tools, load_prompt_template(_PROMPT_PATH))
         instruction = _render_history(history) + f"用户问题：{question}"
         limits = RunLimits(max_steps=config.max_steps, timeout_seconds=_TIMEOUT_SECONDS)

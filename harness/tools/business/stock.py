@@ -79,13 +79,13 @@ async def stock_kline(workspace: Path, args: dict) -> ToolResult:
 STOCK_QUOTE_SPEC = ToolSpec(
     name="stock_quote",
     description="查询 A 股个股实时行情（最新价、涨跌幅、成交量、市盈率、市值等）",
-    args_description='{"code": "6 位股票代码，可带 .SH/.SZ/.BJ 后缀，如 600519.SH 或 920001.BJ"}',
+    args_description='{"code": "6 位股票代码，可带 .SH/.SZ/.BJ 后缀，如 600519.SH 或 920001.BJ；按常识给出，不要臆造不存在的代码"}',
     handler=stock_quote,
 )
 
 STOCK_KLINE_SPEC = ToolSpec(
     name="stock_kline",
     description="查询 A 股个股历史 K 线（开盘/收盘/最高/最低/成交量/涨跌幅）",
-    args_description='{"code": "6 位股票代码，如 600519.SH 或 920001.BJ", "period": "可选，daily/weekly/monthly/1m/5m/15m/30m/60m，默认 daily", "count": "可选，默认 30，上限 120"}',
+    args_description='{"code": "6 位股票代码，如 600519.SH 或 920001.BJ，不要臆造不存在的代码", "period": "可选，daily/weekly/monthly/1m/5m/15m/30m/60m，默认 daily", "count": "可选，默认 30，上限 120"}',
     handler=stock_kline,
 )

@@ -323,13 +323,14 @@ class AgentRunner:
         return "".join(parts), None
 
     def _render(self, context: StepContext, allowed_tools: list[str]) -> str:
+        # 工具说明由调用方拼进 system prompt（稳定指令层），此处只渲染每轮变化的
+        # 任务与历史观察。allowed_tools 仍传入以保持 run() 签名不变（execute 用）。
         labels = {"assistant": "【你】", "tool": "【工具】"}
         observations = "\n\n".join(
             f"{labels[m['role']]}{m['content']}" for m in context.history
         ) or "（暂无）"
         return self.prompt_template.format(
             instruction=context.instruction,
-            tools_desc=self.tools.describe(allowed_tools),
             observations=observations,
         )
 

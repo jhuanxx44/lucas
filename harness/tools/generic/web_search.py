@@ -30,6 +30,6 @@ async def web_search(workspace: Path, args: dict) -> ToolResult:
 WEB_SEARCH_SPEC = ToolSpec(
     name="web_search",
     description="联网搜索公开网页，返回编号、标题、链接、摘要的 markdown 列表",
-    args_description='{"query": "搜索关键词", "max_results": "可选，默认 5，上限 10"}',
+    args_description='{"query": "搜索关键词，用具体词组（主体+主题+时间范围），不要把整句问题原样丢进去", "max_results": "可选，默认 5，上限 10"}',
     handler=web_search,
 )

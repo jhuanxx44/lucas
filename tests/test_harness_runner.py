@@ -43,7 +43,7 @@ def _runner(tmp_path: Path, model: FakeModel, trace: TraceRecorder, specs=None):
         READ_FILE_SPEC, APPLY_PATCH_SPEC,
     ])
     return AgentRunner(model, tools, load_prompt_template(
-        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "tool-loop.md"
+        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
     ))
 
 
@@ -542,7 +542,7 @@ async def test_async_tool_handler_is_awaited(tmp_path):
     trace = _trace(tmp_path)
     tools = ToolRuntime(tmp_path, [spec, READ_FILE_SPEC])
     runner = AgentRunner(model, tools, load_prompt_template(
-        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "tool-loop.md"
+        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
     ))
     result = await runner.run("task", ["async_tool", "read_file"], LIMITS, trace)
 

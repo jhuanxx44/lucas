@@ -22,3 +22,15 @@
 - `smoke`：最小读写闭环，用于快速确认 Runner、工具和 grader 基本可用。
 - `capability`：文件系统通用能力，包括长文本、多文件、消歧编辑和新建文件。
 - `business-capability`：Lucas 当前业务场景中的本地 Wiki 检索与综合。
+
+## 与线上聊天的关系
+
+评测与线上产品聊天走**同一条执行链路**：同一个 `AgentRunner`、同一份循环模板 `prompts/harness/agent-loop.md`、同一份系统提示 `prompts/harness/lucas-system-prompt.md`、同一套工具 `ToolSpec`。
+
+差异只在工具集，且是有意的：
+
+- 评测 adapter（`evals/harness/adapters/lucas_single.py`）**注册全部 9 个工具**（研究工具 + 文件读写工具），因为评测要覆盖 `READ/EDIT/WRITE` 这类框架级文件操作能力——这些是线上聊天本就不开放的能力。
+- 每道题再通过 `task.yaml` 的 `allowed_tools` **逐题收窄**到该题考察能力的最小集，并由 `type: allowed_tools` grader 校验 Agent 未越界。
+- 线上聊天（`server/services/agent_stream.py`）是只读研究助手，**只装 4 个研究工具**（web_search / stock_quote / stock_kline / wiki_recall），不开放文件读写。
+
+因此在共同能力（研究类）上评测与线上逐字对齐；文件类是评测额外覆盖的框架能力。修改循环模板或系统提示时，两条入口会同时受影响，需一并验证。

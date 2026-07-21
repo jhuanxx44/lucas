@@ -69,7 +69,7 @@
 ### 五、当前 baseline 固定项（供未来对照）
 
 - 模型：providers.yaml 默认（DeepSeek），temperature=0
-- prompt：`prompts/harness/tool-loop.md`（无预算提示、无导航策略提示）
+- prompt：`prompts/harness/tool-loop.md`（无预算提示、无导航策略提示；该文件后更名为 `agent-loop.md`，身份与工具说明移入 `lucas-system-prompt.md`）
 - READ-02：max_steps=12，allowed_tools=[read_file]，read_file 默认 max_chars=16000
 - 成功率参考（小样本）：READ-02 修复后 3/3；LIST-01 约 4/6；其余 3 题稳定通过
 

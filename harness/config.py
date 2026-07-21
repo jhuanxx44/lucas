@@ -16,6 +16,20 @@ DEFAULT_ALLOWED_TOOLS = [
 ]
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "lucas.yaml"
+_SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "harness" / "lucas-system-prompt.md"
+
+
+def build_single_system_prompt(tools_desc: str) -> str:
+    """组装 single 模式的 system prompt：身份/策略模板 + 渲染好的工具说明。
+
+    工具说明属于稳定指令层，随 system 一起下发（而非混进每轮变化的 user prompt）。
+    """
+    text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            text = text[end + 4:].lstrip("\n")
+    return text.format(tools_desc=tools_desc)
 
 
 @dataclass

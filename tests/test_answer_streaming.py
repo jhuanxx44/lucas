@@ -16,7 +16,7 @@ from harness.tools.generic.filesystem import READ_FILE_SPEC
 
 LIMITS = RunLimits(max_steps=5, timeout_seconds=30)
 PROMPT = load_prompt_template(
-    Path(__file__).resolve().parent.parent / "prompts" / "harness" / "tool-loop.md"
+    Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
 )
 
 
