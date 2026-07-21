@@ -307,3 +307,44 @@ AI 版确实保留了 `澄海精密`、`2025年第四季度`、`一次良率` �
 4. 若继续优化，下一个单变量应是候选阈值/停止补位策略，而不是再次更换关键词提取器。
 
 实验产物：`runs/wiki-keyword-ab-20260720-210948-0b2d7985/summary.json`，包含两组完整 prompt、tool args、observation 和 trace。
+
+## 实验 008：结果去重护栏 + 无进展强制收尾（2026-07-21）
+
+### 背景与假设
+
+生产聊天出现一次"分析过程中断"：模型对比博通时，用微调查询（换词序、加 Broadcom、改 limit）连续调用 `wiki_recall`/`web_search`，每次 `status=ok` 但拿回相同/相似内容（库中无博通，靠"光通信"OR 命中返回无关行业页），5 次耗尽 observation 预算后落到 `finish_reason="error"`。
+
+**假设**：Agent 打转的本质是"反复拿回相同信息"而非"反复问相同问题"。对**结果**去重（而非对 args 去重）能抓住"换措辞查询但拿回相同内容"这类打转；命中后先回注警告让模型自纠、再次命中则强制基于已有信息收尾，可把 `finish_reason` 从 error 转为 completed，并显著降低步骤与 observation 消耗。
+
+预期改善指标：无答案中断（error/预算耗尽）→ 正常收尾；单轮工具调用次数有界；重复的大 observation 不再进 history 回放。
+
+### 开源调研依据
+
+调查 LangGraph / smolagents / aider / AutoGPT / openclaw / OpenHands 真实源码（clone 读码）。关键结论：
+- 只有 openclaw（`tool-loop-detection.ts`）与 OpenHands（`stuck.py`）真正做"结果/observation 去重"；其余仅有步数上限。
+- 共识做法：比对 `result_hash`（非仅 args）、遍历用 `continue` 支持非紧邻重复、hash 前剥离易变字段、两档（warning→强制/拦截）、回注时给**具体替代动作**。
+- 无人用语义相似度判重——精确 hash 已覆盖"换措辞"场景。
+- 强制收尾（smolagents 式）对检索型任务比报错中止（LangGraph/OpenHands 式）体验更好。
+
+### 单变量实现
+
+只改 `harness/runner.py`，不动任何工具（工具改造留作独立实验，避免功劳混淆）：
+- 维护 `seen_result_steps: {observation_hash → 首次出现的 step}`。工具**成功**后对最终 observation 文本算 sha256（我们的 observation 是纯文本、无 messageId/timestamp 等易变字段，无需字段黑名单）。
+- 命中已见 hash → `stall_count += 1`，不把重复正文再塞进 history（只回注一条短提示），支持非紧邻重复。
+- 两档：`stall_count==1` 回注 warning（给替代动作，放行）；`stall_count>=2`（`_STALL_FORCE_ANSWER`）回注强制收尾指令（软收尾：要求模型下一轮只出 answer，仍由模型执行）。
+- 新增 trace 事件 `no_progress_detected`；新增 grader `no_stalled_progress`（断言无进展次数 ≤ 阈值）；新增固定 task `LOOP-01`（问库中不存在的公司，fixture 用"半导体"行业页复现 OR 误命中），纳入 business-capability suite。
+- 同轮把 `MAX_TOTAL_OBSERVATION_CHARS` 48000→240000、`MAX_OBSERVATION_CHARS` 16000→32000（DeepSeek-V4-Flash 1M 窗口下先解除对正常复杂任务的误伤；这是独立的预算旋钮，非本实验主变量）。
+
+### 结果（确定性层）
+
+- 单元测试 `test_no_progress_stall_forces_answer`：baseline 复现（三次相同结果全部执行、最终非 completed）→ 改动后首次重复 warning、二次重复强制收尾、`finish_reason=completed`，two `no_progress_detected` 事件均正确追溯到首次 step。
+- 全量测试 206 passed（仅需外部 model fixture 的连通性脚本除外）。修正了两个因常量调大/去重生效而过时假设的既有测试。
+- `LOOP-01` oracle run 通过、known-bad run 失败，证明 grader 接受正确答案、拒绝错误答案。
+
+**未完成（诚实标注）**：真实模型 trial 需 `DEEPSEEK_API_KEY`，当前环境无此密钥，未能跑 baseline vs 改动后的多 trial 对比（成功率/步骤/token/成本）。确定性层已证明机制正确，但"软收尾在真实模型上是否足够（模型收到强指令是否仍可能继续调工具）"尚未用真实 trial 验证。
+
+### 结论与后续
+
+1. 机制在确定性层成立并已进入产品链路（chat 走同一 `AgentRunner`）。
+2. 待补：用真实 key 跑 `LOOP-01`（含博通式场景）多 trial，确认软收尾足够；若模型收到强指令仍打转，再升级为硬收尾（跳出工具循环、禁用工具单独发 final-answer prompt）。
+3. 本护栏是第二道防线（兜底）。第一道防线（`wiki_recall` 摘要化 + 相关性阈值 + 分词级命中透明，治本，对应实验 007 预告的候选阈值方向）作为下一轮独立实验。

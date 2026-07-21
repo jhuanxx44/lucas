@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -13,6 +14,9 @@ from utils.token_tracker import TokenUsage
 
 MAX_OBSERVATION_CHARS = 32_000
 MAX_TOTAL_OBSERVATION_CHARS = 240_000
+# 拿回已见过结果累计达到此次数即强制收尾（软收尾：回注强指令，下一轮仍由模型出 answer）。
+# 首次重复（stall_count=1）先回注 warning 放行，第二次（=2）强制收尾。
+_STALL_FORCE_ANSWER = 2
 
 
 class _RunDeadlineExceeded(Exception):
@@ -69,6 +73,10 @@ class AgentRunner:
         """
         context = StepContext(step_id="", instruction=instruction)
         last_failed_signature = None
+        # 无进展检测：成功调用的 observation 指纹 → 首次出现的 step。
+        # 判"打转"看结果是否重复（拿回相同信息），而非参数是否重复（换措辞查询也能抓到）。
+        seen_result_steps: dict[str, int] = {}
+        stall_count = 0  # 累计"拿回已见过的结果"次数
         total_observation_chars = 0
         total_usage: TokenUsage | None = None
         cost_usd = 0.0
@@ -280,6 +288,29 @@ class AgentRunner:
                     "truncated": result.truncated,
                 })
                 last_failed_signature = None
+                result_hash = hashlib.sha256(observation.encode("utf-8")).hexdigest()
+                first_step = seen_result_steps.get(result_hash)
+                if first_step is not None:
+                    # 无进展：不把重复正文再塞进 history（省预算），只回注一条提示。
+                    # raw（模型本轮输出）已在 model_call 后入 history，此处只补 tool 反馈。
+                    stall_count += 1
+                    stall_note = _stall_note(tool, first_step, stall_count >= _STALL_FORCE_ANSWER)
+                    context.history.append({"role": "tool", "content": stall_note})
+                    trace.record("no_progress_detected", {
+                        "step_id": context.step_id,
+                        "tool": tool,
+                        "repeated_from_step": first_step,
+                        "stall_count": stall_count,
+                        "forced_answer": stall_count >= _STALL_FORCE_ANSWER,
+                    })
+                    trace.record("step_finished", {"step_id": context.step_id})
+                    if on_event is not None:
+                        on_event({
+                            "kind": "tool_step", "step": step, "tool": tool,
+                            "args": args, "ok": result.ok, "observation": observation,
+                        })
+                    continue
+                seen_result_steps[result_hash] = step
             else:
                 trace.record("tool_call_error", {
                     "tool_call_id": call_id,
@@ -398,6 +429,20 @@ def _parse_action(raw: str) -> dict | None:
 def _format_observation(tool: str, result) -> str:
     suffix = " [truncated]" if result.truncated else ""
     return f"[{tool}] status={result.status}{suffix}\n{result.observation}"
+
+
+def _stall_note(tool: str, first_step: int, force_answer: bool) -> str:
+    """无进展回注：结果与前一步相同即"没拿到新信息"。给出明确替代动作。
+
+    force_answer=True 时要求模型立即基于已有信息作答，不再调用工具。
+    """
+    base = (
+        f"注意：{tool} 这次返回的内容与第 {first_step} 步完全相同，没有获得新信息。"
+        "换查询词重复检索同一来源不会有新结果。"
+    )
+    if force_answer:
+        return base + "请立即基于已经掌握的信息给出最终答案（action: answer），不要再调用任何工具。"
+    return base + "请改用其他工具、换一个信息来源，或直接基于已有信息作答。"
 
 
 def _truncate_observation(text: str, limit: int) -> tuple[str, bool]:

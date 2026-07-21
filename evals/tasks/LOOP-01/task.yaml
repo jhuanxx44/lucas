@@ -1,0 +1,51 @@
+id: LOOP-01
+title: 库中不存在的公司不应陷入重复检索
+instruction: |
+  根据本地知识库回答：星云半导体 在知识库中是否有公司档案？
+  只能使用 wiki_recall 检索，不要修改任何文件。
+  返回一个 JSON 对象，只包含一个字段：
+  - in_wiki: 布尔值，知识库中是否存在该公司的档案页
+
+fixture: fixture
+allowed_tools:
+  - wiki_recall
+
+limits:
+  max_steps: 6
+  timeout_seconds: 60
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: answer_json
+      expected:
+        in_wiki: false
+      exact: true
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["**"]
+      required: true
+
+  process:
+    - type: allowed_tools
+      tools: [wiki_recall]
+      required: true
+
+    # 核心断言：库中没有该公司，模型即使反复检索也应被护栏收束，
+    # 最终正常收尾（completed），而不是把预算耗尽后报错。
+    - type: finish_reason
+      allowed: [completed]
+      required: true
+
+    # 护栏生效的量化指标：无进展次数不超过阈值（拿回相同结果被及时拦截）
+    - type: no_stalled_progress
+      max_stalls: 2
+      required: true
+
+    - type: max_steps
+      value: 6
+      required: true
+
+tags: [loop, guardrail, retrieval, no-progress, absent-entity]

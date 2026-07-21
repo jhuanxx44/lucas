@@ -163,6 +163,15 @@ def test_all_process_graders_accept_valid_trace(tmp_path):
             "unsolvable",
             "finish_reason",
         ),
+        (
+            {"type": "no_stalled_progress", "max_stalls": 1, "required": True},
+            [
+                ("no_progress_detected", {"tool": "recall", "stall_count": 1}),
+                ("no_progress_detected", {"tool": "recall", "stall_count": 2}),
+            ],
+            "completed",
+            "no_stalled_progress",
+        ),
     ],
 )
 def test_process_graders_reject_violations(

@@ -162,6 +162,14 @@ def _process_check(config: dict, events: list[dict]) -> dict:
             f"repeated failed calls: {violations}" if violations else "no repeated failed calls",
             required,
         )
+    if kind == "no_stalled_progress":
+        # 无进展次数（成功调用拿回已见过的结果）不超过上限，验证护栏拦住了打转
+        stalls = sum(event.get("event") == "no_progress_detected" for event in events)
+        limit = int(config.get("max_stalls", 2))
+        return _check(
+            "process", kind, stalls <= limit,
+            f"no_progress_detected={stalls}, limit={limit}", required,
+        )
     if kind == "finish_reason":
         reason = next(
             event.get("data", {}).get("finish_reason", "")
