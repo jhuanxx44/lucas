@@ -100,10 +100,15 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
   useEffect(() => {
     onLiveTraceChange?.(
       state.isLoading && state.activeQuestion
-        ? { question: state.activeQuestion, steps: state.traceSteps }
+        ? {
+            question: state.activeQuestion,
+            answer: state.synthesis,
+            steps: state.traceSteps,
+            runtimeTrace: state.runtimeTrace,
+          }
         : null
     );
-  }, [onLiveTraceChange, state.activeQuestion, state.isLoading, state.traceSteps]);
+  }, [onLiveTraceChange, state.activeQuestion, state.isLoading, state.runtimeTrace, state.synthesis, state.traceSteps]);
 
   return (
     <div className="relative flex h-full min-w-0 flex-col bg-white dark:bg-zinc-950">

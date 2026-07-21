@@ -50,6 +50,14 @@ export interface ChatTraceStep {
   output?: string;
 }
 
+export interface ChatRuntimeTraceEvent {
+  sequence: number;
+  timestamp: string;
+  event: string;
+  step?: number;
+  data: Record<string, unknown>;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -59,6 +67,7 @@ export interface ChatMessage {
   actions?: ChatAction[];
   processSteps?: string[];
   traceSteps?: ChatTraceStep[];
+  runtimeTrace?: ChatRuntimeTraceEvent[];
 }
 
 export interface ChatSessionSummary {

@@ -168,6 +168,7 @@ async def chat_event_stream(
         # 产品聊天显式装配四个只读研究工具；wiki 根 = 工作区/wiki。
         tools = ToolRuntime(workspace or _PROJECT_ROOT, _CHAT_TOOL_SPECS)
         allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
+        system_prompt: str | None = None
         if model_adapter is None:
             # 工具说明渲染进 system prompt（稳定指令层），user prompt 只留每轮变化内容。
             system_prompt = build_single_system_prompt(
@@ -182,7 +183,9 @@ async def chat_event_stream(
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
             runner.run(instruction, allowed_tools, limits,
-                       on_event=queue.put_nowait, stream_answer=True)
+                       on_event=queue.put_nowait,
+                       on_trace_event=queue.put_nowait,
+                       stream_answer=True)
         )
 
         # answer_chunk 已推送的字符数；run 结束时若少于最终答案长度则补尾防缺字
@@ -191,6 +194,24 @@ async def chat_event_stream(
         def _forward(evt: dict) -> str | None:
             nonlocal streamed_chars
             kind = evt.get("kind")
+            if kind == "model_input":
+                return _sse("trace_event", {
+                    "event": "model_input",
+                    "step": evt.get("step"),
+                    "data": {"prompt": evt.get("prompt", "")},
+                })
+            if kind == "model_output":
+                return _sse("trace_event", {
+                    "event": "model_output",
+                    "step": evt.get("step"),
+                    "data": {"output": evt.get("output", "")},
+                })
+            if kind == "thought":
+                return _sse("trace_event", {
+                    "event": "model_reasoning",
+                    "step": evt.get("step"),
+                    "data": {"text": evt.get("text", "")},
+                })
             if kind == "tool_step":
                 return _sse("tool_step", {
                     "step": evt.get("step"),
@@ -219,6 +240,19 @@ async def chat_event_stream(
             "mode": "single",
         })
         yield _sse("researcher_start", {"id": "single", "name": config.name})
+        yield _sse("trace_event", {
+            "event": "run_config",
+            "data": {
+                "agent": config.name,
+                "provider": config.provider,
+                "model": config.model,
+                "temperature": config.temperature,
+                "allowed_tools": allowed_tools,
+                "max_steps": limits.max_steps,
+                "timeout_seconds": limits.timeout_seconds,
+                "system_prompt": system_prompt,
+            },
+        })
         # 运行期间增量排出工具 step / answer_chunk 事件；
         # answer 事件以最终 AgentResult 为准，不重复推送
         while not run_task.done():

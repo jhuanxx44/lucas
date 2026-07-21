@@ -56,6 +56,7 @@ class AgentRunner:
         trace: TraceRecorder | None = None,
         on_event: Callable[[dict], None] | None = None,
         stream_answer: bool = False,
+        on_trace_event: Callable[[dict], None] | None = None,
     ) -> AgentResult:
         """on_event：可选的 step 事件钩子（同步回调，零开销缺省）。
 
@@ -63,6 +64,7 @@ class AgentRunner:
         "observation"}；
         answer 产出时回调 {"kind": "answer", "step", "answer"}。
         不改变任何终止语义，仅用于外部观察（如 SSE 桥）。
+        on_trace_event 单独承接完整模型输入与原始输出，不污染上述展示事件协议。
 
         stream_answer=True 且 adapter 实现 complete_stream 且传了 on_event 时，
         模型输出改走流式：AnswerStreamParser 确认是字符串 reply 后逐段回调
@@ -127,6 +129,8 @@ class AgentRunner:
             context.step_id = f"step-{step}"
             trace.record("step_started", {"step_id": context.step_id})
             prompt = self._render(context, allowed_tools)
+            if on_trace_event is not None:
+                on_trace_event({"kind": "model_input", "step": step, "prompt": prompt})
             # 大 payload 写 artifact，trace 只留引用；prompt 不含敏感信息（工作区隔离、env 已净化）
             prompt_ref = (
                 _write_artifact(artifacts, f"prompt-{context.step_id}.txt", prompt)
@@ -182,6 +186,8 @@ class AgentRunner:
                 "artifact": output_ref,
                 **(_usage_trace_data(usage)),
             })
+            if on_trace_event is not None:
+                on_trace_event({"kind": "model_output", "step": step, "output": raw})
             # 全量回放：模型自己的原始输出（包括格式错误的）进入后续上下文
             context.history.append({"role": "assistant", "content": raw})
             action = _parse_action(raw)

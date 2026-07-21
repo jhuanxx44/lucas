@@ -108,13 +108,14 @@ async def test_agent_stream_full_event_sequence(tmp_path):
         (json.dumps({"action": "answer", "reply": "最终答案"}), u2),
     ])
     events = await _collect("查一下茅台", model=model, workspace=tmp_path)
+    visible_events = [item for item in events if item[0] != "trace_event"]
 
-    assert [e for e, _ in events] == [
+    assert [e for e, _ in visible_events] == [
         "dispatch", "researcher_start", "tool_step", "synthesis_chunk", "researcher_done", "done",
     ]
-    assert events[0][1] == {"researchers": [{"id": "single", "name": "Lucas"}], "mode": "single"}
-    assert events[1][1] == {"id": "single", "name": "Lucas"}
-    assert events[2][1] == {
+    assert visible_events[0][1] == {"researchers": [{"id": "single", "name": "Lucas"}], "mode": "single"}
+    assert visible_events[1][1] == {"id": "single", "name": "Lucas"}
+    assert visible_events[2][1] == {
         "step": 1,
         "tool": "wiki_recall",
         "args": {"query": "贵州茅台"},
@@ -122,9 +123,63 @@ async def test_agent_stream_full_event_sequence(tmp_path):
         "output": "[wiki_recall] status=ok\n（wiki 知识库为空，没有可召回的页面）",
         "message": "Lucas 调用 wiki_recall: 贵州茅台",
     }
-    assert events[3][1] == {"text": "最终答案"}
-    assert events[4][1] == {"id": "single"}
-    assert events[5][1] == {"total_tokens": 430}
+    assert visible_events[3][1] == {"text": "最终答案"}
+    assert visible_events[4][1] == {"id": "single"}
+    assert visible_events[5][1] == {"total_tokens": 430}
+
+
+async def test_agent_stream_exports_complete_model_trajectory(tmp_path):
+    """隐藏 trace 流包含每轮模型输入、原始输出，供导出完整复盘。"""
+    tool_output = json.dumps({
+        "summary": "先查知识库",
+        "action": "tool",
+        "tool": "wiki_recall",
+        "args": {"query": "贵州茅台"},
+    }, ensure_ascii=False)
+    answer_output = json.dumps({
+        "summary": "根据检索结果回答",
+        "action": "answer",
+        "reply": "最终答案",
+    }, ensure_ascii=False)
+    model = FakeModel([tool_output, answer_output])
+
+    events = await _collect("查一下茅台", model=model, workspace=tmp_path)
+
+    trace_events = [data for event, data in events if event == "trace_event"]
+    assert [event["event"] for event in trace_events] == [
+        "run_config", "model_input", "model_output", "model_input", "model_output",
+    ]
+    assert trace_events[0]["data"]["allowed_tools"]
+    assert trace_events[1]["step"] == 1
+    assert "用户问题：查一下茅台" in trace_events[1]["data"]["prompt"]
+    assert trace_events[2] == {
+        "event": "model_output",
+        "step": 1,
+        "data": {"output": tool_output},
+    }
+    assert "[wiki_recall] status=ok" in trace_events[3]["data"]["prompt"]
+    assert trace_events[4]["data"]["output"] == answer_output
+
+
+async def test_agent_stream_exports_provider_reasoning_without_display_event(tmp_path):
+    """provider 返回的 reasoning 进入隐藏 trace，但不改变右侧展示事件。"""
+    class ReasoningModel:
+        async def complete_stream(self, prompt: str):
+            yield "reasoning", "先判断知识库是否足够。"
+            yield "content", json.dumps({"action": "answer", "reply": "够了"}, ensure_ascii=False)
+
+    events = await _collect("资料够吗", model=ReasoningModel(), workspace=tmp_path)
+
+    reasoning = [
+        data for event, data in events
+        if event == "trace_event" and data["event"] == "model_reasoning"
+    ]
+    assert reasoning == [{
+        "event": "model_reasoning",
+        "step": 1,
+        "data": {"text": "先判断知识库是否足够。"},
+    }]
+    assert "thought" not in [event for event, _ in events]
 
 
 async def test_agent_stream_dispatch_contract(tmp_path):
@@ -151,15 +206,16 @@ async def test_agent_stream_history_injected_into_instruction(tmp_path):
         {"role": "assistant", "content": "之前的回答"},
     ]
     events = await _collect("新问题", history=history, model=model, workspace=tmp_path)
+    visible_events = [item for item in events if item[0] != "trace_event"]
 
-    assert [e for e, _ in events] == [
+    assert [e for e, _ in visible_events] == [
         "dispatch", "researcher_start", "synthesis_chunk", "researcher_done", "done",
     ]
     prompt = model.prompts[0]
     assert "用户: 之前的问题" in prompt
     assert "助手: 之前的回答" in prompt
     assert "用户问题：新问题" in prompt
-    assert events[-1][1] == {"total_tokens": 0}  # FakeModel 无 usage
+    assert visible_events[-1][1] == {"total_tokens": 0}  # FakeModel 无 usage
 
 
 async def test_agent_stream_model_exception_yields_error(tmp_path):
@@ -169,11 +225,12 @@ async def test_agent_stream_model_exception_yields_error(tmp_path):
             raise RuntimeError("boom")
 
     events = await _collect("test", model=BoomModel(), workspace=tmp_path)
+    visible_events = [item for item in events if item[0] != "trace_event"]
 
-    assert [e for e, _ in events] == ["dispatch", "researcher_start", "error"]
-    assert events[2][1]["message"] == "分析过程出错，请稍后重试。"
+    assert [e for e, _ in visible_events] == ["dispatch", "researcher_start", "error"]
+    assert visible_events[2][1]["message"] == "分析过程出错，请稍后重试。"
     # 内部异常详情（含 provider 英文报错）不外抛给前端
-    assert "boom" not in events[2][1]["message"]
+    assert "boom" not in visible_events[2][1]["message"]
 
 
 async def test_agent_stream_max_steps_yields_error(tmp_path):

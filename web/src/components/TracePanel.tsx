@@ -1,16 +1,20 @@
 import { useEffect, useRef } from "react";
 import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Wrench, X } from "lucide-react";
-import type { ChatMessage, ChatTraceStep } from "@/types";
+import type { ChatMessage, ChatRuntimeTraceEvent, ChatTraceStep } from "@/types";
 
 export interface LiveTraceTurn {
   question: string;
+  answer: string;
   steps: ChatTraceStep[];
+  runtimeTrace: ChatRuntimeTraceEvent[];
 }
 
 interface TraceTurn {
   id: string;
   question: string;
+  answer: string;
   steps: ChatTraceStep[];
+  runtimeTrace: ChatRuntimeTraceEvent[];
   live?: boolean;
 }
 
@@ -44,7 +48,13 @@ function buildTurns(messages: ChatMessage[], liveTurn: LiveTraceTurn | null): Tr
       const steps = rawSteps.filter((step, index) => (
         index === 0 || rawSteps[index - 1].label !== step.label
       ));
-      if (steps.length) turns.push({ id: message.id, question, steps });
+      if (steps.length) turns.push({
+        id: message.id,
+        question,
+        answer: message.content,
+        steps,
+        runtimeTrace: message.runtimeTrace ?? [],
+      });
     }
   }
   if (liveTurn) {
@@ -53,12 +63,32 @@ function buildTurns(messages: ChatMessage[], liveTurn: LiveTraceTurn | null): Tr
   return turns;
 }
 
+function traceCompleteness(events: ChatRuntimeTraceEvent[], live?: boolean) {
+  if (live) return "in_progress";
+  const names = new Set(events.map((event) => event.event));
+  const finished = events.find((event) => event.event === "run_finished");
+  const finishReason = finished?.data.finishReason;
+  const hasLifecycle = names.has("run_started") && names.has("run_config") && names.has("run_finished");
+  const hasCompletedOutput = finishReason !== "completed" || (
+    names.has("model_input")
+    && names.has("model_output")
+    && names.has("assistant_answer")
+  );
+  return hasLifecycle && hasCompletedOutput ? "complete" : "legacy_partial";
+}
+
 function exportTrace(turns: TraceTurn[]) {
   const exportedAt = new Date();
   const payload = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    traceType: "lucas-product-run",
     exportedAt: exportedAt.toISOString(),
-    turns,
+    turns: turns.map(({ live, runtimeTrace, ...turn }) => ({
+      ...turn,
+      status: live ? "running" : "finished",
+      completeness: traceCompleteness(runtimeTrace, live),
+      events: runtimeTrace,
+    })),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
