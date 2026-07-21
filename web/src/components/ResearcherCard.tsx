@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { REMARK_PLUGINS } from "@/lib/markdown";
 import type { ResearcherState } from "@/types";
 
 const ICONS: Record<string, string> = {
@@ -33,7 +33,7 @@ export function ResearcherCard({ researcher }: { researcher: ResearcherState }) 
       </button>
       {expanded && researcher.text && (
         <div className="px-3 pb-3 text-xs prose prose-sm max-w-none dark:prose-invert prose-p:text-zinc-500 dark:prose-p:text-zinc-400 prose-headings:text-zinc-700 dark:prose-headings:text-zinc-300">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
             {researcher.text}
           </ReactMarkdown>
         </div>

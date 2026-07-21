@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Minus, Plus, X } from "lucide-react";
 import { fetchWikiPage, fetchRawFile, searchWiki } from "@/lib/api";
-import { processWikiLinks } from "@/lib/markdown";
+import { processWikiLinks, REMARK_PLUGINS } from "@/lib/markdown";
 import { useWikiNavigation } from "@/hooks/useWikiNavigation";
 import { RawReportPanel } from "@/components/RawReportPanel";
 import type { WikiPage } from "@/types";
@@ -92,7 +91,7 @@ export function WikiContent({ onClose }: WikiContentProps) {
       </div>
       <article style={{ fontSize: `${FONT_SIZES[fontIndex]}px` }} className="prose max-w-none dark:prose-invert prose-headings:text-zinc-800 dark:prose-headings:text-zinc-200 prose-p:text-zinc-600 dark:prose-p:text-zinc-300 prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-strong:text-zinc-800 dark:prose-strong:text-zinc-200 prose-code:text-indigo-600 dark:prose-code:text-indigo-300 prose-td:text-zinc-600 dark:prose-td:text-zinc-300 prose-th:text-zinc-800 dark:prose-th:text-zinc-200">
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={REMARK_PLUGINS}
           components={{
             a: ({ href, children }) => {
               if (href?.startsWith("#wiki:")) {

@@ -1,11 +1,21 @@
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import type { ChatMessage as ChatMessageType } from "@/types";
+import type { ChatMessage as ChatMessageType, ChatTraceStep } from "@/types";
 import { AnalysisProcess } from "./AnalysisProcess";
+import { REMARK_PLUGINS } from "@/lib/markdown";
 
 interface Props {
   message: ChatMessageType;
   onAction?: (value: string) => void;
+}
+
+// 历史消息只有 processSteps（无 traceSteps）时，退化成 action 步展示
+function legacySteps(message: ChatMessageType): ChatTraceStep[] {
+  return (message.processSteps ?? []).map((label, index) => ({
+    id: `${message.id}-legacy-${index}`,
+    kind: "action" as const,
+    label,
+    status: label.includes("失败") || label.includes("取消") ? "error" : "done",
+  }));
 }
 
 export function ChatMessage({ message, onAction }: Props) {
@@ -21,9 +31,9 @@ export function ChatMessage({ message, onAction }: Props) {
 
   return (
     <div className="mb-10">
-      <AnalysisProcess steps={message.processSteps ?? []} />
+      <AnalysisProcess steps={message.traceSteps?.length ? message.traceSteps : legacySteps(message)} />
       <div className="prose prose-zinc max-w-none text-[15px] leading-7 dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-4 prose-p:leading-7 prose-p:text-zinc-700 prose-a:text-indigo-600 prose-strong:text-zinc-900 prose-li:my-1 prose-li:text-zinc-700 prose-pre:rounded-xl prose-pre:border prose-pre:border-zinc-800 prose-pre:bg-zinc-950 dark:prose-p:text-zinc-300 dark:prose-a:text-indigo-400 dark:prose-strong:text-zinc-100 dark:prose-li:text-zinc-300">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
           {message.content}
         </ReactMarkdown>
       </div>

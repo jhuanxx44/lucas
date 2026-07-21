@@ -1,8 +1,8 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { fetchRawReport } from "@/lib/api";
+import { REMARK_PLUGINS } from "@/lib/markdown";
 import type { WikiPage } from "@/types";
 
 interface RawReportPanelProps {
@@ -104,7 +104,7 @@ export function RawReportPanel({ sources, researchers }: RawReportPanelProps) {
                 {r.error && <div className="text-xs text-red-500">{r.error}</div>}
                 {r.page && (
                   <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:text-zinc-500 dark:prose-p:text-zinc-400 prose-headings:text-zinc-700 dark:prose-headings:text-zinc-300">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{r.page.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{r.page.content}</ReactMarkdown>
                   </div>
                 )}
                 {r.loading && !r.page && <div className="text-xs text-zinc-400">加载中...</div>}

@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Loader2 } from "lucide-react";
+import { REMARK_PLUGINS } from "@/lib/markdown";
 
 interface SynthesisCardProps {
   text: string;
@@ -18,7 +18,7 @@ export function SynthesisCard({ text, loading }: SynthesisCardProps) {
       </div>
       {text && (
         <div className="prose prose-zinc mt-3 max-w-none text-[15px] dark:prose-invert prose-p:leading-7 prose-p:text-zinc-700 dark:prose-p:text-zinc-300">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
             {text}
           </ReactMarkdown>
         </div>
