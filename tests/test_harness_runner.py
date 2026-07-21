@@ -112,6 +112,32 @@ async def test_tool_step_event_keeps_full_observation_for_trace_ui(tmp_path):
     assert len(tool_step["observation"]) > 500
 
 
+async def test_summary_event_emitted_and_not_in_answer(tmp_path):
+    """action JSON 的 summary 字段 → summary 事件；不污染答案，缺省时不发事件"""
+    (tmp_path / "config.yaml").write_text("provider: deepseek\n")
+    model = FakeModel([
+        json.dumps({"summary": "先读配置文件", "action": "tool",
+                    "tool": "read_file", "args": {"path": "config.yaml"}}),
+        json.dumps({"action": "answer", "reply": "done"}),  # 无 summary
+    ])
+    trace = _trace(tmp_path)
+    streamed_events = []
+    result = await _runner(tmp_path, model, trace).run(
+        "read config", ["read_file"], LIMITS, trace,
+        on_event=streamed_events.append,
+    )
+
+    summaries = [e for e in streamed_events if e["kind"] == "summary"]
+    assert len(summaries) == 1
+    assert summaries[0]["text"] == "先读配置文件"
+    assert summaries[0]["step"] == 1
+    # summary 早于该步工具执行
+    tool_steps = [e for e in streamed_events if e["kind"] == "tool_step"]
+    assert streamed_events.index(summaries[0]) < streamed_events.index(tool_steps[0])
+    # 答案不含 summary
+    assert result.answer == "done"
+
+
 async def test_history_replays_model_raw_output(tmp_path):
     """全量回放：第二轮 prompt 同时包含第一轮模型的原始输出和工具 observation"""
     (tmp_path / "config.yaml").write_text("provider: deepseek\ntimeout: 10\n")

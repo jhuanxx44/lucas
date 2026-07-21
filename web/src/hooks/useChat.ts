@@ -29,7 +29,6 @@ type Action =
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
   | { type: "TRACE_STEP"; trace: ChatTraceStep }
-  | { type: "THOUGHT_DELTA"; step: number; text: string; id: string }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage };
 
@@ -43,7 +42,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         synthesis: "",
         actions: [],
         processSteps: ["Lucas 收到问题"],
-        traceSteps: [{ id: nextId(), kind: "action", label: "Lucas 收到问题", status: "done" }],
+        traceSteps: [],
         activeQuestion: action.message.content,
         isLoading: true,
         phase: "dispatching",
@@ -76,21 +75,6 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, processSteps: [...state.processSteps, action.step] };
     case "TRACE_STEP":
       return { ...state, traceSteps: [...state.traceSteps, action.trace] };
-    case "THOUGHT_DELTA": {
-      // 同一 step 的思考 delta 累积成一条 trace step；换 step 或首段则新建
-      const last = state.traceSteps.at(-1);
-      if (last && last.kind === "thought" && last.step === action.step) {
-        const traceSteps = state.traceSteps.slice(0, -1);
-        traceSteps.push({ ...last, label: last.label + action.text });
-        return { ...state, traceSteps };
-      }
-      return {
-        ...state,
-        traceSteps: [...state.traceSteps, {
-          id: action.id, kind: "thought", label: action.text, status: "done", step: action.step,
-        }],
-      };
-    }
     case "DONE": {
       return {
         ...state,
@@ -177,9 +161,7 @@ export function useChat(
       let streamedSynthesis = "";
       let streamedActions: ChatAction[] = [];
       let streamedProcessSteps = ["Lucas 收到问题"];
-      let streamedTraceSteps: ChatTraceStep[] = [
-        { id: nextId(), kind: "action", label: "Lucas 收到问题", status: "done" },
-      ];
+      let streamedTraceSteps: ChatTraceStep[] = [];
       let completed = false;
 
       const appendProcessStep = (step: string) => {
@@ -193,24 +175,6 @@ export function useChat(
         dispatch({ type: "TRACE_STEP", trace });
       };
 
-      const appendThoughtDelta = (step: number, text: string) => {
-        // 与 reducer 一致：同 step 思考 delta 累积成一条，供最终提交的消息复用
-        const last = streamedTraceSteps.at(-1);
-        if (last && last.kind === "thought" && last.step === step) {
-          streamedTraceSteps = [
-            ...streamedTraceSteps.slice(0, -1),
-            { ...last, label: last.label + text },
-          ];
-          dispatch({ type: "THOUGHT_DELTA", step, text, id: last.id });
-        } else {
-          const id = nextId();
-          streamedTraceSteps = [
-            ...streamedTraceSteps,
-            { id, kind: "thought", label: text, status: "done", step },
-          ];
-          dispatch({ type: "THOUGHT_DELTA", step, text, id });
-        }
-      };
 
       dispatch({ type: "USER_MESSAGE", message: userMessage });
 
@@ -231,7 +195,6 @@ export function useChat(
                 break;
               case "dispatch":
                 appendProcessStep("Lucas 开始分析");
-                appendTraceStep({ id: nextId(), kind: "action", label: "Lucas 开始分析", status: "done" });
                 dispatch({ type: "DISPATCH" });
                 onResearchTarget?.(question);
                 break;
@@ -239,9 +202,17 @@ export function useChat(
                 streamedResearchers.set(d.id, { id: d.id, name: d.name, status: "running", text: "" });
                 dispatch({ type: "RESEARCHER_START", id: d.id, name: d.name });
                 break;
-              case "thought": {
-                const t = data as { step: number; text: string };
-                if (t.text) appendThoughtDelta(t.step, t.text);
+              case "summary": {
+                const s = data as { step: number; text: string };
+                if (s.text) {
+                  appendTraceStep({
+                    id: nextId(),
+                    kind: "summary",
+                    label: s.text,
+                    status: "done",
+                    step: s.step,
+                  });
+                }
                 break;
               }
               case "tool_step": {

@@ -370,19 +370,25 @@ async def test_agent_stream_buffered_answer_tail_fill(tmp_path):
     assert json.loads(chunks[0]) == {"y2022": 2606}
 
 
-async def test_agent_stream_thought_event(tmp_path):
-    """reasoning 段经 SSE 桥 → thought 事件，早于 synthesis_chunk"""
+async def test_agent_stream_summary_event(tmp_path):
+    """action JSON 的 summary 字段 → summary 事件，早于 synthesis_chunk；
+    模型原生 reasoning 草稿不再转发前端（仅 trace 记录）"""
     reply = "白酒行业"
     model = FakeStreamModel([{
         "reasoning": "这是白酒龙头。",
-        "content": json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False),
+        "content": json.dumps(
+            {"summary": "直接判断行业归属", "action": "answer", "reply": reply},
+            ensure_ascii=False),
     }], chunk_size=3)
     events = await _collect("茅台是什么行业", model, tmp_path)
 
     kinds = [e for e, _ in events]
-    assert "thought" in kinds
-    assert kinds.index("thought") < kinds.index("synthesis_chunk")
-    thought = "".join(d["text"] for e, d in events if e == "thought")
-    assert thought == "这是白酒龙头。"
+    # reasoning 草稿不再进前端
+    assert "thought" not in kinds
+    # summary 事件产出（answer 步的 reply 边流边推，summary 于整段解析后发出，
+    # 两者分属不同 UI 区域，不强制先后；工具步的 summary 先于动作见 runner 测试）
+    assert "summary" in kinds
+    summary = "".join(d["text"] for e, d in events if e == "summary")
+    assert summary == "直接判断行业归属"
     synth = "".join(d["text"] for e, d in events if e == "synthesis_chunk")
     assert synth == reply

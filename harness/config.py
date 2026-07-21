@@ -4,6 +4,7 @@ lucas.yaml 承载 runtime + single_agent 段；
 M5 起新增 wiki 段：wiki 知识模块的领域本体（行业列表、索引标题等）。
 """
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -19,17 +20,21 @@ _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "lucas.yaml"
 _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "harness" / "lucas-system-prompt.md"
 
 
-def build_single_system_prompt(tools_desc: str) -> str:
+def build_single_system_prompt(tools_desc: str, current_date: str = "") -> str:
     """组装 single 模式的 system prompt：身份/策略模板 + 渲染好的工具说明。
 
     工具说明属于稳定指令层，随 system 一起下发（而非混进每轮变化的 user prompt）。
+    current_date 为当前日期锚点（如 2026-07-21），消除模型对"今天"的时间幻觉；
+    留空时由调用方按 date.today() 填充。
     """
+    if not current_date:
+        current_date = date.today().isoformat()
     text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
     if text.startswith("---"):
         end = text.find("\n---", 3)
         if end != -1:
             text = text[end + 4:].lstrip("\n")
-    return text.format(tools_desc=tools_desc)
+    return text.format(tools_desc=tools_desc, current_date=current_date)
 
 
 @dataclass

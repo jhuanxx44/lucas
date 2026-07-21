@@ -190,6 +190,11 @@ class AgentRunner:
                 trace.record("step_finished", {"step_id": context.step_id})
                 continue
 
+            # summary：面向用户的一句话旁白，解析后即刻发出（先于工具执行/答案返回）
+            summary = action.get("summary")
+            if summary and on_event is not None:
+                on_event({"kind": "summary", "step": step, "text": summary})
+
             if action["kind"] == "answer":
                 answer_text = action["answer"]
                 trace.record("action_parsed", {
@@ -371,19 +376,22 @@ def _parse_action(raw: str) -> dict | None:
         return None
     if not isinstance(value, dict):
         return None
+    # summary：给用户看的一句话旁白（可选），不影响动作语义
+    raw_summary = value.get("summary")
+    summary = raw_summary.strip() if isinstance(raw_summary, str) and raw_summary.strip() else None
     if value.get("action") == "answer":
         answer = value.get("reply", value.get("answer"))
         if answer is None:
             return None
-        return {"kind": "answer", "answer": answer}
+        return {"kind": "answer", "answer": answer, "summary": summary}
     if value.get("action") == "tool" and isinstance(value.get("tool"), str):
         args = value.get("args", {})
         if not isinstance(args, dict):
             return None
-        return {"kind": "tool", "tool": value["tool"], "args": args}
+        return {"kind": "tool", "tool": value["tool"], "args": args, "summary": summary}
     if "action" not in value:
         # 宽容解析：模型直接输出答案 JSON（无 action 外壳）时按 answer 接受
-        return {"kind": "answer", "answer": value}
+        return {"kind": "answer", "answer": value, "summary": summary}
     return None
 
 
