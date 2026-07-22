@@ -2,13 +2,6 @@ import { useRef, useState } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import type { ChatPhase } from "@/hooks/useChat";
 
-const PHASE_LABEL: Record<ChatPhase, string> = {
-  idle: "",
-  dispatching: "正在派发任务…",
-  researching: "",
-  synthesizing: "",
-};
-
 interface ChatInputProps {
   onSend: (message: string) => void;
   onCancel: () => void;
@@ -32,15 +25,6 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white/95 to-transparent px-3 pb-3 pt-10 dark:from-zinc-950 dark:via-zinc-950/95 sm:px-6 sm:pb-5">
       <div className="pointer-events-auto mx-auto w-full max-w-3xl">
-        {loading && PHASE_LABEL[phase] && (
-          <div className="mb-2 flex items-center gap-2 px-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500" />
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">{PHASE_LABEL[phase]}</span>
-          </div>
-        )}
         <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_8px_30px_rgba(24,24,27,0.08)] transition-colors focus-within:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.28)] dark:focus-within:border-zinc-500">
           <textarea
             ref={inputRef}
