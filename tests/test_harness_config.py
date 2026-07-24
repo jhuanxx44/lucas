@@ -1,4 +1,8 @@
-from harness.config import DEFAULT_ALLOWED_TOOLS, load_agent_config
+from harness.config import (
+    DEFAULT_ALLOWED_TOOLS,
+    build_single_system_prompt,
+    load_agent_config,
+)
 from utils.providers import get_provider_model
 
 
@@ -61,6 +65,17 @@ def test_repo_root_lucas_yaml_loads():
     assert config.model == get_provider_model("deepseek")
     assert config.temperature == 0.0
     assert set(config.allowed_tools) == set(DEFAULT_ALLOWED_TOOLS)
+
+
+def test_single_system_prompt_requires_complete_detailed_answers():
+    prompt = build_single_system_prompt("- read_file", current_date="2026-07-24")
+
+    assert "完整、具体、细致的回答" in prompt
+    assert "不要只给结论、只写一两句话" in prompt
+    assert "事实依据、分析、关键假设、不确定性、风险和可行的下一步" in prompt
+    assert "简单事实题可以简洁" in prompt
+    assert "2026-07-24" in prompt
+    assert "- read_file" in prompt
 
 
 def test_product_chat_intersects_config_with_registered_tools():
