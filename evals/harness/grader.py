@@ -155,6 +155,13 @@ def _process_check(config: dict, events: list[dict]) -> dict:
         actual = sum(event.get("event") == "step_started" for event in events)
         limit = int(config["value"])
         return _check("process", kind, actual <= limit, f"steps={actual}, limit={limit}", required)
+    if kind == "max_tool_calls":
+        actual = sum(event.get("event") == "tool_call_started" for event in events)
+        limit = int(config["value"])
+        return _check(
+            "process", kind, actual <= limit,
+            f"tool_calls={actual}, limit={limit}", required,
+        )
     if kind == "no_repeated_failure":
         violations = _repeated_failures(events, int(config.get("max_consecutive", 1)))
         return _check(

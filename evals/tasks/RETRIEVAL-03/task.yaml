@@ -1,0 +1,41 @@
+id: RETRIEVAL-03
+title: 稳定定义题不应触发检索
+instruction: |
+  招股说明书通常在上市前还是上市后披露？
+  不要修改任何文件。返回一个 JSON 对象，只包含一个字段：
+  - stage: 回答“上市前”或“上市后”
+
+fixture: fixture
+allowed_tools:
+  - wiki_recall
+
+limits:
+  max_steps: 3
+  timeout_seconds: 60
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: answer_json
+      expected:
+        stage: 上市前
+      exact: true
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["**"]
+      required: true
+
+  process:
+    - type: allowed_tools
+      tools: [wiki_recall]
+      required: true
+    - type: max_tool_calls
+      value: 0
+      required: true
+    - type: max_steps
+      value: 3
+      required: true
+
+tags: [tool-policy, direct-answer, definition, over-retrieval]

@@ -100,6 +100,7 @@ def test_trace_integrity_rejects_unfinished_call(tmp_path):
 def test_all_process_graders_accept_valid_trace(tmp_path):
     task = _task(tmp_path, process=[
         {"type": "allowed_tools", "tools": ["read_file"], "required": True},
+        {"type": "max_tool_calls", "value": 1, "required": True},
         {"type": "max_steps", "value": 1, "required": True},
         {"type": "no_repeated_failure", "max_consecutive": 1, "required": True},
         {"type": "finish_reason", "allowed": ["completed"], "required": True},
@@ -130,6 +131,17 @@ def test_all_process_graders_accept_valid_trace(tmp_path):
             ],
             "completed",
             "allowed_tools",
+        ),
+        (
+            {"type": "max_tool_calls", "value": 1, "required": True},
+            [
+                ("tool_call_started", {"tool_call_id": "c1", "tool": "read_file", "args": {}}),
+                ("tool_call_finished", {"tool_call_id": "c1"}),
+                ("tool_call_started", {"tool_call_id": "c2", "tool": "read_file", "args": {}}),
+                ("tool_call_finished", {"tool_call_id": "c2"}),
+            ],
+            "completed",
+            "max_tool_calls",
         ),
         (
             {"type": "max_steps", "value": 1, "required": True},
