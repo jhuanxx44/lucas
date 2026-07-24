@@ -349,6 +349,34 @@ AI 版确实保留了 `澄海精密`、`2025年第四季度`、`一次良率` �
 2. 待补：用真实 key 跑 `LOOP-01`（含博通式场景）多 trial，确认软收尾足够；若模型收到强指令仍打转，再升级为硬收尾（跳出工具循环、禁用工具单独发 final-answer prompt）。
 3. 本护栏是第二道防线（兜底）。第一道防线（`wiki_recall` 摘要化 + 相关性阈值 + 分词级命中透明，治本，对应实验 007 预告的候选阈值方向）作为下一轮独立实验。
 
+### 真实模型补跑（2026-07-24）
+
+补跑边界：A=`9e4b062`（护栏前），B=`12151ce`（护栏后）；两组统一使用
+`deepseek-v4-flash`、temperature=0、当前同一份 `LOOP-01` task/fixture/limits，
+各 3 trials。当前环境通过同一 OpenAI-compatible 代理调用该模型，不与 7 月 20 日
+历史样本混算。A 组旧 grader 不认识后来新增的 `no_stalled_progress`，因此正式比较
+使用 outcome、finish reason 和原始 trace，不使用 A 组 `process_passed` 总值。
+
+| 指标 | A 护栏前 | B 护栏后 |
+|---|---:|---:|
+| outcome success | 3/3 | 3/3 |
+| completed | 3/3 | 3/3 |
+| 平均 steps / tool calls | 2 / 1 | 2 / 1 |
+| `no_progress_detected` | 0 | 0 |
+| 平均 observation chars | 432 | 432 |
+| 平均 prompt chars | 1,838 | 1,976 |
+| 平均 tokens | 3,028 | 3,256 |
+| 总成本 | $0.024638 | $0.030558 |
+| 平均延迟 | 4.60s | 5.72s |
+
+结论：本轮真实模型每次只调用一次 `wiki_recall` 就正确回答“不存在”，没有复现打转，
+所以只能证明护栏没有造成功能回退，**不能证明护栏带来真实收益**。B 组多出的 prompt
+说明还存在小幅固定开销，但 3 次样本不足以把 token/延迟波动归因给护栏。机制暂时保留
+作为生产事故的低风险兜底，实验状态仍为“证据不足”；下一步不是继续堆 trials，而是把
+原生产失败缩成一个能让 baseline 稳定出现重复 observation 的固定 task，再做同一 A/B。
+
+产物：`/tmp/lucas-exp-runs/008-a*`、`/tmp/lucas-exp-runs/008-b*`（本机临时实验目录）。
+
 ## 实验 009：wiki_recall 摘要化（progressive disclosure）（2026-07-21）
 
 ### 假设
@@ -386,3 +414,77 @@ AI 版确实保留了 `澄海精密`、`2025年第四季度`、`一次良率` �
 真实聊天 trace 暴露反效果：查"光通信"时，光通信板块的公司档案（光迅科技等）因分类名命中只得 1 分，被 `min_score=2` 全部过滤，agent 只好绕道 list_files 数目录。即阈值 2 不是挡噪音，而是误伤了"分类相关但名字不含关键词"的正常结果。
 
 决定把 `min_score` 默认放宽到 1（凡关键词匹配即返回），阈值逻辑代码保留供后续复用。依据：摘要形态已足以让 agent 过滤无关页（这正是本实验的核心手段），工具端不必再卡阈值。召回质量本身（板块结构/语义相关，如"光通信"应带出全部板块公司）是更根本的问题，单列为"wiki 召回专项优化"，走独立 eval-driven（先写"查板块应召回全部 N 家公司"的召回率 task 作 baseline，再改算法），不在本实验范围。
+
+### 真实模型补跑（2026-07-24）
+
+补跑边界：A=`12151ce`（返回正文），B=`298cd6e`（返回路径+摘要，且包含
+`min_score=1` 的最终修正）；两组统一使用 `deepseek-v4-flash`、temperature=0、当前
+同一份 task/fixture/limits。WIKI-01～03 各 3 trials；另用 LOOP-01 各 3 trials 比较
+无答案场景。B 组 WIKI 任务 9/9 都稳定走通 `wiki_recall -> read_file -> answer`。
+
+#### 有明确答案的三个小 Wiki 任务
+
+| 指标 | A 正文直返 | B 摘要后读取 |
+|---|---:|---:|
+| outcome success | 9/9 | 9/9 |
+| 平均 steps | 2.00 | 3.33 |
+| 平均 tool calls | 1.00 | 2.33 |
+| 平均 observation chars | 278 | 400 |
+| 平均 prompt chars | 1,898 | 4,159 |
+| 平均 tokens | 3,216 | 5,829 |
+| 总成本 | $0.080334 | $0.137896 |
+| 平均延迟 | 4.08s | 6.75s |
+
+两组成功率相同；B 的 tokens +81%、成本 +72%、延迟 +66%。当前 fixture 页面很短，
+A 一次返回的正文平均只有 278 字，B 增加一次或两次 `read_file` 后反而更贵。因此
+“摘要化会降低当前 WIKI-01～03 总上下文成本”的假设被证伪。
+
+#### 无答案、低相关命中的 LOOP-01
+
+| 指标 | A 正文直返 | B 只返摘要 |
+|---|---:|---:|
+| outcome success / completed | 3/3 | 3/3 |
+| 平均 steps / tool calls | 2 / 1 | 2 / 1 |
+| 平均 observation chars | 432 | 142 |
+| 平均 prompt chars | 1,976 | 1,944 |
+| 平均 tokens | 3,256 | 3,089 |
+| 总成本 | $0.030558 | $0.024326 |
+| 平均延迟 | 5.72s | 3.89s |
+
+在模型从摘要即可判断“不是目标公司”的场景，B 无需 `read_file`，observation 减少
+67%，tokens 减少约 5%，同时保持正确率。这证明 progressive disclosure 的收益是
+**场景依赖**，不是对所有 Wiki 查询都成立。
+
+阶段结论：两步协作稳定性通过（9/9），但当前小页面任务上效率显著回退；现有任务集
+无法代表它原本要解决的“大页面 + 相似干扰页 + 低相关命中”问题。因此先增加一个由同一
+语料派生的长页面/多干扰页固定 task，再比较正文直返与摘要后读取；若新任务仍无成功率
+或总成本收益，应回滚默认摘要化，而不是继续增加召回复杂度。
+
+#### 追加区分任务 WIKI-04
+
+新增独立 `wiki-retrieval-experiment-v1` suite 和 WIKI-04：五个同属新材料、公司名和
+指标相似的较长页面，问题只需要海岳材料一页中的资本开支。该任务不规定工具路径，使用
+确定性 answer/outcome 与 forbidden-diff grader；oracle 通过、known-bad 失败。A/B 各
+3 trials：
+
+| 指标 | A 正文直返 | B 摘要后读取 |
+|---|---:|---:|
+| outcome success | 3/3 | 3/3 |
+| 平均 steps | 2.00 | 3.33 |
+| 平均 tool calls | 1.00 | 2.00 |
+| 平均 observation chars | 1,904 | 833 |
+| 平均 prompt chars | 3,419 | 4,673 |
+| 平均 tokens | 4,093 | 6,093 |
+| 总成本 | $0.031156 | $0.045990 |
+| 平均延迟 | 3.70s | 5.84s |
+
+B 确实把 observation 减少 56%，但新增模型轮次使 prompt +37%、tokens +49%、成本
++48%、延迟 +58%；其中一次还多发生一个格式 correction。成功率仍无差异。在当前
+JSON-per-step loop 与模型下，“默认对所有 Wiki 查询先摘要再读正文”没有通过收益门槛。
+
+**最终处置：回滚实验 009。** `wiki_recall` 恢复每页最多 3000 字符的正文直返，移除
+强制 `wiki_recall -> read_file` prompt 和对应任务预算扩张；WIKI-04 保留在独立实验
+suite，供未来 Context policy、snippet 或批量读取机制做同题对照。LOOP-01 中摘要版的
+局部收益不再由默认工具契约承担，后续应通过相关性/无答案识别的独立实验解决。
+
+产物：`/tmp/lucas-exp-runs/009-a*`、`/tmp/lucas-exp-runs/009-b*`（本机临时实验目录）。

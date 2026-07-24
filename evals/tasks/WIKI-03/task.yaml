@@ -12,10 +12,9 @@ instruction: |
 fixture: fixture
 allowed_tools:
   - wiki_recall
-  - read_file
 
 limits:
-  max_steps: 8
+  max_steps: 6
   timeout_seconds: 60
   max_cost_usd: 0
 
@@ -37,11 +36,11 @@ graders:
 
   process:
     - type: allowed_tools
-      tools: [wiki_recall, read_file]
+      tools: [wiki_recall]
       required: true
 
     - type: max_steps
-      value: 8
+      value: 6
       required: true
 
 tags: [wiki, business, retrieval, multi-page, synthesis]

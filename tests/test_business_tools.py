@@ -10,7 +10,6 @@ import pytest
 from harness.tools.base import ToolResult
 from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
 from harness.tools.business.wiki import WIKI_RECALL_SPEC
-from harness.tools.generic.filesystem import READ_FILE_SPEC
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.stock_data import KlineBar, QuoteData
@@ -185,18 +184,15 @@ def _wiki_fixture(root):
     return wiki
 
 
-async def test_wiki_recall_returns_path_and_summary_not_content(tmp_path):
+async def test_wiki_recall_index_first_and_truncates(tmp_path):
     _wiki_fixture(tmp_path)
     result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
                             {"query": "贵州茅台 产能"})
     assert result.status == "ok"
-    # 返回定位信息：read_file 可用路径（带 wiki/ 前缀）+ 摘要，不含正文全文
-    assert "wiki/companies/白酒/贵州茅台.md" in result.observation
-    assert "贵州茅台" in result.observation
-    assert "company" in result.observation  # frontmatter 摘要
-    assert "read_file" in result.observation  # 引导取正文
-    # 正文（重复 400 次的长句）不应出现在召回结果里
-    assert "基酒产能与渠道库存分析" not in result.observation
+    assert "--- 贵州茅台（companies/白酒/贵州茅台.md） ---" in result.observation
+    assert "…[truncated]" in result.observation
+    page_body = result.observation.split("---\n", 1)[1]
+    assert len(page_body) < 3100
     # 五粮液与查询无关，未被召回
     assert "五粮液" not in result.observation
 
@@ -207,31 +203,27 @@ async def test_wiki_recall_fulltext_fallback_when_index_misses(tmp_path):
     result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
                             {"query": "600519 分红"})
     assert result.status == "ok"
-    # 定位到未索引页面，路径可用，正文交给 read_file
-    assert "wiki/notes/600519-公告.md" in result.observation
+    assert "600519-公告" in result.observation
+    assert "分红公告摘要" in result.observation
 
 
-async def test_wiki_recall_path_is_readable_by_read_file(tmp_path):
-    """契约：wiki_recall 返回的路径必须能被 read_file 直接读到正文。
+async def test_wiki_recall_returns_all_matching_pages(tmp_path):
+    wiki = tmp_path / "wiki"
+    pages = wiki / "companies" / "白酒"
+    pages.mkdir(parents=True)
+    (wiki / "index.md").write_text(
+        "# 知识库索引\n\n## 公司档案 · 白酒\n\n"
+        + "".join(f"- [白酒公司{i}](companies/白酒/白酒公司{i}.md)\n" for i in range(6)),
+        encoding="utf-8",
+    )
+    for i in range(6):
+        (pages / f"白酒公司{i}.md").write_text(f"白酒公司{i}档案", encoding="utf-8")
 
-    守住"给地图→取正文"链路闭合——recall 相对 wiki 根、read_file 相对工作区根，
-    工具须补 wiki/ 前缀，否则 agent 拿路径去 read_file 会 file not found。
-    """
-    _wiki_fixture(tmp_path)
-    recall = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
-                            {"query": "贵州茅台 产能"})
-    assert recall.status == "ok"
-    # 从召回结果里提取工具吐出的路径（形如 "- wiki/... — ..."）
-    paths = [
-        line[2:].split(" — ", 1)[0].strip()
-        for line in recall.observation.splitlines()
-        if line.startswith("- wiki/")
-    ]
-    assert paths, f"未从召回结果解析出路径：{recall.observation!r}"
-    for path in paths:
-        read = await _execute(tmp_path, READ_FILE_SPEC, "read_file", {"path": path})
-        assert read.status == "ok", f"read_file 读不到 recall 返回的路径 {path}: {read.observation}"
-        assert "贵州茅台" in read.observation  # 确实拿到了正文
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "白酒"})
+
+    assert result.status == "ok"
+    for i in range(6):
+        assert f"白酒公司{i}" in result.observation
 
 
 async def test_wiki_recall_skips_index_entries_escaping_wiki(tmp_path):
@@ -281,20 +273,6 @@ async def test_wiki_recall_bad_args(tmp_path):
     assert result.status == "invalid_input"
 
 
-async def test_wiki_recall_absent_company_returns_only_locators(tmp_path):
-    """查库中不存在的公司：即使宽泛词蹭中某页，也只以路径+摘要返回，
-
-    agent 据摘要即可判断"这些都不是目标公司"，不会被灌一整页无关正文误导。
-    """
-    _wiki_fixture(tmp_path)
-    # 查询问的是不存在的"泸州老窖"，只有"白酒"这类宽泛词可能蹭中已有页面
-    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
-                            {"query": "泸州老窖 2025 年报"})
-    assert result.status == "ok"
-    # 无论命中与否，都不灌正文；命中的话只给路径+摘要，agent 自行判断
-    assert "基酒产能与渠道库存分析" not in result.observation
-
-
 @pytest.mark.parametrize(
     ("task_id", "query", "expected_paths"),
     [
@@ -314,7 +292,7 @@ async def test_wiki_eval_fixtures_recall_expected_pages(task_id, query, expected
         workspace,
         WIKI_RECALL_SPEC,
         "wiki_recall",
-        {"query": query, "limit": 3},
+        {"query": query},
     )
 
     assert result.status == "ok"

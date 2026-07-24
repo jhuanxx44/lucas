@@ -1,17 +1,18 @@
-id: WIKI-01
-title: 从已索引公司页面提取单个事实
+id: WIKI-04
+title: 从相似长页面中定位单个公司事实
 instruction: |
-  根据本地知识库回答：澄海精密 2025 年第四季度核心产线的一次良率是多少？
+  根据本地知识库回答：海岳材料 2025 年的资本开支是多少？
   不要修改任何文件。
   返回一个 JSON 对象，只包含一个字段：
-  - yield_rate: 一次良率的百分数数值（浮点数，不带百分号）
+  - capex_million: 资本开支金额（百万元，整数）
 
 fixture: fixture
 allowed_tools:
   - wiki_recall
+  - read_file
 
 limits:
-  max_steps: 5
+  max_steps: 6
   timeout_seconds: 60
   max_cost_usd: 0
 
@@ -19,7 +20,7 @@ graders:
   outcome:
     - type: answer_json
       expected:
-        yield_rate: 97.3
+        capex_million: 684
       exact: true
       required: true
 
@@ -30,11 +31,11 @@ graders:
 
   process:
     - type: allowed_tools
-      tools: [wiki_recall]
+      tools: [wiki_recall, read_file]
       required: true
 
     - type: max_steps
-      value: 5
+      value: 6
       required: true
 
-tags: [wiki, business, retrieval, single-page]
+tags: [wiki, retrieval-experiment, distractors, long-page, single-page]

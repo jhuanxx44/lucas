@@ -17,12 +17,14 @@
 | [`WIKI-01`](WIKI-01/task.yaml) | `business-capability` | 从已索引公司页面回答澄海精密的产线一次良率 | Wiki 单页事实召回 |
 | [`WIKI-02`](WIKI-02/task.yaml) | `business-capability` | 从未索引公告页面回答股票代码 688559 对应公司的现金分红方案 | Wiki 未索引内容召回 |
 | [`WIKI-03`](WIKI-03/task.yaml) | `business-capability` | 综合两个公司页面，比较年产能并计算差值 | Wiki 多页召回、信息综合与计算 |
+| [`WIKI-04`](WIKI-04/task.yaml) | `wiki-retrieval-experiment` | 从五个名称和指标相似的较长公司页面中定位海岳材料的资本开支 | 相似干扰页、长页面、progressive disclosure 成本 |
 
 ## 套件定位
 
 - `smoke`：最小读写闭环，用于快速确认 Runner、工具和 grader 基本可用。
 - `capability`：文件系统通用能力，包括长文本、多文件、消歧编辑和新建文件。
 - `business-capability`：Lucas 当前业务场景中的本地 Wiki 检索与综合。
+- `wiki-retrieval-experiment`：只用于 Wiki 访问策略消融；结论稳定前不迁入 regression。
 
 ## 与线上聊天的关系
 
