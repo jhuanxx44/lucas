@@ -55,7 +55,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const [traceOpen, setTraceOpen] = useState(true);
+  const [traceOpen, setTraceOpen] = useState(false);
   const [liveTraceTurn, setLiveTraceTurn] = useState<LiveTraceTurn | null>(null);
   const initialSessionPromise = useRef<ReturnType<typeof loadInitialSession> | null>(null);
   const creatingSessionRef = useRef(false);
