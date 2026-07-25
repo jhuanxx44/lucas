@@ -12,11 +12,8 @@ from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
 
-MAX_OBSERVATION_CHARS = 32_000
-MAX_TOTAL_OBSERVATION_CHARS = 240_000
-# 拿回已见过结果累计达到此次数即强制收尾（软收尾：回注强指令，下一轮仍由模型出 answer）。
-# 首次重复（stall_count=1）先回注 warning 放行，第二次（=2）强制收尾。
-_STALL_FORCE_ANSWER = 2
+# 单次 observation 截断上限：极大值，实际永不触发（LLM 上下文窗口是真正的瓶颈）
+MAX_OBSERVATION_CHARS = 10_000_000
 
 
 class _RunDeadlineExceeded(Exception):
@@ -236,12 +233,21 @@ class AgentRunner:
             })
             signature = (tool, json.dumps(args, sort_keys=True, ensure_ascii=False))
             if signature == last_failed_signature:
+                trace.record("tool_call_repeated_failure", {
+                    "step_id": context.step_id, "tool": tool, "args": args,
+                })
+                context.history.append({"role": "tool", "content": (
+                    f"警告：{tool} 连续两次以相同参数调用失败。"
+                    "请换用其他工具、换一组参数，或基于已有信息作答。"
+                )})
                 trace.record("step_finished", {"step_id": context.step_id})
-                return AgentResult(
-                    finish_reason="error",
-                    error=f"repeated failing tool call aborted: {tool}",
-                    usage=total_usage, cost_usd=cost_usd,
-                )
+                if on_event is not None:
+                    on_event({
+                        "kind": "tool_step", "step": step, "tool": tool,
+                        "args": args, "ok": False,
+                        "observation": "repeated failure; prompt injected",
+                    })
+                continue
             # 预算在执行下一个工具前检查：已产出的最终答案不会被预算拦截丢弃
             if limits.max_cost_usd and cost_usd > limits.max_cost_usd:
                 trace.record("budget_exceeded", {
@@ -255,18 +261,6 @@ class AgentRunner:
                     error=f"cost {cost_usd:.4f} USD exceeded budget {limits.max_cost_usd} USD",
                     usage=total_usage, cost_usd=cost_usd,
                 )
-            if total_observation_chars >= MAX_TOTAL_OBSERVATION_CHARS:
-                trace.record("observation_budget_exceeded", {
-                    "step_id": context.step_id,
-                    "total_observation_chars": total_observation_chars,
-                    "max_total_observation_chars": MAX_TOTAL_OBSERVATION_CHARS,
-                })
-                trace.record("step_finished", {"step_id": context.step_id})
-                return AgentResult(
-                    finish_reason="error",
-                    error="tool observation budget exhausted",
-                    usage=total_usage, cost_usd=cost_usd,
-                )
             call_id = f"call-{step}"
             trace.record("tool_call_started", {
                 "tool_call_id": call_id, "tool": tool, "args": args,
@@ -278,7 +272,7 @@ class AgentRunner:
                 return timeout_result("tool_call")
             full_observation = _format_observation(tool, result)
             remaining_observation_chars = (
-                MAX_TOTAL_OBSERVATION_CHARS - total_observation_chars
+                max(0, MAX_OBSERVATION_CHARS - total_observation_chars)
             )
             observation, was_truncated = _truncate_observation(
                 full_observation,
@@ -302,15 +296,14 @@ class AgentRunner:
                     # 无进展：不把重复正文再塞进 history（省预算），只回注一条提示。
                     # raw（模型本轮输出）已在 model_call 后入 history，此处只补 tool 反馈。
                     stall_count += 1
-                    stall_note = _stall_note(tool, first_step, stall_count >= _STALL_FORCE_ANSWER)
+                    stall_note = _stall_note(tool, first_step)
                     context.history.append({"role": "tool", "content": stall_note})
                     trace.record("no_progress_detected", {
                         "step_id": context.step_id,
                         "tool": tool,
                         "repeated_from_step": first_step,
                         "stall_count": stall_count,
-                        "forced_answer": stall_count >= _STALL_FORCE_ANSWER,
-                    })
+                                            })
                     trace.record("step_finished", {"step_id": context.step_id})
                     if on_event is not None:
                         on_event({
@@ -439,18 +432,13 @@ def _format_observation(tool: str, result) -> str:
     return f"[{tool}] status={result.status}{suffix}\n{result.observation}"
 
 
-def _stall_note(tool: str, first_step: int, force_answer: bool) -> str:
-    """无进展回注：结果与前一步相同即"没拿到新信息"。给出明确替代动作。
-
-    force_answer=True 时要求模型立即基于已有信息作答，不再调用工具。
-    """
-    base = (
-        f"注意：{tool} 这次返回的内容与第 {first_step} 步完全相同，没有获得新信息。"
-        "换查询词重复检索同一来源不会有新结果。"
+def _stall_note(tool: str, first_step: int) -> str:
+    """无进展回注：结果与前面某步相同即"没拿到新信息"，引导 LLM 换策略。"""
+    return (
+        f"⚠️ 停滞：{tool} 返回结果与第 {first_step} 步完全相同，"
+        "继续当前方式不会获得新信息。\n"
+        "先盘点已经掌握的内容，想想还缺什么——然后换个思路再试。"
     )
-    if force_answer:
-        return base + "请立即基于已经掌握的信息给出最终答案（action: answer），不要再调用任何工具。"
-    return base + "请改用其他工具、换一个信息来源，或直接基于已有信息作答。"
 
 
 def _truncate_observation(text: str, limit: int) -> tuple[str, bool]:

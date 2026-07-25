@@ -231,7 +231,7 @@ async def test_bare_json_answer_accepted(tmp_path):
     assert parsed[0]["data"]["kind"] == "answer"
 
 
-async def test_repeated_failure_aborts_before_third_call(tmp_path):
+async def test_repeated_failure_injects_prompt_instead_of_abort(tmp_path):
     model = FakeModel([
         json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "../escape"}}),
         json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "../escape"}}),
@@ -240,10 +240,9 @@ async def test_repeated_failure_aborts_before_third_call(tmp_path):
     result = await _runner(tmp_path, model, trace).run(
         "loop", ["read_file"], LIMITS, trace
     )
-    assert result.finish_reason == "error"
-    assert "repeated" in result.error
-    errors = [e for e in _events(trace) if e["event"] == "tool_call_error"]
-    assert len(errors) == 1  # 第二次重复在执行前终止，trace 不留重复失败
+    assert result.finish_reason == "completed"  # 不再掐死，fallback answer
+    failures = [e for e in _events(trace) if e["event"] == "tool_call_repeated_failure"]
+    assert len(failures) == 1
 
 
 def _echo_spec(name: str, observation: str) -> ToolSpec:
@@ -253,11 +252,10 @@ def _echo_spec(name: str, observation: str) -> ToolSpec:
     return ToolSpec(name=name, description="echo", args_description="{}", handler=handler)
 
 
-async def test_no_progress_stall_forces_answer(tmp_path):
-    """成功工具连续返回相同 observation（args 每次微调）→ 判无进展并强制收尾。
+async def test_no_progress_stall_injects_prompt(tmp_path):
+    """成功工具连续返回相同 observation（args 每次微调）→ 判无进展并注入提示。
 
-    baseline（改动前）行为：三次相同结果全部执行、observation 预算累加、
-    最终因步数耗尽落到 max_steps。改动后应在第二次相同结果时强制收尾作答。
+    不再强制收尾，每次重复都只向 LLM 注入换策略提示，由模型自行决定继续还是作答。
     """
     spec = _echo_spec("recall", "status=ok\n没有找到相关内容")
     model = FakeModel([
@@ -273,16 +271,17 @@ async def test_no_progress_stall_forces_answer(tmp_path):
     trace = _trace(tmp_path)
     result = await runner.run("对比博通", ["recall"], LIMITS, trace)
 
-    # 强制收尾：拿到答案而非报错/耗尽
+    # 模型自行决定作答
     assert result.finish_reason == "completed"
     assert result.answer is not None
-    # 内容去重是执行后判定：首次结果记录、两次重复各触发一次无进展
+    # 两次重复各触发一次无进展提示
     events = _events(trace)
     stalls = [e for e in events if e["event"] == "no_progress_detected"]
     assert len(stalls) == 2
-    assert stalls[0]["data"]["forced_answer"] is False  # 首次重复只 warning
-    assert stalls[1]["data"]["forced_answer"] is True   # 二次重复强制收尾
-    assert stalls[1]["data"]["repeated_from_step"] == 1  # 都追溯到首次出现的 step
+    # 不再有 forced_answer 标记，只有 stall_count 递增
+    assert stalls[0]["data"]["stall_count"] == 1
+    assert stalls[1]["data"]["stall_count"] == 2
+    assert stalls[1]["data"]["repeated_from_step"] == 1
 
 
 async def test_invalid_json_feedback_then_recover(tmp_path):
@@ -776,26 +775,24 @@ async def test_provider_timeout_before_run_deadline_is_not_misclassified(tmp_pat
     assert not any(event["event"] == "timeout" for event in _events(trace))
 
 
-async def test_runner_truncates_single_and_total_tool_observations(tmp_path):
-    """工具输出必须受单次和全 run observation 预算约束。"""
-    from harness.runner import MAX_OBSERVATION_CHARS, MAX_TOTAL_OBSERVATION_CHARS
+async def test_runner_truncates_single_tool_observations(tmp_path):
+    """工具输出仅受单次 observation 截断约束（全 run 累计预算已移除）。"""
+    from harness.runner import MAX_OBSERVATION_CHARS
 
     def large_tool(workspace, args):
-        # 每次内容不同（前缀带 n），避免触发无进展检测，专注验证截断预算
         head = f"chunk-{args.get('n')}\n"
         return ToolResult(status="ok", observation=head + "x" * (MAX_OBSERVATION_CHARS * 2))
 
     spec = ToolSpec(
         name="large", description="large", args_description="{}", handler=large_tool,
     )
-    calls_to_exhaust = MAX_TOTAL_OBSERVATION_CHARS // MAX_OBSERVATION_CHARS
     model = FakeModel([
         json.dumps({"action": "tool", "tool": "large", "args": {"n": index}})
-        for index in range(calls_to_exhaust)
+        for index in range(3)
     ] + [json.dumps({"action": "answer", "reply": "done"})])
     trace = _trace(tmp_path)
     result = await _runner(tmp_path, model, trace, [spec]).run(
-        "t", ["large"], RunLimits(max_steps=calls_to_exhaust + 2, timeout_seconds=30), trace,
+        "t", ["large"], RunLimits(max_steps=5, timeout_seconds=30), trace,
     )
 
     assert result.finish_reason == "completed"
@@ -804,7 +801,6 @@ async def test_runner_truncates_single_and_total_tool_observations(tmp_path):
     assert finished
     assert all(event["data"]["observation_chars"] <= MAX_OBSERVATION_CHARS
                for event in finished)
-    assert finished[-1]["data"]["total_observation_chars"] <= MAX_TOTAL_OBSERVATION_CHARS
     assert "truncated" in model.prompts[1]
 
 

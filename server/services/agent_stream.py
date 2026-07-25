@@ -88,7 +88,7 @@ _WIKI_APPLY_PATCH_SPEC = replace(
 )
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
-_TIMEOUT_SECONDS = 120.0
+_TIMEOUT_SECONDS = 0.0  # 0 = 不限时
 _CHAT_TOOL_SPECS = [
     UPDATE_PLAN_SPEC,
     WEB_SEARCH_SPEC,
@@ -217,7 +217,7 @@ async def chat_event_stream(
 
 
         instruction = _render_date_header() + _render_history(history) + tool_tag + f"用户问题：{question}"
-        limits = RunLimits(max_steps=config.max_steps, timeout_seconds=_TIMEOUT_SECONDS)
+        limits = RunLimits(max_steps=0, timeout_seconds=_TIMEOUT_SECONDS)  # 0 = 不限步数
 
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
