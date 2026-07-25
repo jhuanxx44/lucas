@@ -35,15 +35,17 @@ async def _tavily_search(query: str, max_results: int = 5, search_type: str = "g
         return None
 
 
-async def _ddg_search(query: str, max_results: int = 5, search_type: str = "general") -> Optional[str]:
+async def _ddg_search(query: str, max_results: int = 5, search_type: str = "general", timeout: float = 15.0) -> Optional[str]:
     try:
         from ddgs import DDGS
-        ddgs = DDGS()
-        if search_type == "news":
-            raw = await asyncio.to_thread(ddgs.news, query, max_results=max_results, region="cn-zh")
-        else:
-            raw = await asyncio.to_thread(ddgs.text, query, max_results=max_results, region="cn-zh")
-        results = list(raw) if raw else []
+        ddgs = DDGS(timeout=timeout)
+        async def _do_search():
+            if search_type == "news":
+                raw = await asyncio.to_thread(ddgs.news, query, max_results=max_results, region="cn-zh")
+            else:
+                raw = await asyncio.to_thread(ddgs.text, query, max_results=max_results, region="cn-zh")
+            return list(raw) if raw else []
+        results = await asyncio.wait_for(_do_search(), timeout=timeout + 5)
         if not results:
             return None
         parts = []
@@ -53,6 +55,9 @@ async def _ddg_search(query: str, max_results: int = 5, search_type: str = "gene
             url = r.get("href", r.get("url", ""))
             parts.append(f"{i}. [{title}]({url})\n   {body}")
         return "\n\n".join(parts)
+    except asyncio.TimeoutError:
+        logger.warning("DuckDuckGo 搜索超时 (%.0fs): %s", timeout + 5, query[:80])
+        return None
     except Exception as e:
         logger.warning("DuckDuckGo 搜索失败: %s", e)
         return None
