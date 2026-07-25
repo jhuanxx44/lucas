@@ -12,8 +12,10 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - 每个 prompt 模板和内联 LLM 调用都必须用 `llm-weight: heavy|medium|light` 标注复杂度。
 - 决策策略、任务拆解和输出行为优先通过 `prompts/` 下的模板调整。
 - 执行语义、状态、安全、权限、超时、重试和可靠性必须由代码保证，不要只写进 prompt。
-- 保留用户已有和并行进行的修改；不要清理、格式化或重构无关代码。
-- 后续所有 Git commit message 均使用中文，例：feat: 新增产品功能, fix: 修复问题, refactor: 代码重构, docs: 文档变更。
+- 修改 `prompts/harness/lucas-system-prompt.md`、`prompts/harness/agent-loop.md` 等核心 prompt 时，避免"头痛医头，脚痛医脚"：从整体结构出发做精简，不在末尾追加补丁。新增指令前先检查是否与已有内容重复或矛盾。
+  - `lucas-system-prompt.md`：全局行为原则（何时用工具、如何规划、wiki 约定、回答规范、底线等），不放格式约束。
+  - `agent-loop.md`：输出格式和硬约束（JSON schema、单轮一工具、重试规则、路径规范等），不重复 system prompt。
+- Git commit message 均使用中文，例：feat: 新增产品功能, fix: 修复问题, refactor: 代码重构, docs: 文档变更。
 
 ## 3. 先判断当前任务类型
 
@@ -71,7 +73,7 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 ### 最小、外科式修改
 
 - 只修改完成当前任务所必需的代码。
-- 不顺手改善相邻代码、注释或格式。
+- 保留用户已有和并行进行的修改；不要清理、格式化或重构无关代码，不顺手改善相邻代码、注释或格式。
 - 匹配现有项目风格，即使你个人会采用其他写法。
 - 发现无关死代码时只说明，不删除。
 - 删除由本次修改造成的未使用 import、变量和函数。
