@@ -123,7 +123,9 @@ class AgentRunner:
                 usage=total_usage, cost_usd=cost_usd,
             )
 
-        for step in range(1, limits.max_steps + 1):
+        step = 0
+        while limits.max_steps <= 0 or step < limits.max_steps:
+            step += 1
             if deadline is not None and time.monotonic() >= deadline:
                 return timeout_result("between_steps")
             context.step_id = f"step-{step}"

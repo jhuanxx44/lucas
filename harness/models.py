@@ -7,6 +7,7 @@ from utils.token_tracker import TokenUsage
 @dataclass(frozen=True)
 class RunLimits:
     max_steps: int
+    # 0 或 <=0 表示不限制步数；>0 表示步数上限
     # 总 run 硬 deadline；None 或 <=0 表示不限制（与 max_cost_usd 约定一致）
     timeout_seconds: float
     # 0 或 None 表示不限制成本（evals 任务里 max_cost_usd: 0 即"未设置"）

@@ -7,7 +7,7 @@ single_agent:
   name: Lucas
   provider: deepseek
   temperature: 0.0
-  max_steps: 10
+  max_steps: 0
   allowed_tools: [read_file, apply_patch, list_files, search, write_file, web_search, stock_quote, stock_kline, wiki_recall]
 
 # wiki 知识模块（server/services/knowledge.py）领域配置

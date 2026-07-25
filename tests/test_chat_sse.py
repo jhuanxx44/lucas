@@ -236,20 +236,23 @@ async def test_agent_stream_model_exception_yields_error(tmp_path):
     assert "boom" not in visible_events[2][1]["message"]
 
 
-async def test_agent_stream_max_steps_yields_error(tmp_path):
-    """始终调工具不作答 → max_steps → error 事件"""
+async def test_agent_stream_unlimited_steps_ok(tmp_path):
+    """max_steps=0（不限步数）→ 多步工具调用 + 最终作答正常完成"""
     model = FakeModel([
-        json.dumps({"action": "tool", "tool": "wiki_recall", "args": {"query": f"q{i}"}})
-        for i in range(10)  # lucas.yaml single_agent.max_steps = 10
+        json.dumps({"action": "tool", "tool": "wiki_recall", "args": {"query": "q1"}}),
+        json.dumps({"action": "tool", "tool": "wiki_recall", "args": {"query": "q2"}}),
+        json.dumps({"action": "tool", "tool": "web_search", "args": {"query": "q3"}}),
+        json.dumps({"action": "answer", "reply": "分析完成"}),
     ])
-    events = await _collect("永不回答", model=model, workspace=tmp_path)
+    events = await _collect("不限步数测试", model=model, workspace=tmp_path)
 
     kinds = [e for e, _ in events]
     assert kinds[0] == "dispatch"
     assert kinds[1] == "researcher_start"
-    assert kinds[-1] == "error"
-    assert kinds.count("tool_step") == 10
-    assert "步骤达到上限" in events[-1][1]["message"]
+    assert kinds.count("tool_step") == 3
+    # 最终应为 done（正常完成），不是 error
+    assert kinds[-1] == "done"
+    assert events[-1][1]["total_tokens"] >= 0
 
 
 async def test_agent_stream_client_disconnect_cancels_run(tmp_path):
