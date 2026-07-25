@@ -124,3 +124,12 @@ export interface WikiTreeNode {
   type: "file" | "dir";
   children?: WikiTreeNode[];
 }
+export interface PlanStep {
+  step: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+export interface PlanState {
+  steps: PlanStep[];
+  updatedAt: number;
+}

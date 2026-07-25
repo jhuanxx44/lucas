@@ -15,6 +15,7 @@ from harness.tools.generic.filesystem import (
     WRITE_FILE_SPEC,
 )
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
+from harness.tools.generic.planning import UPDATE_PLAN_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.json_extract import extract_json
 from utils.llm_client import create_client
@@ -49,6 +50,7 @@ class LucasSingleAgent:
             SEARCH_SPEC,
             WRITE_FILE_SPEC,
             WEB_SEARCH_SPEC,
+            UPDATE_PLAN_SPEC,
             STOCK_QUOTE_SPEC,
             STOCK_KLINE_SPEC,
             WIKI_RECALL_SPEC,

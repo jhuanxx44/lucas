@@ -14,6 +14,7 @@ from utils.providers import get_provider_model
 DEFAULT_ALLOWED_TOOLS = [
     "read_file", "apply_patch", "list_files", "search", "write_file",
     "web_search", "stock_quote", "stock_kline", "wiki_recall",
+    "update_plan",
 ]
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent / "lucas.yaml"

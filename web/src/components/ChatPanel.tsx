@@ -3,6 +3,7 @@ import { useChat } from "@/hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
 import { SynthesisCard } from "./SynthesisCard";
+import { PlanCard } from "./PlanCard";
 import { AnalysisProcess } from "./AnalysisProcess";
 import { fetchWikiIndex } from "@/lib/api";
 import { MessageSquare, RefreshCw, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
@@ -134,6 +135,8 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
         ))}
 
         {state.isLoading && <AnalysisProcess steps={state.traceSteps} live />}
+
+        {state.isLoading && state.plan && <PlanCard plan={state.plan} />}
 
         {state.isLoading && <SynthesisCard text={state.synthesis} loading={state.isLoading} />}
       </div>

@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ChatRunConfig, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep } from "@/types";
+import type { ChatMessage, ChatRunConfig, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep, PlanStep, PlanState } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -16,6 +16,7 @@ interface ChatState {
   traceSteps: ChatTraceStep[];
   runConfig: ChatRunConfig | null;
   runtimeTrace: ChatRuntimeTraceEvent[];
+  plan: PlanState | null;
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -34,7 +35,8 @@ type Action =
   | { type: "RUN_CONFIG"; config: ChatRunConfig }
   | { type: "TRACE_EVENT"; event: ChatRuntimeTraceEvent }
   | { type: "DONE"; message: ChatMessage }
-  | { type: "ERROR"; message: ChatMessage };
+  | { type: "ERROR"; message: ChatMessage }
+  | { type: "PLAN_UPDATE"; steps: PlanStep[] };
 
 function reducer(state: ChatState, action: Action): ChatState {
   switch (action.type) {
@@ -82,6 +84,8 @@ function reducer(state: ChatState, action: Action): ChatState {
     case "PROCESS_STEP":
       if (!action.step || state.processSteps.at(-1) === action.step) return state;
       return { ...state, processSteps: [...state.processSteps, action.step] };
+    case "PLAN_UPDATE":
+      return { ...state, plan: { steps: action.steps, updatedAt: Date.now() } };
     case "RUN_CONFIG":
       return { ...state, runConfig: action.config };
     case "TRACE_EVENT":
@@ -121,6 +125,7 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     traceSteps: [],
     runConfig: null,
     runtimeTrace: [],
+    plan: null,
     isLoading: false,
     phase: "idle",
   };
@@ -202,6 +207,11 @@ export function useChat(
                 dispatch({ type: "DISPATCH" });
                 onResearchTarget?.(question);
                 break;
+              case "plan_update": {
+                const planData = data as { plan: PlanStep[] };
+                dispatch({ type: "PLAN_UPDATE", steps: planData.plan });
+                break;
+              }
               case "researcher_start":
                 appendProcessStep(`${d.name}开始分析`);
                 streamedResearchers.set(d.id, { id: d.id, name: d.name, status: "running", text: "" });

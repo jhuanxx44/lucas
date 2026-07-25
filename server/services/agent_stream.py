@@ -42,6 +42,7 @@ from harness.tools.generic.filesystem import (
     WRITE_FILE_SPEC,
 )
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
+from harness.tools.generic.planning import UPDATE_PLAN_SPEC
 from harness.tools.registry import ToolRuntime
 from utils.llm_client import create_client
 from utils.path_safety import resolve_within
@@ -89,6 +90,7 @@ _WIKI_APPLY_PATCH_SPEC = replace(
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 120.0
 _CHAT_TOOL_SPECS = [
+    UPDATE_PLAN_SPEC,
     WEB_SEARCH_SPEC,
     STOCK_QUOTE_SPEC,
     STOCK_KLINE_SPEC,
@@ -142,17 +144,30 @@ def _render_date_header() -> str:
 def _status_message(evt: dict) -> str:
     """工具 step → status 文案，如「调用 web_search: 贵州茅台 年报」"""
     args = evt.get("args") or {}
+    tool = evt.get("tool", "?")
     hint = ""
-    for key in ("query", "code", "path"):
-        if isinstance(args.get(key), str):
-            hint = args[key]
-            break
-    if not hint:
-        hint = json.dumps(args, ensure_ascii=False)
+    if tool == "update_plan":
+        steps = args.get("steps", args.get("plan", []))
+        if isinstance(steps, str):
+            steps = [{"step": steps}]
+        if isinstance(steps, list) and steps:
+            hint = "、".join(s.get("step", "") for s in steps[:3] if isinstance(s, dict))
+            if len(steps) > 3:
+                hint += f" 等{len(steps)}步"
+            hint = f"计划: {hint}"
+        else:
+            hint = "（空计划）"
+    else:
+        for key in ("query", "code", "path"):
+            if isinstance(args.get(key), str):
+                hint = args[key]
+                break
+        if not hint:
+            hint = json.dumps(args, ensure_ascii=False)
     if len(hint) > 60:
         hint = hint[:60] + "…"
     suffix = "" if evt.get("ok") else "（失败）"
-    return f"Lucas 调用 {evt.get('tool')}: {hint}{suffix}"
+    return f"Lucas 调用 {tool}: {hint}{suffix}"
 
 
 def _error_message(result: AgentResult) -> str:
@@ -229,17 +244,17 @@ async def chat_event_stream(
                 })
             return None
 
-        def _forward(evt: dict) -> str | None:
+        def _forward(evt: dict):
             nonlocal streamed_chars, step_count
             kind = evt.get("kind")
             if kind == "model_input":
-                return _sse("trace_event", {
+                yield _sse("trace_event", {
                     "event": "model_input",
                     "step": evt.get("step"),
                     "data": {"prompt": evt.get("prompt", "")},
                 })
             if kind == "model_output":
-                return _sse("trace_event", {
+                yield _sse("trace_event", {
                     "event": "model_output",
                     "step": evt.get("step"),
                     "data": {"output": evt.get("output", "")},
@@ -247,7 +262,7 @@ async def chat_event_stream(
             if kind == "thought":
                 step = evt.get("step", 0)
                 _pending_reasoning[step] = _pending_reasoning.get(step, "") + evt.get("text", "")
-                return None
+                return
             if kind == "tool_step":
                 tool_name = evt.get("tool", "?")
                 ok = bool(evt.get("ok"))
@@ -259,7 +274,7 @@ async def chat_event_stream(
                             tool_name,
                             "ok" if ok else "fail",
                             len(obs))
-                return _sse("tool_step", {
+                yield _sse("tool_step", {
                     "step": evt.get("step"),
                     "tool": tool_name,
                     "args": evt.get("args") or {},
@@ -267,23 +282,31 @@ async def chat_event_stream(
                     "output": obs,
                     "message": _status_message(evt),
                 })
+                if tool_name == "update_plan" and ok:
+                    plan_data = evt.get("args", {})
+                    plan_steps = plan_data.get("steps", plan_data.get("plan", []))
+                    if isinstance(plan_steps, str):
+                        plan_steps = [{"step": plan_steps, "status": "in_progress"}]
+                    yield _sse("plan_update", {
+                        "plan": plan_steps,
+                    })
             if kind == "summary":
                 text = evt.get("text", "")
                 if text:
                     logger.info("  💬 step %s summary: %s", evt.get("step"), text[:120])
-                return _sse("summary", {
+                yield _sse("summary", {
                     "step": evt.get("step"),
                     "text": text,
                 })
             if kind == "answer_chunk":
                 text = evt.get("text", "")
                 streamed_chars += len(text)
-                return _sse("synthesis_chunk", {"text": text})
+                yield _sse("synthesis_chunk", {"text": text})
             if kind == "answer":
                 # Runner 权威计数（含流式回退前的部分推送）
                 streamed_chars = evt.get("streamed_chars", streamed_chars)
                 step_count = evt.get("step", step_count)
-            return None
+            return
 
         yield _sse("dispatch", {
             "researchers": [{"id": "single", "name": config.name}],
@@ -312,9 +335,9 @@ async def chat_event_stream(
                 evt = await asyncio.wait_for(queue.get(), timeout=0.05)
             except asyncio.TimeoutError:
                 continue
-            out = _forward(evt)
-            if out is not None:
-                yield out
+            for out in _forward(evt):
+                if out is not None:
+                    yield out
         # 排空当前 step 的累积 reasoning
         cur_step = max(_pending_reasoning.keys()) if _pending_reasoning else 0
         flush = _flush_reasoning(cur_step)
@@ -322,9 +345,9 @@ async def chat_event_stream(
             yield flush
         result = run_task.result()
         while not queue.empty():
-            out = _forward(queue.get_nowait())
-            if out is not None:
-                yield out
+            for out in _forward(queue.get_nowait()):
+                if out is not None:
+                    yield out
         # 排空所有剩余累积 reasoning
         for step in sorted(_pending_reasoning.keys()):
             flush = _flush_reasoning(step)

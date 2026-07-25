@@ -185,6 +185,20 @@ def _process_check(config: dict, events: list[dict]) -> dict:
         )
         allowed = config.get("allowed", [])
         return _check("process", kind, reason in allowed, f"finish_reason={reason!r}", required)
+    if kind == "plan_usage":
+        plan_calls = sum(
+            1 for event in events
+            if event.get("event") == "tool_call_started"
+            and (event.get("data") or {}).get("tool") == "update_plan"
+        )
+        min_calls = config.get("min_calls", 0)
+        max_calls = config.get("max_calls")
+        passed = plan_calls >= min_calls
+        if max_calls is not None:
+            passed = passed and plan_calls <= max_calls
+        detail = f"update_plan called {plan_calls} times (min={min_calls}, max={max_calls})"
+        return _check("process", kind, passed, detail, required)
+
     return _check("process", kind, False, "unknown process grader", required)
 
 

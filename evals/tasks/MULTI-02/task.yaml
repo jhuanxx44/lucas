@@ -1,0 +1,54 @@
+id: MULTI-02
+title: Wiki 多公司调研对比 — 从知识库中召回、读取、对比并输出报告
+instruction: |
+  知识库 wiki/ 中收录了智能汽车产业链中激光雷达相关公司的档案。
+  请完成以下任务：
+  1. 使用 wiki_recall 召回激光雷达相关公司
+  2. 阅读每家公司完整档案，提取关键财务指标（营收、毛利率、核心客户）
+  3. 对比三家公司的优劣势
+  4. 将对比报告写入 wiki/reports/电子/激光雷达公司对比.md，包含：
+     - 行业概况（一句话）
+     - 每家公司的基础信息、关键财务数据、核心观点
+     - 对比表格
+  5. 回答中给出对比结论摘要
+
+fixture: fixture
+allowed_tools:
+  - wiki_recall
+  - read_file
+  - write_file
+  - list_files
+  - update_plan
+
+limits:
+  max_steps: 12
+  timeout_seconds: 180
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: file_content
+      path: wiki/reports/电子/激光雷达公司对比.md
+      contains: "禾赛科技"
+      required: true
+
+    - type: file_content
+      path: wiki/reports/电子/激光雷达公司对比.md
+      contains: "速腾聚创"
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["**"]
+      required: false
+
+  process:
+    - type: plan_usage
+      min_calls: 1
+      required: false
+
+    - type: max_steps
+      value: 12
+      required: true
+
+tags: [planning, wiki, multi-step, complex]

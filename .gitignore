@@ -17,3 +17,4 @@ reports/
 workspaces/
 runs/
 .firecrawl/
+tmp/

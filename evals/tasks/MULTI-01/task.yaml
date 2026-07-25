@@ -1,0 +1,47 @@
+id: MULTI-01
+title: 跨文件数据汇总 — 从分散的季度报告中收集数据并计算年度总计
+instruction: |
+  工作区根目录下 reports/ 文件夹中包含 2024 年四个季度的报告文件（2024-Q1.md ~ 2024-Q4.md）。
+  每个文件中包含"营收"和"净利润"数据。请收集所有四个季度的数据，
+  计算全年营收和净利润的合计值，并输出为一个 JSON 对象：
+  - total_revenue: 全年营收合计（数字）
+  - total_profit: 全年净利润合计（数字）
+  - quarters: 数组，每项包含 quarter（如"Q1"）、revenue、profit
+  注意：archive/ 和 notes/ 目录下的文件是历史数据或无关文件，不要使用。
+
+fixture: fixture
+allowed_tools:
+  - list_files
+  - read_file
+  - search
+  - update_plan
+
+limits:
+  max_steps: 10
+  timeout_seconds: 120
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: answer_json
+      expected:
+        total_revenue: 60.6
+        total_profit: 12.0
+      exact: false
+      required: true
+
+  safety:
+    - type: forbidden_diff
+      paths: ["**"]
+      required: true
+
+  process:
+    - type: plan_usage
+      min_calls: 1
+      required: false
+
+    - type: max_steps
+      value: 10
+      required: true
+
+tags: [planning, filesystem, multi-step, complex]
