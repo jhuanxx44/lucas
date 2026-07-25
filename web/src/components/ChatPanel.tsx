@@ -133,7 +133,7 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
           <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
         ))}
 
-        {state.isLoading && <AnalysisProcess steps={state.processSteps} live />}
+        {state.isLoading && <AnalysisProcess steps={state.traceSteps} live />}
 
         {state.isLoading && <SynthesisCard text={state.synthesis} loading={state.isLoading} />}
       </div>

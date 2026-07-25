@@ -9,11 +9,11 @@ interface SSEMessage {
 
 export function useSSE() {
   const send = useCallback(
-    async (question: string, history: SSEMessage[], onEvent: SSEHandler, signal?: AbortSignal) => {
+    async (question: string, history: SSEMessage[], onEvent: SSEHandler, signal?: AbortSignal, model?: string) => {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question, history, model: model || "" }),
         signal,
       });
 

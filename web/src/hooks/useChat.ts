@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ResearcherState, ChatAction } from "@/types";
+import type { ChatMessage, ChatRunConfig, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -13,6 +13,9 @@ interface ChatState {
   synthesis: string;
   actions: ChatAction[];
   processSteps: string[];
+  traceSteps: ChatTraceStep[];
+  runConfig: ChatRunConfig | null;
+  runtimeTrace: ChatRuntimeTraceEvent[];
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -26,6 +29,10 @@ type Action =
   | { type: "SYNTHESIS_CHUNK"; text: string }
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
+  | { type: "TOOL_STEP"; step: ChatTraceStep }
+  | { type: "SUMMARY_STEP"; step: ChatTraceStep }
+  | { type: "RUN_CONFIG"; config: ChatRunConfig }
+  | { type: "TRACE_EVENT"; event: ChatRuntimeTraceEvent }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage };
 
@@ -39,6 +46,9 @@ function reducer(state: ChatState, action: Action): ChatState {
         synthesis: "",
         actions: [],
         processSteps: ["已收到问题"],
+        traceSteps: [{ id: "init", kind: "action", label: "已收到问题", status: "done" }],
+        runConfig: null,
+        runtimeTrace: [],
         isLoading: true,
         phase: "dispatching",
       };
@@ -65,14 +75,24 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, synthesis: state.synthesis + action.text, phase: "synthesizing" };
     case "ACTIONS":
       return { ...state, actions: action.actions };
+    case "TOOL_STEP":
+      return { ...state, traceSteps: [...state.traceSteps, action.step] };
+    case "SUMMARY_STEP":
+      return { ...state, traceSteps: [...state.traceSteps, action.step] };
     case "PROCESS_STEP":
       if (!action.step || state.processSteps.at(-1) === action.step) return state;
       return { ...state, processSteps: [...state.processSteps, action.step] };
+    case "RUN_CONFIG":
+      return { ...state, runConfig: action.config };
+    case "TRACE_EVENT":
+      return { ...state, runtimeTrace: [...state.runtimeTrace, action.event] };
     case "DONE": {
       return {
         ...state,
         messages: [...state.messages, action.message],
         actions: [],
+        runConfig: null,
+        runtimeTrace: [],
         isLoading: false,
         phase: "idle",
       };
@@ -98,6 +118,9 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     synthesis: "",
     actions: [],
     processSteps: [],
+    traceSteps: [],
+    runConfig: null,
+    runtimeTrace: [],
     isLoading: false,
     phase: "idle",
   };
@@ -135,7 +158,7 @@ export function useChat(
   }, [onMessagesCommitted]);
 
   const sendMessage = useCallback(
-    async (question: string) => {
+    async (question: string, model?: string) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -146,6 +169,9 @@ export function useChat(
       let streamedSynthesis = "";
       let streamedActions: ChatAction[] = [];
       let streamedProcessSteps = ["已收到问题"];
+      let streamedTraceSteps: ChatTraceStep[] = [{ id: "init", kind: "action", label: "已收到问题", status: "done" }];
+      let streamedRuntimeTrace: ChatRuntimeTraceEvent[] = [];
+      let streamedRunConfig: ChatRunConfig | null = null;
       let completed = false;
 
       const appendProcessStep = (step: string) => {
@@ -204,6 +230,52 @@ export function useChat(
                 streamedActions = (data as { actions: ChatAction[] }).actions;
                 dispatch({ type: "ACTIONS", actions: streamedActions });
                 break;
+              case "tool_step": {
+                const toolData = data as { step: number; tool: string; args: Record<string, unknown>; ok: boolean; output: string; message: string };
+                const step: ChatTraceStep = {
+                  id: `tool-${toolData.step}-${toolData.tool}`,
+                  kind: "tool",
+                  label: toolData.message,
+                  status: toolData.ok ? "done" : "error",
+                  step: toolData.step,
+                  tool: toolData.tool,
+                  input: toolData.args,
+                  output: toolData.output,
+                };
+                streamedTraceSteps = [...streamedTraceSteps, step];
+                dispatch({ type: "TOOL_STEP", step });
+                break;
+              }
+              case "summary": {
+                const summaryData = data as { step: number; text: string };
+                const step: ChatTraceStep = {
+                  id: `summary-${summaryData.step}`,
+                  kind: "summary",
+                  label: summaryData.text,
+                  status: "done",
+                  step: summaryData.step,
+                };
+                streamedTraceSteps = [...streamedTraceSteps, step];
+                dispatch({ type: "SUMMARY_STEP", step });
+                break;
+              }
+              case "trace_event": {
+                const evt = data as { event: string; step?: number; data: Record<string, unknown> };
+                if (evt.event === "run_config") {
+                  streamedRunConfig = evt.data as unknown as ChatRunConfig;
+                  dispatch({ type: "RUN_CONFIG", config: streamedRunConfig });
+                }
+                const traceEvent: ChatRuntimeTraceEvent = {
+                  sequence: streamedRuntimeTrace.length + 1,
+                  timestamp: new Date().toISOString(),
+                  event: evt.event,
+                  step: evt.step,
+                  data: evt.data,
+                };
+                streamedRuntimeTrace = [...streamedRuntimeTrace, traceEvent];
+                dispatch({ type: "TRACE_EVENT", event: traceEvent });
+                break;
+              }
               case "done": {
                 completed = true;
                 const assistantMessage: ChatMessage = {
@@ -214,6 +286,9 @@ export function useChat(
                   synthesis: streamedSynthesis,
                   actions: streamedActions.length > 0 ? streamedActions : undefined,
                   processSteps: streamedProcessSteps,
+                  traceSteps: streamedTraceSteps,
+                  runtimeTrace: streamedRuntimeTrace.length > 0 ? streamedRuntimeTrace : undefined,
+                  runConfig: streamedRunConfig ?? undefined,
                 };
                 const messages = [...previousMessages, userMessage, assistantMessage];
                 dispatch({ type: "DONE", message: assistantMessage });
@@ -229,6 +304,8 @@ export function useChat(
                   role: "assistant",
                   content: `错误: ${d.message}`,
                   processSteps: streamedProcessSteps,
+                  runtimeTrace: streamedRuntimeTrace.length > 0 ? streamedRuntimeTrace : undefined,
+                  runConfig: streamedRunConfig ?? undefined,
                 };
                 const messages = [...previousMessages, userMessage, errorMessage];
                 dispatch({ type: "ERROR", message: errorMessage });
@@ -237,7 +314,8 @@ export function useChat(
               }
             }
           },
-          controller.signal
+          controller.signal,
+          model
         );
       } catch (e: unknown) {
         if (!completed && e instanceof Error && e.name !== "AbortError") {

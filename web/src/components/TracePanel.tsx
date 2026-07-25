@@ -7,6 +7,8 @@ export interface LiveTraceTurn {
   answer: string;
   steps: ChatTraceStep[];
   runtimeTrace: ChatRuntimeTraceEvent[];
+  requestAt?: string;
+  responseAt?: string;
 }
 
 interface TraceTurn {
@@ -15,6 +17,8 @@ interface TraceTurn {
   answer: string;
   steps: ChatTraceStep[];
   runtimeTrace: ChatRuntimeTraceEvent[];
+  requestAt?: string;
+  responseAt?: string;
   live?: boolean;
 }
 
@@ -77,15 +81,39 @@ function traceCompleteness(events: ChatRuntimeTraceEvent[], live?: boolean) {
   return hasLifecycle && hasCompletedOutput ? "complete" : "legacy_partial";
 }
 
-function exportTrace(turns: TraceTurn[]) {
+function exportTrace(turns: TraceTurn[], messages: ChatMessage[]) {
+  // 从所有消息中提取第一个有效的 runConfig（session 级别，每次对话仅一份）
+  let runConfig = undefined;
+  for (const msg of messages) {
+    if (msg.runConfig) {
+      runConfig = msg.runConfig;
+      break;
+    }
+  }
   const exportedAt = new Date();
-  const payload = {
-    schemaVersion: 2,
+  const payload: Record<string, unknown> = {
+    schemaVersion: 3,
     traceType: "lucas-product-run",
     exportedAt: exportedAt.toISOString(),
-    turns: turns.map(({ live, runtimeTrace, ...turn }) => ({
+    config: runConfig
+      ? {
+          agent: runConfig.agent,
+          provider: runConfig.provider,
+          model: runConfig.model,
+          temperature: runConfig.temperature,
+          allowed_tools: runConfig.allowed_tools,
+          max_steps: runConfig.max_steps,
+          timeout_seconds: runConfig.timeout_seconds,
+          system_prompt: runConfig.system_prompt,
+          tools_description: runConfig.tools_description,
+          prompt_template: runConfig.prompt_template,
+        }
+      : undefined,
+    turns: turns.map(({ live, runtimeTrace, requestAt, responseAt, ...turn }) => ({
       ...turn,
       status: live ? "running" : "finished",
+      requestAt: requestAt ?? null,
+      responseAt: responseAt ?? null,
       completeness: traceCompleteness(runtimeTrace, live),
       events: runtimeTrace,
     })),
@@ -199,7 +227,7 @@ export function TracePanel({ messages, liveTurn }: TracePanelProps) {
           aria-label="导出 Trace JSON"
           title="导出 Trace JSON"
           disabled={turns.length === 0}
-          onClick={() => exportTrace(turns)}
+          onClick={() => exportTrace(turns, messages)}
           className="ml-auto rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
         >
           <Download size={15} />

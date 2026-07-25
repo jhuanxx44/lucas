@@ -23,6 +23,7 @@ import json
 import logging
 from dataclasses import replace
 from datetime import date, datetime
+import time
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -173,6 +174,7 @@ async def chat_event_stream(
     user_id: str = "default",
     workspace: Path | None = None,
     model_adapter=None,
+    model_override: str | None = None,
 ) -> AsyncGenerator[str, None]:
     run_task: asyncio.Task | None = None
     try:
@@ -181,15 +183,25 @@ async def chat_event_stream(
         tools = ToolRuntime(workspace or _PROJECT_ROOT, _CHAT_TOOL_SPECS)
         allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
         system_prompt: str | None = None
+        model = model_override or config.model
+        tools_desc = tools.describe(allowed_tools)
         if model_adapter is None:
             # 工具说明渲染进 system prompt（稳定指令层），user prompt 只留每轮变化内容。
             system_prompt = build_single_system_prompt(
-                tools.describe(allowed_tools), current_date=date.today().isoformat())
-            client = create_client(provider=config.provider, model=config.model,
+                tools_desc, current_date=date.today().isoformat())
+            logger.info("━━ 收到问题 | model=%s | %s", model, question[:100])
+            client = create_client(provider=config.provider, model=model,
                                    system_prompt=system_prompt)
             model_adapter = LLMClientAdapter(client, temperature=config.temperature)
-        runner = AgentRunner(model_adapter, tools, load_prompt_template(_PROMPT_PATH))
-        instruction = _render_date_header() + _render_history(history) + f"用户问题：{question}"
+        prompt_template = load_prompt_template(_PROMPT_PATH)
+        runner = AgentRunner(model_adapter, tools, prompt_template)
+        # 非寒暄问题强制标注：提醒模型必须使用工具查证
+        chitchat_patterns = ('hi', 'hello', '你好', '谢谢', '你是谁', '你是什么', '你叫什么')
+        is_chitchat = question.strip().lower().startswith(chitchat_patterns) and len(question) < 15
+        tool_tag = "" if is_chitchat else "⚠️ 本条问题需要查证外部事实，禁止凭记忆直接回答。先调用 wiki_recall 或 web_search。\n\n"
+
+
+        instruction = _render_date_header() + _render_history(history) + tool_tag + f"用户问题：{question}"
         limits = RunLimits(max_steps=config.max_steps, timeout_seconds=_TIMEOUT_SECONDS)
 
         queue: asyncio.Queue = asyncio.Queue()
@@ -200,11 +212,25 @@ async def chat_event_stream(
                        stream_answer=True)
         )
 
+        t0 = time.monotonic()
         # answer_chunk 已推送的字符数；run 结束时若少于最终答案长度则补尾防缺字
         streamed_chars = 0
+        step_count = 0
+
+        _pending_reasoning: dict[int, str] = {}
+
+        def _flush_reasoning(step: int) -> str | None:
+            text = _pending_reasoning.pop(step, None)
+            if text:
+                return _sse("trace_event", {
+                    "event": "model_reasoning",
+                    "step": step,
+                    "data": {"text": text},
+                })
+            return None
 
         def _forward(evt: dict) -> str | None:
-            nonlocal streamed_chars
+            nonlocal streamed_chars, step_count
             kind = evt.get("kind")
             if kind == "model_input":
                 return _sse("trace_event", {
@@ -219,24 +245,35 @@ async def chat_event_stream(
                     "data": {"output": evt.get("output", "")},
                 })
             if kind == "thought":
-                return _sse("trace_event", {
-                    "event": "model_reasoning",
-                    "step": evt.get("step"),
-                    "data": {"text": evt.get("text", "")},
-                })
+                step = evt.get("step", 0)
+                _pending_reasoning[step] = _pending_reasoning.get(step, "") + evt.get("text", "")
+                return None
             if kind == "tool_step":
+                tool_name = evt.get("tool", "?")
+                ok = bool(evt.get("ok"))
+                obs = evt.get("observation", "")
+                step_count = evt.get("step", 0)
+                logger.info("  📎 step %s | %s %s → %s (%d chars)",
+                            step_count,
+                            "✅" if ok else "❌",
+                            tool_name,
+                            "ok" if ok else "fail",
+                            len(obs))
                 return _sse("tool_step", {
                     "step": evt.get("step"),
-                    "tool": evt.get("tool"),
+                    "tool": tool_name,
                     "args": evt.get("args") or {},
-                    "ok": bool(evt.get("ok")),
-                    "output": evt.get("observation", ""),
+                    "ok": ok,
+                    "output": obs,
                     "message": _status_message(evt),
                 })
             if kind == "summary":
+                text = evt.get("text", "")
+                if text:
+                    logger.info("  💬 step %s summary: %s", evt.get("step"), text[:120])
                 return _sse("summary", {
                     "step": evt.get("step"),
-                    "text": evt.get("text", ""),
+                    "text": text,
                 })
             if kind == "answer_chunk":
                 text = evt.get("text", "")
@@ -245,6 +282,7 @@ async def chat_event_stream(
             if kind == "answer":
                 # Runner 权威计数（含流式回退前的部分推送）
                 streamed_chars = evt.get("streamed_chars", streamed_chars)
+                step_count = evt.get("step", step_count)
             return None
 
         yield _sse("dispatch", {
@@ -257,12 +295,14 @@ async def chat_event_stream(
             "data": {
                 "agent": config.name,
                 "provider": config.provider,
-                "model": config.model,
+                "model": model,
                 "temperature": config.temperature,
                 "allowed_tools": allowed_tools,
                 "max_steps": limits.max_steps,
                 "timeout_seconds": limits.timeout_seconds,
                 "system_prompt": system_prompt,
+                "tools_description": tools_desc,
+                "prompt_template": prompt_template,
             },
         })
         # 运行期间增量排出工具 step / answer_chunk 事件；
@@ -275,22 +315,38 @@ async def chat_event_stream(
             out = _forward(evt)
             if out is not None:
                 yield out
+        # 排空当前 step 的累积 reasoning
+        cur_step = max(_pending_reasoning.keys()) if _pending_reasoning else 0
+        flush = _flush_reasoning(cur_step)
+        if flush:
+            yield flush
         result = run_task.result()
         while not queue.empty():
             out = _forward(queue.get_nowait())
             if out is not None:
                 yield out
+        # 排空所有剩余累积 reasoning
+        for step in sorted(_pending_reasoning.keys()):
+            flush = _flush_reasoning(step)
+            if flush:
+                yield flush
 
         if result.finish_reason == "completed" and result.answer is not None:
             text = result.answer if isinstance(result.answer, str) else json.dumps(
                 result.answer, ensure_ascii=False)
-            if streamed_chars < len(text):
-                # 解析器保守缓冲（工具步/结构化 answer/回退）时整段或补尾推送
+            answer_len = len(text)
+            if streamed_chars < answer_len:
                 yield _sse("synthesis_chunk", {"text": text[streamed_chars:]})
             yield _sse("researcher_done", {"id": "single"})
             total_tokens = result.usage.total_tokens if result.usage else 0
+            elapsed = time.monotonic() - t0
+            logger.info("  ✅ 回答完成 | %d 步, %d tokens, %d chars, %.1fs",
+                        step_count, total_tokens, answer_len, elapsed)
             yield _sse("done", {"total_tokens": total_tokens})
         else:
+            elapsed = time.monotonic() - t0
+            logger.warning("  ⚠️ 非正常结束 | finish_reason=%s, %.1fs",
+                           result.finish_reason, elapsed)
             yield _sse("error", {"message": _error_message(result)})
     except Exception:
         logger.exception("agent stream error for question: %s", question[:80])

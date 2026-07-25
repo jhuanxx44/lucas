@@ -58,6 +58,19 @@ export interface ChatRuntimeTraceEvent {
   data: Record<string, unknown>;
 }
 
+export interface ChatRunConfig {
+  agent: string;
+  provider: string;
+  model: string;
+  temperature: number;
+  allowed_tools: string[];
+  max_steps: number;
+  timeout_seconds: number;
+  system_prompt: string;
+  tools_description: string;
+  prompt_template: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -68,6 +81,7 @@ export interface ChatMessage {
   processSteps?: string[];
   traceSteps?: ChatTraceStep[];
   runtimeTrace?: ChatRuntimeTraceEvent[];
+  runConfig?: ChatRunConfig;
 }
 
 export interface ChatSessionSummary {
