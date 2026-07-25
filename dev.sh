@@ -42,4 +42,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 cd "$DIR"
-"$VENV/bin/uvicorn" server.app:app --host 0.0.0.0 --port 8000 --reload --log-level info
+mkdir -p "$DIR/logs"
+LOG_FILE="$DIR/logs/backend-$(date +%Y%m%d).log"
+echo "📝 后端日志: $LOG_FILE"
+echo ""
+"$VENV/bin/uvicorn" server.app:app --host 0.0.0.0 --port 8000 --reload --log-level info 2>&1 | tee -a "$LOG_FILE"
