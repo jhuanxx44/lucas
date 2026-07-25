@@ -30,7 +30,8 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 
 - 完成一个较大的产品功能或涉及关键设计决策的改动后，输出一份简短教程/解释，用浅显易懂的语言解释实现中涉及的核心原理、关键设计决策及其取舍理由。
 - 小改动（如加一个参数、修一个 Bug、改一行配置）不需要输出教学文档。
-- 教程写入 `docs/learnings/` 目录，文件名格式：`YYYY-MM-DD-功能简述.md`。
+- 教程写入 `docs/learnings/` 目录。
+- 文件名格式：`YYYY-MM-DD-功能简述.md`。
 
 ### Agent 机制实验
 
@@ -42,7 +43,8 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 4. 实现能验证假设的最小改动。
 5. 对相同任务运行多次 trial，比较成功率、稳定性、步骤、延迟和成本。
 6. 以环境最终状态（outcome）作为主要验收，用 transcript/trace 解释原因。
-7. 记录实验结论，再决定保留、修改或删除该机制。
+7. 实验报告写入 `docs/experiments/` 目录，运行日志追加到 `docs/experiments/experiment-log.md`。
+8. 根据实验结论决定保留、修改或删除该机制。
 
 如果 Evaluation Harness 尚未支持所需能力，只补当前阶段需要的最小 task、grader 和运行记录；不要因此提前建设完整框架。
 
