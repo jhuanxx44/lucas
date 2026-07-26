@@ -1,0 +1,358 @@
+[
+  {
+    "query_id": "q01",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/半导体/联发科.md",
+      "companies/光通信/中兴通讯.md",
+      "concepts/微处理器.md",
+      "companies/光通信/华为技术.md",
+      "companies/软件服务/微软.md",
+      "companies/半导体/AMD.md",
+      "companies/半导体/英伟达.md",
+      "companies/半导体/英特尔.md",
+      "companies/半导体/三星电子.md",
+      "companies/餐饮/星巴克.md"
+    ],
+    "scores": [
+      0.8719,
+      0.8525,
+      0.8518,
+      0.8484,
+      0.846,
+      0.8322,
+      0.8321,
+      0.8298,
+      0.8287,
+      0.8259
+    ]
+  },
+  {
+    "query_id": "q02",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/半导体/英伟达.md",
+      "companies/光通信/华为技术.md",
+      "companies/半导体/AMD.md",
+      "concepts/数据中心.md",
+      "companies/汽车/特斯拉.md",
+      "concepts/微处理器.md",
+      "companies/半导体/海思半导体.md",
+      "companies/半导体/英特尔.md",
+      "companies/软件服务/微软.md",
+      "companies/互联网/腾讯.md"
+    ],
+    "scores": [
+      14.3446,
+      8.1921,
+      6.1368,
+      5.3084,
+      5.1503,
+      5.1396,
+      4.7114,
+      4.0622,
+      3.9048,
+      2.729
+    ]
+  },
+  {
+    "query_id": "q03",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/半导体/台积电.md",
+      "concepts/芯片设计.md",
+      "concepts/晶圆.md",
+      "concepts/集成电路.md",
+      "companies/光通信/诺基亚.md",
+      "companies/半导体/英特尔.md",
+      "companies/新能源/隆基绿能.md",
+      "companies/半导体/中芯国际.md",
+      "companies/半导体/英伟达.md",
+      "companies/光通信/爱立信.md"
+    ],
+    "scores": [
+      1.0091,
+      1.0068,
+      0.9917,
+      0.9711,
+      0.9399,
+      0.92,
+      0.8759,
+      0.8636,
+      0.8629,
+      0.8601
+    ]
+  },
+  {
+    "query_id": "q04",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/光纤通信.md",
+      "companies/光通信/烽火通信.md",
+      "concepts/波分复用.md",
+      "concepts/5G.md",
+      "concepts/激光器.md",
+      "concepts/光放大器.md",
+      "companies/光通信/华为技术.md",
+      "companies/光通信/中兴通讯.md",
+      "companies/半导体/高通.md",
+      "companies/光通信/诺基亚.md"
+    ],
+    "scores": [
+      6.1209,
+      5.5602,
+      5.4787,
+      5.0579,
+      4.7114,
+      4.3522,
+      2.9337,
+      2.1838,
+      2.1473,
+      2.1473
+    ]
+  },
+  {
+    "query_id": "q05",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/摩尔定律.md",
+      "concepts/微处理器.md",
+      "concepts/集成电路.md",
+      "companies/半导体/中芯国际.md",
+      "concepts/晶体管.md",
+      "companies/半导体/英伟达.md",
+      "concepts/芯片设计.md",
+      "companies/半导体/AMD.md",
+      "concepts/晶圆.md",
+      "companies/半导体/台积电.md"
+    ],
+    "scores": [
+      15.8641,
+      10.0281,
+      9.3621,
+      8.9045,
+      7.1744,
+      6.5852,
+      6.4853,
+      5.6347,
+      5.5611,
+      5.4167
+    ]
+  },
+  {
+    "query_id": "q06",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/半导体.md",
+      "companies/半导体/海思半导体.md",
+      "concepts/晶体管.md",
+      "companies/半导体/台积电.md",
+      "concepts/集成电路.md",
+      "concepts/晶圆.md",
+      "concepts/激光器.md",
+      "concepts/摩尔定律.md",
+      "companies/半导体/SK海力士.md",
+      "concepts/芯片设计.md"
+    ],
+    "scores": [
+      1.2361,
+      1.1832,
+      1.1787,
+      1.1622,
+      1.1528,
+      1.1472,
+      1.1441,
+      1.1353,
+      1.1262,
+      1.1235
+    ]
+  },
+  {
+    "query_id": "q07",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/光放大器.md",
+      "concepts/光纤通信.md",
+      "concepts/波分复用.md",
+      "concepts/激光器.md",
+      "companies/光通信/烽火通信.md",
+      "concepts/5G.md",
+      "companies/光通信/华为技术.md"
+    ],
+    "scores": [
+      4.3522,
+      4.3057,
+      3.7623,
+      3.6393,
+      3.249,
+      2.7844,
+      0.9013
+    ]
+  },
+  {
+    "query_id": "q08",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [],
+    "scores": []
+  },
+  {
+    "query_id": "q09",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/集成电路.md",
+      "concepts/芯片设计.md",
+      "concepts/晶圆.md",
+      "companies/半导体/英伟达.md",
+      "companies/半导体/中芯国际.md",
+      "concepts/微处理器.md",
+      "companies/光通信/华为技术.md",
+      "companies/半导体/海思半导体.md",
+      "companies/光通信/爱立信.md",
+      "companies/半导体/AMD.md"
+    ],
+    "scores": [
+      11.429,
+      9.275,
+      8.2459,
+      7.6448,
+      7.6239,
+      6.3675,
+      6.1589,
+      4.9116,
+      4.2247,
+      3.6563
+    ]
+  },
+  {
+    "query_id": "q10",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/存储器.md",
+      "companies/半导体/三星电子.md",
+      "companies/半导体/SK海力士.md",
+      "companies/半导体/英特尔.md"
+    ],
+    "scores": [
+      15.0357,
+      7.2167,
+      4.0683,
+      3.936
+    ]
+  },
+  {
+    "query_id": "q11",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "concepts/5G.md",
+      "companies/光通信/中兴通讯.md",
+      "companies/光通信/华为技术.md",
+      "companies/光通信/爱立信.md",
+      "companies/消费电子/苹果公司.md",
+      "companies/半导体/英伟达.md",
+      "companies/半导体/高通.md",
+      "concepts/数据中心.md",
+      "concepts/光纤通信.md",
+      "companies/半导体/海思半导体.md"
+    ],
+    "scores": [
+      9.1458,
+      7.5115,
+      7.3743,
+      6.318,
+      5.9394,
+      5.759,
+      5.7051,
+      5.6426,
+      5.0027,
+      4.7582
+    ]
+  },
+  {
+    "query_id": "q12",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/新能源/宁德时代.md",
+      "companies/汽车/特斯拉.md",
+      "companies/汽车/比亚迪.md",
+      "companies/半导体/三星电子.md",
+      "concepts/半导体.md",
+      "concepts/晶圆.md",
+      "concepts/晶体管.md",
+      "concepts/集成电路.md",
+      "concepts/数据中心.md",
+      "companies/光通信/华为技术.md"
+    ],
+    "scores": [
+      9.0266,
+      8.2792,
+      8.0388,
+      5.0258,
+      2.3802,
+      2.1023,
+      2.0876,
+      1.9802,
+      1.8234,
+      1.1522
+    ]
+  },
+  {
+    "query_id": "q13",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/半导体/联发科.md",
+      "companies/餐饮/麦当劳.md",
+      "companies/软件服务/微软.md",
+      "companies/汽车/比亚迪.md",
+      "concepts/长城.md",
+      "companies/光通信/华为技术.md"
+    ],
+    "scores": [
+      3.2544,
+      2.8492,
+      2.3764,
+      1.9316,
+      1.657,
+      0.9716
+    ]
+  },
+  {
+    "query_id": "q14",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/互联网/腾讯.md",
+      "companies/体育用品/耐克.md"
+    ],
+    "scores": [
+      2.2251,
+      1.9376
+    ]
+  },
+  {
+    "query_id": "q15",
+    "retriever": "bm25@LLM-KW (deepseek-chat)",
+    "ranked": [
+      "companies/半导体/海思半导体.md",
+      "concepts/长城.md",
+      "concepts/熊猫.md",
+      "concepts/故宫.md",
+      "companies/汽车/比亚迪.md",
+      "companies/汽车/特斯拉.md",
+      "concepts/存储器.md",
+      "companies/半导体/台积电.md",
+      "concepts/激光器.md",
+      "concepts/光纤通信.md"
+    ],
+    "scores": [
+      5.589,
+      2.4978,
+      2.4403,
+      2.2853,
+      1.8243,
+      1.6022,
+      1.3277,
+      1.2955,
+      1.2039,
+      1.1353
+    ]
+  }
+]
