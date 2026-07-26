@@ -106,9 +106,10 @@ def test_chat_write_guard_allows_wiki_blocks_elsewhere(tmp_path):
     (tmp_path / "raw").mkdir()
     handler = _WIKI_WRITE_FILE_SPEC.handler
 
-    ok = handler(tmp_path, {"path": "wiki/companies/x.md", "content": "hi"})
+    body = "---\nsummary: '测试页面'\n---\n\nhi"
+    ok = handler(tmp_path, {"path": "wiki/companies/x.md", "content": body})
     assert ok.status == "ok"
-    assert (tmp_path / "wiki/companies/x.md").read_text() == "hi"
+    assert (tmp_path / "wiki/companies/x.md").read_text() == body
 
     for bad in ("raw/x.md", "notes.md", "../escape.md", "/etc/passwd"):
         denied = handler(tmp_path, {"path": bad, "content": "x"})

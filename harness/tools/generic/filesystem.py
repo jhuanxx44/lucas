@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+import yaml
+
 from harness.tools.base import ToolResult, ToolSpec
 from utils.path_safety import resolve_within
 
@@ -92,6 +94,30 @@ def apply_patch(workspace: Path, args: dict) -> ToolResult:
     return ToolResult(status="ok", observation=f"patched {args.get('path')}")
 
 
+_WIKI_SUMMARY_ERROR = (
+    "wiki 页面必须在 frontmatter 中包含 summary 字段（2-4 句中文 TL;DR）。\n"
+    "示例 frontmatter：\n"
+    "---\n"
+    "title: 页面标题\n"
+    "type: company\n"
+    "summary: '2-4 句中文摘要，概括核心信息、关键数据和时间范围'\n"
+    "---"
+)
+
+
+def _has_summary_frontmatter(content: str) -> bool:
+    if not content.startswith("---"):
+        return False
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return False
+    try:
+        fm = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return False
+    return bool(fm.get("summary", "").strip())
+
+
 def write_file(workspace: Path, args: dict) -> ToolResult:
     path = _resolve_in_workspace(workspace, args.get("path"))
     if path is None:
@@ -101,6 +127,18 @@ def write_file(workspace: Path, args: dict) -> ToolResult:
     if not isinstance(content, str):
         return ToolResult(status="invalid_input", error_code="bad_args",
                           observation="content must be a string")
+    # wiki 写入校验：.md 文件必须包含 non-empty summary frontmatter
+    # 排除 index.md / glossary.md（索引和术语表不需要 summary）
+    ws_root = workspace.resolve()
+    rel_to_ws = str(path.resolve().relative_to(ws_root))
+    if (rel_to_ws.startswith("wiki/") and path.suffix == ".md"
+            and path.name not in ("index.md", "glossary.md")):
+        if not _has_summary_frontmatter(content):
+            return ToolResult(
+                status="invalid_input", error_code="missing_summary",
+                observation=_WIKI_SUMMARY_ERROR,
+            )
+
     if path.exists():
         if args.get("overwrite") is not True:
             return ToolResult(

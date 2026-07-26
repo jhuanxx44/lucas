@@ -370,11 +370,12 @@ def test_read_file_not_found(tmp_path):
 
 
 def test_write_file_creates_new_file(tmp_path):
+    body = "---\nsummary: '测试页面摘要'\n---\n\n# 新页面\n"
     result = _execute(tmp_path, WRITE_FILE_SPEC, "write_file", {
-        "path": "wiki/notes/new.md", "content": "# 新页面\n",
+        "path": "wiki/notes/new.md", "content": body,
     })
     assert result.status == "ok"
-    assert (tmp_path / "wiki" / "notes" / "new.md").read_text() == "# 新页面\n"
+    assert (tmp_path / "wiki" / "notes" / "new.md").read_text() == body
 
 
 def test_write_file_refuses_overwrite_by_default(tmp_path):
