@@ -1,0 +1,422 @@
+[
+  {
+    "query_id": "q01",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/晶圆.md",
+      "concepts/芯片设计.md",
+      "concepts/集成电路.md",
+      "companies/光通信/华为技术.md",
+      "companies/半导体/中芯国际.md",
+      "companies/半导体/三星电子.md",
+      "concepts/微处理器.md",
+      "companies/半导体/英伟达.md",
+      "companies/半导体/联发科.md",
+      "companies/半导体/英特尔.md"
+    ],
+    "scores": [
+      0.165,
+      0.017,
+      0.0161,
+      0.0119,
+      0.0109,
+      0.0108,
+      0.0101,
+      0.01,
+      0.0092,
+      0.0091
+    ]
+  },
+  {
+    "query_id": "q02",
+    "retriever": "tfidf",
+    "ranked": [
+      "companies/半导体/英伟达.md",
+      "companies/半导体/AMD.md",
+      "companies/半导体/海思半导体.md",
+      "concepts/半导体.md",
+      "companies/半导体/台积电.md",
+      "companies/光通信/华为技术.md",
+      "concepts/集成电路.md",
+      "concepts/光纤通信.md",
+      "concepts/微处理器.md",
+      "companies/半导体/英特尔.md"
+    ],
+    "scores": [
+      0.0734,
+      0.0274,
+      0.0243,
+      0.0173,
+      0.0153,
+      0.0111,
+      0.011,
+      0.0072,
+      0.0067,
+      0.0062
+    ]
+  },
+  {
+    "query_id": "q03",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/半导体.md",
+      "companies/半导体/台积电.md",
+      "concepts/芯片设计.md",
+      "concepts/集成电路.md",
+      "companies/半导体/中芯国际.md",
+      "concepts/晶圆.md",
+      "concepts/微处理器.md",
+      "concepts/5G.md",
+      "companies/食品饮料/可口可乐.md",
+      "companies/半导体/英特尔.md"
+    ],
+    "scores": [
+      0.0349,
+      0.0344,
+      0.0226,
+      0.0184,
+      0.0176,
+      0.0167,
+      0.0151,
+      0.0114,
+      0.0114,
+      0.0114
+    ]
+  },
+  {
+    "query_id": "q04",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/光放大器.md",
+      "companies/光通信/烽火通信.md",
+      "concepts/光纤通信.md",
+      "concepts/波分复用.md",
+      "concepts/5G.md",
+      "concepts/激光器.md",
+      "companies/半导体/高通.md",
+      "companies/半导体/AMD.md",
+      "companies/半导体/英伟达.md",
+      "companies/半导体/海思半导体.md"
+    ],
+    "scores": [
+      0.1358,
+      0.1158,
+      0.0804,
+      0.062,
+      0.0413,
+      0.0207,
+      0.0182,
+      0.0163,
+      0.0154,
+      0.0151
+    ]
+  },
+  {
+    "query_id": "q05",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/摩尔定律.md",
+      "concepts/芯片设计.md",
+      "concepts/微处理器.md",
+      "concepts/集成电路.md",
+      "companies/半导体/高通.md",
+      "companies/半导体/中芯国际.md",
+      "concepts/数据中心.md",
+      "companies/消费电子/苹果公司.md",
+      "concepts/晶体管.md",
+      "concepts/激光器.md"
+    ],
+    "scores": [
+      0.4024,
+      0.0331,
+      0.0142,
+      0.0095,
+      0.0095,
+      0.0062,
+      0.0062,
+      0.0054,
+      0.0046,
+      0.0046
+    ]
+  },
+  {
+    "query_id": "q06",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/半导体.md",
+      "concepts/晶体管.md",
+      "concepts/晶圆.md",
+      "concepts/芯片设计.md",
+      "companies/新能源/隆基绿能.md",
+      "companies/半导体/SK海力士.md",
+      "concepts/集成电路.md",
+      "concepts/光纤通信.md",
+      "companies/半导体/海思半导体.md",
+      "concepts/激光器.md"
+    ],
+    "scores": [
+      0.3395,
+      0.0392,
+      0.0263,
+      0.0261,
+      0.0245,
+      0.0215,
+      0.0194,
+      0.0171,
+      0.0136,
+      0.012
+    ]
+  },
+  {
+    "query_id": "q07",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/波分复用.md",
+      "concepts/光放大器.md",
+      "concepts/光纤通信.md",
+      "concepts/芯片设计.md",
+      "companies/光通信/烽火通信.md",
+      "concepts/5G.md",
+      "concepts/摩尔定律.md",
+      "concepts/互联网.md",
+      "concepts/集成电路.md",
+      "concepts/激光器.md"
+    ],
+    "scores": [
+      0.2112,
+      0.0891,
+      0.0632,
+      0.0432,
+      0.0238,
+      0.0189,
+      0.0175,
+      0.014,
+      0.0108,
+      0.0087
+    ]
+  },
+  {
+    "query_id": "q08",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/5G.md",
+      "concepts/互联网.md",
+      "concepts/芯片设计.md",
+      "companies/光通信/华为技术.md",
+      "companies/半导体/海思半导体.md",
+      "companies/半导体/联发科.md",
+      "concepts/存储器.md",
+      "concepts/半导体.md",
+      "concepts/晶体管.md",
+      "companies/半导体/高通.md"
+    ],
+    "scores": [
+      0.3016,
+      0.0349,
+      0.0333,
+      0.0273,
+      0.0246,
+      0.0189,
+      0.0172,
+      0.0139,
+      0.0132,
+      0.0132
+    ]
+  },
+  {
+    "query_id": "q09",
+    "retriever": "tfidf",
+    "ranked": [
+      "companies/半导体/中芯国际.md",
+      "concepts/微处理器.md",
+      "concepts/芯片设计.md",
+      "concepts/晶圆.md",
+      "companies/半导体/英伟达.md",
+      "concepts/集成电路.md",
+      "companies/半导体/AMD.md",
+      "companies/半导体/海思半导体.md",
+      "companies/半导体/高通.md",
+      "companies/半导体/英特尔.md"
+    ],
+    "scores": [
+      0.0365,
+      0.0359,
+      0.0272,
+      0.0189,
+      0.0163,
+      0.0157,
+      0.0146,
+      0.0143,
+      0.0124,
+      0.007
+    ]
+  },
+  {
+    "query_id": "q10",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/存储器.md",
+      "companies/半导体/三星电子.md",
+      "companies/半导体/SK海力士.md",
+      "concepts/5G.md",
+      "companies/半导体/英特尔.md",
+      "concepts/微处理器.md",
+      "companies/光通信/中兴通讯.md",
+      "companies/半导体/AMD.md",
+      "companies/半导体/联发科.md",
+      "companies/光通信/华为技术.md"
+    ],
+    "scores": [
+      0.0514,
+      0.0275,
+      0.0198,
+      0.0146,
+      0.0113,
+      0.0081,
+      0.0069,
+      0.0041,
+      0.0033,
+      0.003
+    ]
+  },
+  {
+    "query_id": "q11",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/5G.md",
+      "concepts/互联网.md",
+      "companies/光通信/华为技术.md",
+      "concepts/芯片设计.md",
+      "companies/光通信/中兴通讯.md",
+      "concepts/光纤通信.md",
+      "companies/半导体/海思半导体.md",
+      "companies/半导体/高通.md",
+      "companies/半导体/联发科.md",
+      "concepts/激光器.md"
+    ],
+    "scores": [
+      0.1853,
+      0.0247,
+      0.0167,
+      0.0159,
+      0.0156,
+      0.0156,
+      0.0153,
+      0.0116,
+      0.0113,
+      0.0098
+    ]
+  },
+  {
+    "query_id": "q12",
+    "retriever": "tfidf",
+    "ranked": [
+      "companies/汽车/特斯拉.md",
+      "companies/新能源/宁德时代.md",
+      "companies/汽车/比亚迪.md",
+      "concepts/5G.md",
+      "concepts/芯片设计.md",
+      "concepts/存储器.md",
+      "concepts/摩尔定律.md",
+      "companies/食品饮料/可口可乐.md",
+      "concepts/集成电路.md",
+      "companies/消费电子/苹果公司.md"
+    ],
+    "scores": [
+      0.07,
+      0.0365,
+      0.0309,
+      0.0104,
+      0.0076,
+      0.0071,
+      0.0044,
+      0.0043,
+      0.0041,
+      0.004
+    ]
+  },
+  {
+    "query_id": "q13",
+    "retriever": "tfidf",
+    "ranked": [
+      "companies/光通信/诺基亚.md",
+      "companies/半导体/联发科.md",
+      "concepts/芯片设计.md",
+      "companies/半导体/三星电子.md",
+      "companies/半导体/中芯国际.md",
+      "companies/软件服务/微软.md",
+      "concepts/互联网.md",
+      "companies/食品饮料/可口可乐.md",
+      "companies/光通信/华为技术.md",
+      "companies/半导体/AMD.md"
+    ],
+    "scores": [
+      0.0275,
+      0.017,
+      0.0136,
+      0.0118,
+      0.0105,
+      0.0089,
+      0.0088,
+      0.0085,
+      0.0077,
+      0.0074
+    ]
+  },
+  {
+    "query_id": "q14",
+    "retriever": "tfidf",
+    "ranked": [
+      "concepts/5G.md",
+      "companies/光通信/爱立信.md",
+      "companies/光通信/中兴通讯.md",
+      "companies/光通信/诺基亚.md",
+      "companies/汽车/比亚迪.md",
+      "companies/汽车/特斯拉.md",
+      "companies/互联网/腾讯.md",
+      "companies/光通信/华为技术.md",
+      "concepts/数据中心.md",
+      "companies/软件服务/微软.md"
+    ],
+    "scores": [
+      0.0181,
+      0.0168,
+      0.0147,
+      0.0141,
+      0.009,
+      0.0072,
+      0.0067,
+      0.0067,
+      0.0061,
+      0.0059
+    ]
+  },
+  {
+    "query_id": "q15",
+    "retriever": "tfidf",
+    "ranked": [
+      "companies/半导体/海思半导体.md",
+      "concepts/长城.md",
+      "concepts/互联网.md",
+      "concepts/熊猫.md",
+      "concepts/故宫.md",
+      "companies/光通信/爱立信.md",
+      "concepts/半导体.md",
+      "concepts/芯片设计.md",
+      "companies/半导体/AMD.md",
+      "concepts/晶体管.md"
+    ],
+    "scores": [
+      0.0238,
+      0.0162,
+      0.007,
+      0.0068,
+      0.0067,
+      0.0041,
+      0.0035,
+      0.0035,
+      0.0034,
+      0.0033
+    ]
+  }
+]

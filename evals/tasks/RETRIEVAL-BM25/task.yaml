@@ -1,0 +1,37 @@
+# RETRIEVAL-BM25 检索对照实验
+description: >
+  在 46 篇中英文维基百科文档（覆盖半导体、光通信 + 其他行业干扰项）上，
+  对比 TF-IDF 和 BM25 的检索质量。
+  评估指标：recall@k, precision@k, MRR, NDCG@k（确定性）+ LLM 相关性评分。
+
+knowledge_base:
+  path: fixture/wiki
+  doc_count: 46
+  languages: [zh]
+  domains: [半导体, 光通信, 汽车, 新能源, 消费电子, 软件, 互联网, 食品饮料, 餐饮, 体育用品]
+
+queries:
+  path: queries.json
+  count: 15
+  types: [公司事实, 概念解释, 跨文档综合, 干扰查询]
+
+retrievers:
+  - name: tfidf
+    description: 基于 jieba 分词 + TF-IDF + 余弦相似度的关键词检索基线
+  - name: bm25
+    description: 基于 jieba 分词 + BM25 算法的概率检索模型
+
+graders:
+  - name: deterministic
+    path: grader/deterministic.py
+    metrics: [recall@1, recall@3, recall@5, recall@10, precision@1, precision@3, precision@5, precision@10, MRR, NDCG@1, NDCG@3, NDCG@5, NDCG@10]
+  - name: llm
+    path: grader/llm_grader.py
+    description: 对 top-5 文档进行 0-3 逐对相关性评分
+    model: gpt-4o-mini
+
+outputs:
+  results_dir: results/
+  reports:
+    - deterministic_report.txt
+    - llm_report.txt
