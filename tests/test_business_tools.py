@@ -273,6 +273,58 @@ async def test_wiki_recall_bad_args(tmp_path):
     assert result.status == "invalid_input"
 
 
+async def test_wiki_recall_sees_page_written_after_first_recall(tmp_path):
+    """第一次 recall 后写入的页面，第二次 recall 必须能命中（索引不得缓存过期）。"""
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    first = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "光放大器"})
+    assert "没有" in first.observation
+
+    (wiki / "光放大器.md").write_text(
+        "---\ntitle: 光放大器\nsummary: 掺铒光放大器是光纤通信的关键器件。\n---\n\n正文。",
+        encoding="utf-8")
+    second = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "光放大器"})
+    assert "光放大器（光放大器.md）" in second.observation
+
+
+async def test_wiki_recall_reflects_overwritten_content(tmp_path):
+    """覆盖已有页面后，新内容可命中、已移除的旧内容不再命中。"""
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    page = wiki / "某页.md"
+    page.write_text("本文介绍波分复用，一种光纤传输技术。", encoding="utf-8")
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "波分复用"})
+    assert "某页" in result.observation
+
+    page.write_text("本文介绍掺铒光放大器，一种光器件。", encoding="utf-8")
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "光放大器"})
+    assert "某页" in result.observation
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "波分复用"})
+    assert "某页" not in result.observation
+
+
+async def test_wiki_recall_stops_returning_deleted_page(tmp_path):
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    page = wiki / "某页.md"
+    page.write_text("本文介绍波分复用，一种光纤传输技术。", encoding="utf-8")
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "波分复用"})
+    assert "某页" in result.observation
+
+    page.unlink()
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "波分复用"})
+    assert "某页" not in result.observation
+
+
+async def test_wiki_recall_matches_entity_without_punctuation_boundary(tmp_path):
+    """实体名以无标点分隔的形式出现时也必须命中（不依赖分词词典，如"台积电"）。"""
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "台积电.md").write_text("台积电主导先进制程。", encoding="utf-8")
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall", {"query": "台积电"})
+    assert "台积电（台积电.md）" in result.observation
+
+
 @pytest.mark.parametrize(
     ("task_id", "query", "expected_paths"),
     [
