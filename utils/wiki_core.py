@@ -108,72 +108,7 @@ def parse_wiki_page(file_path: str) -> dict:
 
 
 def search_wiki(wiki_dir: str, query: str, max_results: int = 20) -> list[dict]:
-    results = []
-    for root, _, files in os.walk(wiki_dir):
-        for fname in files:
-            if not fname.endswith(".md") or fname == "index.md":
-                continue
-            fpath = os.path.join(root, fname)
-            rel = os.path.relpath(fpath, wiki_dir)
-            try:
-                with open(fpath, "r", encoding="utf-8") as f:
-                    content = f.read(4000)
-            except Exception:
-                continue
-            name = fname.replace(".md", "")
-            if query in name or query in content:
-                snippet_idx = content.find(query)
-                snippet = ""
-                if snippet_idx >= 0:
-                    start = max(0, snippet_idx - 40)
-                    snippet = content[start:snippet_idx + len(query) + 60].replace("\n", " ")
-                results.append({"name": name, "path": rel, "snippet": snippet})
-            if len(results) >= max_results:
-                break
-    return results
-
-
-
-
-# ── 关键词提取 ──────────────────────────────────────
-
-# 中文停用词（关键词提取时过滤）
-_STOP_WORDS = frozenset({
-    "的", "了", "是", "在", "我", "你", "他", "她", "它", "们",
-    "这", "那", "吗", "呢", "吧", "啊", "哦", "嗯",
-    "和", "与", "或", "但", "而", "及", "向", "对", "以", "被", "把", "从", "到",
-    "让", "请", "帮", "用", "给", "为",
-    "因为", "所以", "如果", "虽然", "可以", "应该", "需要",
-    "已经", "正在", "将要",
-    "也", "都", "就", "才", "又", "再", "还",
-    "很", "非常", "最", "更", "越",
-    "不", "没", "没有",
-    "什么", "怎么", "怎样", "如何", "为什么", "哪里", "哪个",
-    "一个", "一下", "一些", "这个", "那个", "这种", "那种",
-    "分析", "调研", "看看", "研究", "查询", "请问", "帮忙",
-})
-
-
-def extract_keywords(query: str) -> list[str]:
-    """jieba 分词 + 词性过滤提取关键词；英文/数字 token 原样保留。"""
-    import jieba.posseg as pseg
-
-    keywords = []
-    for token in re.findall(r"[A-Za-z0-9]+", query):
-        keywords.append(token.lower())
-    for word, flag in pseg.cut(query):
-        if len(word) < 2 or word in _STOP_WORDS:
-            continue
-        if flag.startswith(("n", "v", "ns", "nt", "nz")):
-            keywords.append(word)
-    seen = set()
-    deduped = []
-    for kw in keywords:
-        if kw not in seen:
-            seen.add(kw)
-            deduped.append(kw)
-    return deduped
-
+    raise NotImplementedError("search_wiki was removed; use recall_wiki instead")
 
 
 def _resolve_in_wiki(wiki_dir: str, rel_path: str) -> str | None:
@@ -328,26 +263,18 @@ def _bm25_search(wiki_dir: str, keywords: list[str], top_k: int = 20,
     return results[:top_k]
 
 
-def recall_wiki(wiki_dir: str, query: str, max_chars: int = 3000,
-                mode: str = "nl") -> list[dict]:
+def recall_wiki(wiki_dir: str, query: str, max_chars: int = 500) -> list[dict]:
     """从本地 wiki 知识库召回相关页面（BM25 相关性排序）。
 
     Args:
         wiki_dir: wiki 根目录路径
-        query: 检索输入
+        query: LLM 预分词的关键词（空格/逗号/顿号分隔），直接用于 BM25 检索
         max_chars: 单页返回的最大字符数
-        mode: 检索模式
-            - "nl"（默认）: query 为完整自然语言问题，tool 内部用 jieba 分词后检索
-            - "keywords": query 为 LLM 预分词的检索关键词（空格分隔），tool 直接使用不再分词
 
     Returns:
         [{"name", "path", "section", "content", "truncated", "score"}, ...]
     """
-    # ── 关键词提取 ──
-    if mode == "keywords":
-        keywords = [k.strip() for k in re.split(r'[\s,，、]+', query) if k.strip()]
-    else:
-        keywords = extract_keywords(query)
+    keywords = [k.strip() for k in re.split(r'[\s,，、]+', query) if k.strip()]
 
     if not keywords:
         return []

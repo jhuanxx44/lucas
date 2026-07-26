@@ -1,5 +1,5 @@
 import pytest
-from server.services.wiki_parser import parse_wiki_index, parse_wiki_page, search_wiki
+from server.services.wiki_parser import parse_wiki_index, parse_wiki_page
 
 
 def test_parse_wiki_index_extracts_sections(tmp_path):
@@ -50,13 +50,3 @@ sources:
     assert "全球动力电池龙头" in result["content"]
     assert "PCB" in result["wiki_links"]
     assert "AI算力" in result["wiki_links"]
-
-
-def test_search_wiki_matches_filename_and_content(tmp_path):
-    companies = tmp_path / "companies"
-    companies.mkdir()
-    (companies / "宁德时代.md").write_text("---\ntitle: 宁德时代\n---\n动力电池龙头", encoding="utf-8")
-    (companies / "沪电.md").write_text("---\ntitle: 沪电股份\n---\nPCB行业", encoding="utf-8")
-    results = search_wiki(str(tmp_path), "电池")
-    assert len(results) >= 1
-    assert any("宁德" in r["name"] for r in results)

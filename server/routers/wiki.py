@@ -6,7 +6,7 @@ import shutil
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from utils.wiki_core import parse_wiki_index, parse_wiki_page, search_wiki
+from utils.wiki_core import parse_wiki_index, parse_wiki_page
 from workspace import LocalWorkspace
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def get_index(request: Request):
 def get_search(q: str, request: Request):
     ws = _get_ws(request)
     logger.info("wiki search: %s", q)
-    return search_wiki(ws.wiki_root, q)
+    return {"results": [], "note": "search_wiki endpoint removed; use /api/wiki/recall"}
 
 
 @router.get("/raw-report/{path:path}")
