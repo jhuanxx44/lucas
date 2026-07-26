@@ -209,15 +209,21 @@ class BM25Retriever:
 # ═══════════════════════════════════════════════════════
 
 def run_experiment(wiki_root: str, queries_path: str, output_path: str,
-                   retriever_name: str = "tfidf"):
+                   retriever_name: str = "bm25", mode: str = "llm"):
     """运行一次检索实验，输出结果 JSON。
 
     Args:
         wiki_root: wiki fixture 根目录
         queries_path: queries.json 路径
         output_path: 输出 JSON 路径
-        retriever_name: "tfidf" 或 "bm25"
+        retriever_name: "tfidf" 或 "bm25"（默认 bm25，匹配生产）
+        mode: 关键词来源
+            - "llm"（默认）: 使用 queries.json 中缓存的 llm_keywords（模拟生产链路）
+            - "manual": 使用手工编写的 keywords（理论上限基线）
+            - "nl": 直接对自然语言 query 做 jieba 分词后检索（历史对照）
     """
+    mode_labels = {"llm": "LLM 关键词", "manual": "人工关键词", "nl": "自然语言（jieba）"}
+
     print(f"加载文档... ({wiki_root})")
     doc_paths, doc_tokens, _ = load_documents(wiki_root)
     print(f"  共 {len(doc_paths)} 篇文档，平均 {sum(len(t) for t in doc_tokens)//len(doc_tokens)} tokens/篇")
@@ -233,16 +239,21 @@ def run_experiment(wiki_root: str, queries_path: str, output_path: str,
 
     results = []
     for q in queries_data["queries"]:
-        if "keywords" in q and q["keywords"]:
-            kw_str = " ".join(q["keywords"][:6])
-            print(f"  检索 [{q['id']}]: {kw_str}...")
+        if mode == "llm" and "llm_keywords" in q and q["llm_keywords"]:
+            ranked = retriever.search_keywords(q["llm_keywords"], top_k=10)
+            label = f"LLM-KW ({q.get('llm_model', '?')})"
+        elif mode == "manual" and "keywords" in q and q["keywords"]:
             ranked = retriever.search_keywords(q["keywords"], top_k=10)
+            label = "manual-KW"
         else:
-            print(f"  检索 [{q['id']}]: {q['query'][:50]}...")
             ranked = retriever.search(q["query"], top_k=10)
+            label = "NL (jieba)"
+
+        kw_preview = " ".join(q.get("llm_keywords" if mode == "llm" else "keywords", q["query"][:50])[:50])
+        print(f"  [{mode_labels.get(mode, mode)}] [{q['id']}]: {kw_preview}...")
         results.append({
             "query_id": q["id"],
-            "retriever": retriever_name,
+            "retriever": f"{retriever_name}@{label}",
             "ranked": [p for p, _ in ranked],
             "scores": [round(s, 4) for _, s in ranked],
         })
@@ -258,12 +269,14 @@ def run_experiment(wiki_root: str, queries_path: str, output_path: str,
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 4:
-        print("Usage: python retriever.py <wiki_root> <queries.json> <output.json> [tfidf|bm25]")
+        print("Usage: python retriever.py <wiki_root> <queries.json> <output.json> [bm25|tfidf] [llm|manual|nl]")
+        print("  Default: bm25 + llm (matches production pipeline)")
         sys.exit(1)
 
     wiki = sys.argv[1]
     queries = sys.argv[2]
     output = sys.argv[3]
-    method = sys.argv[4] if len(sys.argv) > 4 else "tfidf"
+    method = sys.argv[4] if len(sys.argv) > 4 else "bm25"
+    mode = sys.argv[5] if len(sys.argv) > 5 else "llm"
 
-    run_experiment(wiki, queries, output, method)
+    run_experiment(wiki, queries, output, method, mode)
