@@ -43,7 +43,11 @@ llm-weight: medium
 
 读（召回）：想找已有调研时，先用 wiki_recall；不确定库里有什么，就用 list_files 看 `wiki/` 下的现有目录和分类，再决定去哪个子目录找。
 
-写（落盘）：用 write_file 往 wiki 写内容时，必须放进对应的分类子目录，不要写到 wiki 根目录（根目录只有 index.md 和 glossary.md），否则文件在侧栏归入"未归类"、也难以被后续召回。落点规则：
+写（落盘）：用 write_file 往 wiki 写内容时，必须放进对应的分类子目录，不要写到 wiki 根目录（根目录只有 index.md 和 glossary.md），否则文件在侧栏归入"未归类"、也难以被后续召回。
+
+**每篇 wiki 页面的 frontmatter 中必须包含 `summary` 字段**，写一段 2-4 句话的 TL;DR，概括本页的核心信息、关键数据和时间范围。wiki_recall 召回时会优先返回此摘要而非原始正文，因此摘要必须自包含、能独立支撑阅读和判断。
+
+落点规则：
 - 公司档案 → `wiki/companies/<行业>/<公司名>.md`
 - 行业概览 → `wiki/industries/<行业>.md`
 - 概念/主题 → `wiki/concepts/<概念名>.md`

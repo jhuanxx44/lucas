@@ -14,7 +14,8 @@ llm-weight: heavy
 
 请输出完整的页面内容（包含 frontmatter）。
 
-frontmatter 必填字段：title、type（company|industry|concept）、updated（填 {today}）；
+frontmatter 必填字段：title、type（company|industry|concept）、updated（填 {today}）、summary；
+- summary：2-4 句话的 TL;DR，概括本页核心信息、关键数据和时间范围；wiki_recall 召回时优先返回此摘要，因此必须自包含、能独立支撑阅读和判断。
 sources 列表中必须包含本材料路径：{source_path}（已有 sources 保留并追加）。
 
 规则：

@@ -2,6 +2,7 @@
 title: AMD
 type: company
 industry: 半导体
+summary: "AMD（超威半导体）是美国无厂半导体公司，1969年成立，总部位于加州圣克拉拉。公司以CPU和GPU产品线闻名，2017年推出Zen架构的Ryzen处理器成功扭转市场份额。AMD也是索尼PlayStation和微软Xbox游戏主机的主要芯片供应商。"
 ---
 
 # AMD

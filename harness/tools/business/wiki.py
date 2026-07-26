@@ -13,6 +13,10 @@ def wiki_recall(workspace: Path, args: dict) -> ToolResult:
     if not isinstance(query, str) or not query.strip():
         return ToolResult(status="invalid_input", error_code="bad_args",
                           observation="query must be a non-empty string")
+    mode = args.get("mode", "nl")
+    if mode not in ("nl", "keywords"):
+        return ToolResult(status="invalid_input", error_code="bad_args",
+                          observation='mode must be "nl" or "keywords"')
     workspace_root = workspace.resolve()
     wiki_candidate = workspace_root / "wiki"
     if not wiki_candidate.exists() and not wiki_candidate.is_symlink():
@@ -22,7 +26,7 @@ def wiki_recall(workspace: Path, args: dict) -> ToolResult:
         return ToolResult(status="denied", error_code="path_escape",
                           observation="wiki root escapes workspace")
     try:
-        pages = recall_wiki(str(wiki_root), query.strip(), max_chars=RECALL_PAGE_CHARS)
+        pages = recall_wiki(str(wiki_root), query.strip(), max_chars=RECALL_PAGE_CHARS, mode=mode)
     except Exception as e:
         return ToolResult(status="error", error_code="recall_failed",
                           observation=f"{type(e).__name__}: {e}")
@@ -39,7 +43,13 @@ def wiki_recall(workspace: Path, args: dict) -> ToolResult:
 
 WIKI_RECALL_SPEC = ToolSpec(
     name="wiki_recall",
-    description="从本地 wiki 知识库召回相关页面：先按索引（index.md）条目匹配，不足再全文检索；返回页面正文（每页最多 3000 字符）",
-    args_description='{"query": "检索关键词，如公司名、行业、主题"}',
+    description="从本地 wiki 知识库召回相关页面（BM25 相关性排序）。"
+                "支持两种模式："
+                "nl（默认）：传入完整自然语言问题，tool 内部自动分词后检索；"
+                "keywords：传入已分词的关键词（空格分隔），tool 直接检索不再分词。"
+                "返回页面摘要（来自 frontmatter summary 字段），"
+                "若页面无 summary 则回退为正文截取（最多 3000 字符）。"
+                "每条结果附带 BM25 相关性分数。",
+    args_description='{"query": "检索输入", "mode": "nl（自然语言，默认）或 keywords（LLM 预分词）"}',
     handler=wiki_recall,
 )

@@ -300,6 +300,57 @@ async def test_wiki_eval_fixtures_recall_expected_pages(task_id, query, expected
         assert expected_path in result.observation
 
 
+async def test_wiki_recall_prefers_summary_over_raw_content(tmp_path):
+    """有 frontmatter.summary 时返回摘要而非截取正文。"""
+    wiki = tmp_path / "wiki"
+    (wiki / "companies" / "白酒").mkdir(parents=True)
+    (wiki / "index.md").write_text(
+        "# 知识库索引\n\n## 公司档案 · 白酒\n\n"
+        "- [贵州茅台](companies/白酒/贵州茅台.md)\n",
+        encoding="utf-8",
+    )
+    body = (
+        "---\ntitle: 贵州茅台\ntype: company\n"
+        "summary: 贵州茅台是A股白酒龙头，2025年营收约1800亿，渠道改革持续推进。\n"
+        "---\n"
+        "贵州茅台是白酒龙头。\n" + "基酒产能与渠道库存分析。\n" * 400
+    )
+    (wiki / "companies" / "白酒" / "贵州茅台.md").write_text(body, encoding="utf-8")
+
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
+                            {"query": "贵州茅台 产能"})
+    assert result.status == "ok"
+    # 返回的是摘要，不是正文截取
+    assert "A股白酒龙头" in result.observation
+    assert "2025年营收约1800亿" in result.observation
+    # 不应出现截断标记
+    assert "…[truncated]" not in result.observation
+    # 原始正文不在返回中
+    assert "基酒产能与渠道库存分析" not in result.observation
+
+
+async def test_wiki_recall_falls_back_to_content_when_no_summary(tmp_path):
+    """无 frontmatter.summary 时回退到正文截取（向后兼容）。"""
+    wiki = tmp_path / "wiki"
+    (wiki / "companies" / "白酒").mkdir(parents=True)
+    (wiki / "index.md").write_text(
+        "# 知识库索引\n\n## 公司档案 · 白酒\n\n"
+        "- [贵州茅台](companies/白酒/贵州茅台.md)\n",
+        encoding="utf-8",
+    )
+    body = (
+        "---\ntype: company\ntags: [白酒, 产能, 渠道]\n---\n"
+        "贵州茅台是白酒龙头。\n" + "基酒产能与渠道库存分析。\n" * 400
+    )
+    (wiki / "companies" / "白酒" / "贵州茅台.md").write_text(body, encoding="utf-8")
+
+    result = await _execute(tmp_path, WIKI_RECALL_SPEC, "wiki_recall",
+                            {"query": "贵州茅台 产能"})
+    assert result.status == "ok"
+    assert "…[truncated]" in result.observation
+    assert "基酒产能与渠道库存分析" in result.observation
+
+
 # ---------- 白名单 ----------
 
 async def test_business_tools_denied_when_not_in_whitelist(tmp_path):

@@ -2,9 +2,12 @@
 
 自 server/services/wiki_parser.py 上移（M3），原模块保留为 re-export 兼容层。
 """
+import math
 import os
 import re
+from collections import Counter
 
+import jieba
 import yaml
 
 from utils.path_safety import resolve_within
@@ -130,7 +133,9 @@ def search_wiki(wiki_dir: str, query: str, max_results: int = 20) -> list[dict]:
     return results
 
 
-# ── 索引优先召回（wiki_recall 工具用） ─────────────────
+
+
+# ── 关键词提取 ──────────────────────────────────────
 
 # 中文停用词（关键词提取时过滤）
 _STOP_WORDS = frozenset({
@@ -147,8 +152,6 @@ _STOP_WORDS = frozenset({
     "一个", "一下", "一些", "这个", "那个", "这种", "那种",
     "分析", "调研", "看看", "研究", "查询", "请问", "帮忙",
 })
-
-_INDEX_ENTRY_RE = re.compile(r"- \[(.+?)\]\((.+?)\)")
 
 
 def extract_keywords(query: str) -> list[str]:
@@ -172,36 +175,9 @@ def extract_keywords(query: str) -> list[str]:
     return deduped
 
 
-def parse_index_entries(index_path: str) -> list[dict]:
-    """解析 index.md 的 `## Section` → `- [name](path)` 结构。
-
-    返回: [{"section": "公司档案 · 电子", "name": "沪电股份", "path": "companies/电子/沪电股份.md"}, ...]
-    """
-    entries = []
-    current_section = ""
-    try:
-        with open(index_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                if line.startswith("## "):
-                    current_section = line[3:].strip()
-                elif line.startswith("- ["):
-                    m = _INDEX_ENTRY_RE.match(line)
-                    if m:
-                        entries.append({
-                            "section": current_section,
-                            "name": m.group(1).strip(),
-                            "path": m.group(2).strip(),
-                        })
-    except (FileNotFoundError, PermissionError):
-        pass
-    return entries
-
 
 def _resolve_in_wiki(wiki_dir: str, rel_path: str) -> str | None:
-    """把 wiki 相对路径解析为绝对路径；越出 wiki_dir 的返回 None（防索引条目逃逸）。"""
+    """把 wiki 相对路径解析为绝对路径；越出 wiki_dir 的返回 None。"""
     resolved = resolve_within(wiki_dir, os.path.join(wiki_dir, rel_path), strict=True)
     return str(resolved) if resolved is not None else None
 
@@ -215,92 +191,182 @@ def _read_page(wiki_dir: str, rel_path: str, max_chars: int) -> dict | None:
             content = f.read()
     except (OSError, UnicodeDecodeError):
         return None
+
+    # 从已读内容中提取 frontmatter.summary，避免重复文件 I/O
+    summary = ""
+    if content.startswith("---"):
+        parts = content.split("---", 2)
+        if len(parts) >= 3:
+            try:
+                fm = yaml.safe_load(parts[1]) or {}
+                summary = fm.get("summary", "").strip()
+            except yaml.YAMLError:
+                pass
+
+    if summary:
+        return {
+            "path": rel_path,
+            "content": summary,
+            "truncated": False,
+            "source": "summary",
+        }
     return {
         "path": rel_path,
         "content": content[:max_chars],
         "truncated": len(content) > max_chars,
+        "source": "content",
     }
 
 
-def recall_wiki(wiki_dir: str, query: str, max_chars: int = 3000) -> list[dict]:
-    """索引优先召回：先 index.md 条目关键词匹配，不足再全文子串 fallback。
+# ── BM25 召回引擎（wiki_recall 工具用） ──────────────
 
-    返回所有命中的页面: [{"name", "path", "section", "content", "truncated"}, ...]，
-    单页 content 截断至 max_chars。
+# 文档预处理：去 frontmatter 和 markdown 标记
+_DOC_CLEAN_RE = re.compile(r'---.*?---|[#*`\[\]()>|!\-_{}=~]', re.DOTALL)
+
+def _tokenize_doc(text: str) -> list[str]:
+    """对文档正文分词，返回过滤后的 token 列表。
+
+    同时保留原始专有名词（如"台积电"），防止 jieba 切分后与 LLM 关键词不匹配。
     """
-    keywords = extract_keywords(query)
-    if not keywords:
-        return []
+    text = _DOC_CLEAN_RE.sub(' ', text)
+    words = jieba.lcut(text)
+    # 补充：从未清洗原文中提取专有名词（中英文连续字符 > 2）
+    raw_terms = re.findall(r'[\u4e00-\u9fff]{3,}|[A-Za-z][A-Za-z0-9]{2,}', text)
+    words.extend(raw_terms)
+    stopwords = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
+                 '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着',
+                 '没有', '看', '好', '自己', '这', '他', '她', '它', '们', '那', '些',
+                 '所', '为', '所以', '因为', '但是', '然而', '可以', '这个', '那个',
+                 '什么', '怎么', '如何', '哪个', '吗', '啊', '吧', '呢', '哦',
+                 '与', '及', '等', '或', '被', '从', '对', '向', '以', '将',
+                 '通过', '以及', '此外', '另外', '其中', '其他', '其它',
+                 '进行', '使用', '需要', '可能', '已经', '还', '更', '最',
+                 '之後', '之前', '之後', '之後', '關於', 'また', 'より'}
+    return [w for w in words if len(w) >= 2 and w not in stopwords]
 
-    pages: list[dict] = []
-    seen: set[str] = set()
 
-    # ── Step 1: 索引条目匹配（条目名 + 分类名） ──
-    index_path = _resolve_in_wiki(wiki_dir, "index.md")
-    index_entries = parse_index_entries(index_path) if index_path is not None else []
-    scored_entries = []
-    for entry in index_entries:
-        search_text = f"{entry['name']} {entry['section']}"
-        score = sum(1 for kw in keywords if kw in search_text)
-        if entry["name"] and entry["name"] in query:
-            score += 2  # 条目名直接出现在查询里，强信号且不依赖分词结果
-        if score > 0:
-            scored_entries.append((score, entry))
-    scored_entries.sort(key=lambda x: x[0], reverse=True)
+# 全局 BM25 索引缓存: {wiki_dir: BM25Index}
+_bm25_cache: dict[str, dict] = {}
 
-    for _, entry in scored_entries:
-        page = _read_page(wiki_dir, entry["path"], max_chars)
-        if page is None:
-            continue
-        full = _resolve_in_wiki(wiki_dir, entry["path"])
-        if full in seen:
-            continue
-        seen.add(full)
-        pages.append({**page, "name": entry["name"], "section": entry["section"]})
 
-    # ── Step 2: 全文 fallback（补充索引未覆盖的页面） ──
-    scored_files = []
+def _build_bm25_index(wiki_dir: str) -> dict:
+    """构建 wiki_dir 下所有 .md 文档的 BM25 索引（带缓存）。"""
+    if wiki_dir in _bm25_cache:
+        return _bm25_cache[wiki_dir]
+
+    doc_paths = []
+    doc_tokens = []
     for root, dirs, files in os.walk(wiki_dir):
-        dirs[:] = [name for name in dirs
-                   if not os.path.islink(os.path.join(root, name))]
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
         for fname in files:
             if not fname.endswith(".md") or fname in ("index.md", "glossary.md"):
                 continue
-            candidate = os.path.join(root, fname)
-            if os.path.islink(candidate):
-                continue
-            rel = os.path.relpath(candidate, wiki_dir)
-            full = _resolve_in_wiki(wiki_dir, rel)
-            if full is None or full in seen:
+            fpath = os.path.join(root, fname)
+            if os.path.islink(fpath):
                 continue
             try:
-                with open(full, "r", encoding="utf-8") as f:
-                    content = f.read()
+                with open(fpath, "r", encoding="utf-8") as f:
+                    text = f.read()
             except (OSError, UnicodeDecodeError):
                 continue
-            name = fname.replace(".md", "")
-            # 评分：文件名命中 × 3，内容前 2000 字符命中 × 1
-            score = 0
-            for kw in keywords:
-                if kw in name:
-                    score += 3
-                if kw in content[:2000]:
-                    score += 1
-            if score > 0:
-                scored_files.append((score, name, rel, content))
-    scored_files.sort(key=lambda x: x[0], reverse=True)
+            rel = os.path.relpath(fpath, wiki_dir)
+            doc_paths.append(rel)
+            doc_tokens.append(_tokenize_doc(text))
 
-    for _, name, rel, content in scored_files:
-        resolved = _resolve_in_wiki(wiki_dir, rel)
-        if resolved is None:
+    N = len(doc_paths)
+    if N == 0:
+        _bm25_cache[wiki_dir] = {"N": 0}
+        return _bm25_cache[wiki_dir]
+
+    doc_lens = [len(t) for t in doc_tokens]
+    avgdl = sum(doc_lens) / N
+
+    df = {}
+    for tokens in doc_tokens:
+        for t in set(tokens):
+            df[t] = df.get(t, 0) + 1
+    idf = {}
+    for t, d in df.items():
+        idf[t] = math.log((N - d + 0.5) / (d + 0.5) + 1.0)
+
+    index = {
+        "N": N,
+        "doc_paths": doc_paths,
+        "doc_tokens": doc_tokens,
+        "doc_lens": doc_lens,
+        "avgdl": avgdl,
+        "df": df,
+        "idf": idf,
+    }
+    _bm25_cache[wiki_dir] = index
+    return index
+
+
+def _bm25_search(wiki_dir: str, keywords: list[str], top_k: int = 20,
+                 k1: float = 1.5, b: float = 0.75) -> list[tuple[str, float]]:
+    """BM25 检索，返回 [(rel_path, score), ...] 按分数降序。"""
+    idx = _build_bm25_index(wiki_dir)
+    if idx["N"] == 0:
+        return []
+
+    scores = [0.0] * idx["N"]
+    for kw in keywords:
+        if kw not in idx["idf"]:
             continue
-        seen.add(resolved)
+        idf_val = idx["idf"][kw]
+        for i in range(idx["N"]):
+            tf = idx["doc_tokens"][i].count(kw)
+            if tf == 0:
+                continue
+            doc_len = idx["doc_lens"][i]
+            numerator = tf * (k1 + 1)
+            denominator = tf + k1 * (1 - b + b * doc_len / idx["avgdl"])
+            scores[i] += idf_val * numerator / denominator
+
+    results = [(idx["doc_paths"][i], scores[i]) for i in range(idx["N"]) if scores[i] > 0]
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results[:top_k]
+
+
+def recall_wiki(wiki_dir: str, query: str, max_chars: int = 3000,
+                mode: str = "nl") -> list[dict]:
+    """从本地 wiki 知识库召回相关页面（BM25 相关性排序）。
+
+    Args:
+        wiki_dir: wiki 根目录路径
+        query: 检索输入
+        max_chars: 单页返回的最大字符数
+        mode: 检索模式
+            - "nl"（默认）: query 为完整自然语言问题，tool 内部用 jieba 分词后检索
+            - "keywords": query 为 LLM 预分词的检索关键词（空格分隔），tool 直接使用不再分词
+
+    Returns:
+        [{"name", "path", "section", "content", "truncated", "score"}, ...]
+    """
+    # ── 关键词提取 ──
+    if mode == "keywords":
+        keywords = [k.strip() for k in re.split(r'[\s,，、]+', query) if k.strip()]
+    else:
+        keywords = extract_keywords(query)
+
+    if not keywords:
+        return []
+
+    # ── BM25 排序检索 ──
+    ranked = _bm25_search(wiki_dir, keywords)
+
+    # ── 读取页面内容 ──
+    pages = []
+    for rel_path, score in ranked:
+        page = _read_page(wiki_dir, rel_path, max_chars)
+        if page is None:
+            continue
+        name = os.path.basename(rel_path).replace(".md", "")
         pages.append({
+            **page,
             "name": name,
-            "path": rel,
             "section": "",
-            "content": content[:max_chars],
-            "truncated": len(content) > max_chars,
+            "score": round(score, 4),
         })
 
     return pages
