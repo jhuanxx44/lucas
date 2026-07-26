@@ -5,9 +5,7 @@
 import math
 import os
 import re
-from collections import Counter
 
-import jieba
 import yaml
 
 from utils.path_safety import resolve_within
@@ -155,42 +153,15 @@ def _read_page(wiki_dir: str, rel_path: str, max_chars: int) -> dict | None:
 
 # ── BM25 召回引擎（wiki_recall 工具用） ──────────────
 
-# 文档预处理：去 frontmatter 和 markdown 标记
-_DOC_CLEAN_RE = re.compile(r'---.*?---|[#*`\[\]()>|!\-_{}=~]', re.DOTALL)
+def _bm25_search(wiki_dir: str, keywords: list[str], top_k: int = 20,
+                 k1: float = 1.5, b: float = 0.75) -> list[tuple[str, float]]:
+    """子串 BM25 检索，返回 [(rel_path, score), ...] 按分数降序。
 
-def _tokenize_doc(text: str) -> list[str]:
-    """对文档正文分词，返回过滤后的 token 列表。
-
-    同时保留原始专有名词（如"台积电"），防止 jieba 切分后与 LLM 关键词不匹配。
+    tf = 关键词在原文中的子串出现次数（查询侧已是 LLM 预分词关键词，文档无需
+    再分词），doc_len 以字符计。不建索引、无缓存，每次调用直接扫描全部文档，
+    因此写入/覆盖/删除对后续召回立即可见。
     """
-    text = _DOC_CLEAN_RE.sub(' ', text)
-    words = jieba.lcut(text)
-    # 补充：从未清洗原文中提取专有名词（中英文连续字符 > 2）
-    raw_terms = re.findall(r'[\u4e00-\u9fff]{3,}|[A-Za-z][A-Za-z0-9]{2,}', text)
-    words.extend(raw_terms)
-    stopwords = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
-                 '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着',
-                 '没有', '看', '好', '自己', '这', '他', '她', '它', '们', '那', '些',
-                 '所', '为', '所以', '因为', '但是', '然而', '可以', '这个', '那个',
-                 '什么', '怎么', '如何', '哪个', '吗', '啊', '吧', '呢', '哦',
-                 '与', '及', '等', '或', '被', '从', '对', '向', '以', '将',
-                 '通过', '以及', '此外', '另外', '其中', '其他', '其它',
-                 '进行', '使用', '需要', '可能', '已经', '还', '更', '最',
-                 '之後', '之前', '之後', '之後', '關於', 'また', 'より'}
-    return [w for w in words if len(w) >= 2 and w not in stopwords]
-
-
-# 全局 BM25 索引缓存: {wiki_dir: BM25Index}
-_bm25_cache: dict[str, dict] = {}
-
-
-def _build_bm25_index(wiki_dir: str) -> dict:
-    """构建 wiki_dir 下所有 .md 文档的 BM25 索引（带缓存）。"""
-    if wiki_dir in _bm25_cache:
-        return _bm25_cache[wiki_dir]
-
-    doc_paths = []
-    doc_tokens = []
+    docs = []  # (rel_path, casefolded_text)
     for root, dirs, files in os.walk(wiki_dir):
         dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
         for fname in files:
@@ -204,61 +175,30 @@ def _build_bm25_index(wiki_dir: str) -> dict:
                     text = f.read()
             except (OSError, UnicodeDecodeError):
                 continue
-            rel = os.path.relpath(fpath, wiki_dir)
-            doc_paths.append(rel)
-            doc_tokens.append(_tokenize_doc(text))
+            docs.append((os.path.relpath(fpath, wiki_dir), text.casefold()))
 
-    N = len(doc_paths)
-    if N == 0:
-        _bm25_cache[wiki_dir] = {"N": 0}
-        return _bm25_cache[wiki_dir]
-
-    doc_lens = [len(t) for t in doc_tokens]
-    avgdl = sum(doc_lens) / N
-
-    df = {}
-    for tokens in doc_tokens:
-        for t in set(tokens):
-            df[t] = df.get(t, 0) + 1
-    idf = {}
-    for t, d in df.items():
-        idf[t] = math.log((N - d + 0.5) / (d + 0.5) + 1.0)
-
-    index = {
-        "N": N,
-        "doc_paths": doc_paths,
-        "doc_tokens": doc_tokens,
-        "doc_lens": doc_lens,
-        "avgdl": avgdl,
-        "df": df,
-        "idf": idf,
-    }
-    _bm25_cache[wiki_dir] = index
-    return index
-
-
-def _bm25_search(wiki_dir: str, keywords: list[str], top_k: int = 20,
-                 k1: float = 1.5, b: float = 0.75) -> list[tuple[str, float]]:
-    """BM25 检索，返回 [(rel_path, score), ...] 按分数降序。"""
-    idx = _build_bm25_index(wiki_dir)
-    if idx["N"] == 0:
+    n = len(docs)
+    if n == 0:
         return []
+    avgdl = sum(len(t) for _, t in docs) / n or 1.0
 
-    scores = [0.0] * idx["N"]
+    scores = [0.0] * n
     for kw in keywords:
-        if kw not in idx["idf"]:
+        kw = kw.casefold()
+        if not kw:
             continue
-        idf_val = idx["idf"][kw]
-        for i in range(idx["N"]):
-            tf = idx["doc_tokens"][i].count(kw)
+        tfs = [text.count(kw) for _, text in docs]
+        df = sum(1 for tf in tfs if tf > 0)
+        if df == 0:
+            continue
+        idf = math.log((n - df + 0.5) / (df + 0.5) + 1.0)
+        for i, tf in enumerate(tfs):
             if tf == 0:
                 continue
-            doc_len = idx["doc_lens"][i]
-            numerator = tf * (k1 + 1)
-            denominator = tf + k1 * (1 - b + b * doc_len / idx["avgdl"])
-            scores[i] += idf_val * numerator / denominator
+            doc_len = len(docs[i][1])
+            scores[i] += idf * tf * (k1 + 1) / (tf + k1 * (1 - b + b * doc_len / avgdl))
 
-    results = [(idx["doc_paths"][i], scores[i]) for i in range(idx["N"]) if scores[i] > 0]
+    results = [(docs[i][0], scores[i]) for i in range(n) if scores[i] > 0]
     results.sort(key=lambda x: x[1], reverse=True)
     return results[:top_k]
 
