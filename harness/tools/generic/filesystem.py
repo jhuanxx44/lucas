@@ -346,7 +346,9 @@ LIST_FILES_SPEC = ToolSpec(
 
 WRITE_FILE_SPEC = ToolSpec(
     name="write_file",
-    description="在工作区内新建文件并整体写入内容；文件已存在时默认拒绝，需 overwrite: true 才覆盖",
+    description="在工作区内新建文件并整体写入内容；文件已存在时默认拒绝，需 overwrite: true 才覆盖。"
+                "写入 wiki/*.md 时，内容必须包含 frontmatter 且其中 summary 字段非空（2-4 句中文 TL;DR），"
+                "否则返回 missing_summary 错误。index.md / glossary.md 除外。",
     args_description='{"path": "相对工作区的文件路径", "content": "完整文件内容", "overwrite": 可选，传 true 才允许覆盖已存在文件}',
     handler=write_file,
 )

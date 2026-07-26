@@ -14,4 +14,4 @@ fastapi>=0.115
 uvicorn>=0.30
 pytest>=7.0
 pytest-asyncio>=0.23
-jieba>=0.42
+jieba>=0.42  # 仅 evals/ 检索对照实验使用（生产召回已改为子串 BM25，不依赖分词）
