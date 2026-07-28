@@ -1,0 +1,94 @@
+{
+  "description": "chunk 大小对照实验查询集 —— 12 条，基于真实 wiki/ 内容，强调词汇鸿沟与答案跨度差异",
+  "design_principles": {
+    "doc_level_ground_truth": "ground truth 定在文档级而非 chunk 级：chunk 边界随档位变化，只有文档级标注才能跨档公平比较",
+    "vocabulary_gap": "查询尽量避开文档标题原词（如用'锂电龙头'而非'宁德时代'），使命中依赖语义而非字面",
+    "answer_span": "混合三类答案跨度：point（答案在一两句内）、section（需要一个完整小节）、cross_doc（需要多篇文档），用于检验不同 chunk 大小的适配差异"
+  },
+  "queries": [
+    {
+      "id": "c01",
+      "type": "point",
+      "query": "动力电池全球市占率第一的公司份额是多少",
+      "ground_truth": ["companies/新能源/300750-宁德时代.md"],
+      "rationale": "答案是单个数字（37.2%），落在一两句内，预期小 chunk 更精准"
+    },
+    {
+      "id": "c02",
+      "type": "point",
+      "query": "光模块中国厂商在全球占了多大份额",
+      "ground_truth": ["industries/光通信.md", "companies/光通信/300308-中际旭创.md"],
+      "rationale": "答案是'超50%'这一句，测短答案定位"
+    },
+    {
+      "id": "c03",
+      "type": "section",
+      "query": "锂电龙头的第二增长曲线是什么业务",
+      "ground_truth": ["companies/新能源/300750-宁德时代.md"],
+      "rationale": "需要业务分析整节（储能占比20%+增长迅速），词汇鸿沟：不提'宁德时代'和'储能'"
+    },
+    {
+      "id": "c04",
+      "type": "section",
+      "query": "高端光芯片为什么还依赖进口",
+      "ground_truth": ["industries/光通信.md", "companies/光通信/688498-源杰科技.md"],
+      "rationale": "需要国产替代进度的完整论述，预期中等 chunk 占优"
+    },
+    {
+      "id": "c05",
+      "type": "section",
+      "query": "800G产品出货占比提升会带来什么影响",
+      "ground_truth": ["companies/光通信/300308-中际旭创.md"],
+      "rationale": "答案是因果链（占比提升→毛利率改善），切太碎会断裂"
+    },
+    {
+      "id": "c06",
+      "type": "cross_doc",
+      "query": "光纤光缆和海底电缆业务的综合性龙头是哪家",
+      "ground_truth": ["companies/光通信/600487-亨通光电.md", "industries/光通信.md"],
+      "rationale": "需跨公司页和行业页"
+    },
+    {
+      "id": "c07",
+      "type": "cross_doc",
+      "query": "六氟磷酸锂环节有哪些上市公司在竞争",
+      "ground_truth": ["industries/六氟磷酸锂.md", "companies/化工/002759-天际股份.md", "companies/电力设备-电池-电池化学品/002407-多氟多.md", "companies/电力设备-电池-电池化学品/002709-天赐材料.md"],
+      "rationale": "多文档综合，检验大 chunk 是否因整体语义占优"
+    },
+    {
+      "id": "c08",
+      "type": "cross_doc",
+      "query": "AI算力建设主要拉动了哪些硬件环节的需求",
+      "ground_truth": ["concepts/AI算力.md", "industries/光通信.md", "industries/PCB.md"],
+      "rationale": "概念页+多个行业页，跨度最大"
+    },
+    {
+      "id": "c09",
+      "type": "section",
+      "query": "PCB行业这一轮景气周期的核心驱动力",
+      "ground_truth": ["industries/PCB.md"],
+      "rationale": "行业逻辑整节"
+    },
+    {
+      "id": "c10",
+      "type": "point",
+      "query": "麒麟电池已经量产了吗",
+      "ground_truth": ["companies/新能源/300750-宁德时代.md"],
+      "rationale": "技术进展里的一句话，典型点查询"
+    },
+    {
+      "id": "c11",
+      "type": "cross_doc",
+      "query": "做精密光器件并受益于数据中心建设的标的",
+      "ground_truth": ["companies/电子/300394-天孚通信.md", "industries/光通信.md"],
+      "rationale": "词汇鸿沟明显，需语义匹配'精密光器件'"
+    },
+    {
+      "id": "c12",
+      "type": "section",
+      "query": "半导体设备国产化进展到什么程度",
+      "ground_truth": ["industries/半导体设备.md"],
+      "rationale": "需要国产化率相关完整段落"
+    }
+  ]
+}

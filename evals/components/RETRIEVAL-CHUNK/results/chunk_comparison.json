@@ -1,0 +1,40 @@
+{
+  "model": "bge-m3:latest",
+  "doc_count": 42,
+  "query_count": 12,
+  "overlap_ratio": 0.15,
+  "results": [
+    {
+      "chunk_size": "400",
+      "chunk_count": 483,
+      "avg_chunk_chars": 385,
+      "truncated_pages": 0,
+      "build_s": 19.7,
+      "index_mb": 1.89,
+      "recall@1": 0.59,
+      "recall@3": 0.889,
+      "recall@5": 0.91,
+      "MRR": 0.917,
+      "mrr_by_type": {
+        "cross_doc": 1.0,
+        "point": 0.833,
+        "section": 0.9
+      },
+      "query_ms": 14.14,
+      "per_query_rr": {
+        "c01": 1.0,
+        "c02": 0.5,
+        "c03": 1.0,
+        "c04": 1.0,
+        "c05": 1.0,
+        "c06": 1.0,
+        "c07": 1.0,
+        "c08": 1.0,
+        "c09": 0.5,
+        "c10": 1.0,
+        "c11": 1.0,
+        "c12": 1.0
+      }
+    }
+  ]
+}

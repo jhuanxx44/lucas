@@ -210,7 +210,7 @@ if __name__ == "__main__":
         print("Usage: python llm_grader.py <queries.json> <results.json> [wiki_root]")
         sys.exit(1)
 
-    wiki_root = sys.argv[3] if len(sys.argv) > 3 else "evals/tasks/RETRIEVAL-BM25/fixture/wiki"
+    wiki_root = sys.argv[3] if len(sys.argv) > 3 else "evals/components/RETRIEVAL-BM25/fixture/wiki"
     queries = load_queries(sys.argv[1])
     with open(sys.argv[2]) as f:
         results = json.load(f)

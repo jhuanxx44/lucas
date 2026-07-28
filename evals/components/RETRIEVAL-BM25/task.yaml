@@ -21,6 +21,20 @@ retrievers:
   - name: bm25
     description: 基于 jieba 分词 + BM25 算法的概率检索模型
 
+controlled_experiment:
+  script: run_controlled_experiment.py
+  hypothesis: >
+    如果语料规模是 TF-IDF 优于 BM25 的主要原因，在固定查询、相关文档、
+    tokenizer、候选集和正分过滤规则，只逐步加入干扰文档时，两者的配对差值
+    应随规模呈稳定趋势。
+  corpus_sizes: [10, 20, 30, 46]
+  trials_per_partial_size: 50
+  pairing_unit: query
+  statistics: [query_cluster_bootstrap_95ci, exact_paired_sign_flip]
+  results:
+    json: results/controlled_comparison.json
+    report: results/controlled_comparison.md
+
 graders:
   - name: deterministic
     path: grader/deterministic.py

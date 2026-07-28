@@ -6,7 +6,7 @@ import json, os, re, time
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-FIXTURE = Path(__file__).resolve().parents[1] / "evals" / "tasks" / "RETRIEVAL-BM25" / "fixture" / "wiki"
+FIXTURE = Path(__file__).resolve().parents[1] / "evals" / "components" / "RETRIEVAL-BM25" / "fixture" / "wiki"
 
 with open(Path(__file__).resolve().parents[1] / ".env") as f:
     API_KEY = [l.strip().split("=", 1)[1].strip() for l in f if l.startswith("FIRECRAWL_API_KEY=")][0]

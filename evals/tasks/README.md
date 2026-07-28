@@ -1,8 +1,12 @@
-# Eval 任务纵览
+# Eval 任务纵览（Agent 级）
 
 本文件是面向维护者的任务索引，用于快速了解每个 Eval 任务在验证什么。它不参与运行时加载；任务的可执行定义仍以各目录中的 `task.yaml` 为准，套件归属以 `evals/suites/*.yaml` 为准。
 
 新增、删除或改变任务目标时，应同步更新本表。仅调整 fixture、期望值、步数限制等实现细节，而任务目标没有变化时，不必更新。
+
+> **本目录只放 Agent 级任务。** 直接调用某个函数、不启动 Agent 的组件级实验放在
+> `evals/components/`，见 [`evals/components/README.md`](../components/README.md)。
+> 两类 eval 的判定标准和边界见该文件的"两类 eval 的边界"一节。
 
 | 任务 | 套件 | 要求 Agent 完成什么 | 主要验证能力 |
 | --- | --- | --- | --- |

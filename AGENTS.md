@@ -55,6 +55,19 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - 不要规定固定工具调用路径，除非该路径本身属于安全、权限或任务要求。
 - Capability suite 用于测量尚不稳定的能力；稳定通过的任务进入 regression suite。
 
+#### Agent 级与组件级 eval 分开存放
+
+判定只看一条：**这次运行有没有 Agent 在做决策？**
+
+- **Agent 级** → `evals/tasks/`。由 `AgentRunner` 驱动，必须有 `task.yaml`，注册到 `evals/suites/*.yaml`，由 `evals/harness/grader.py` 判卷。被测对象一定是生产实现。
+- **组件级** → `evals/components/`。独立 `run_*.py` 直接调函数算 Recall/MRR 等指标，不启动 Agent、无需 `task.yaml`、不注册 suite。被测对象**可能是为实验单独写的实现**。
+
+不要把组件级实验放进 `evals/tasks/`，也不要为组件级实验建并行 Harness。
+
+组件级实验额外要求：单变量；ground truth 标注在不随被测维度变化的单位上（如被测维度是 chunk 大小，则标注在文档级）；报告必须写明被测实现是否为生产实现，以及样本量是否足以支撑细粒度排序。完整规范见 `evals/components/README.md`。
+
+组件级结论不能直接当作生产行为的结论——要判断生产是否该改，必须做 Agent 级 eval，或让组件级实验直接调用生产函数。
+
 ## 4. 通用编码规范
 
 ### 开始前先想清楚
