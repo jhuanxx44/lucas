@@ -1,0 +1,11 @@
+{
+  "version": "wiki-scale-v1",
+  "frozen_on": "2026-07-27",
+  "page_count": 500,
+  "source_count": 501,
+  "corpus_sha256": "f26b31a04df663d32e5993ff142dfe71b1486475228f2ad6fc9039eea1de3ad5",
+  "source_plan_sha256": "d0b7f31af443f85362a8bd5bc6605d66b7c8e72f3d61c5cb003a42d2459280ec",
+  "source_plan": "source-plan-500-frozen.jsonl",
+  "catalog_sha256": "0b26182ada4b0a5bf77fcbc896f342138782a7bebfb2bc9e7edc3d76715ce056",
+  "quality_status": "deterministic-gates-passed"
+}

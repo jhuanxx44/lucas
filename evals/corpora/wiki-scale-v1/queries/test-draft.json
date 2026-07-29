@@ -1,0 +1,404 @@
+{
+  "queries": [
+    {
+      "id": "QS-002",
+      "query": "金屬氧化物半導體場效電晶體的核心結構是什麼？",
+      "type": "concept",
+      "answer": "金屬-氧化物-半導體電容",
+      "relevant_paths": [
+        "concepts/半导体/金屬氧化物半導體場效電晶體.md"
+      ],
+      "rationale": "页面指出核心是金属-氧化物-半导体电容。"
+    },
+    {
+      "id": "QS-003",
+      "query": "奈及利亞國家足球隊在世界杯的最佳成績是什麼？",
+      "type": "near_distractor",
+      "answer": "十六強",
+      "relevant_paths": [
+        "concepts/体育/奈及利亞國家足球隊.md"
+      ],
+      "rationale": "页面显示世界杯最佳成绩为十六强（1994、1998、2014年）。"
+    },
+    {
+      "id": "QS-005",
+      "query": "Internet Explorer的簡稱是什麼？",
+      "type": "synonym",
+      "answer": "IE",
+      "relevant_paths": [
+        "concepts/消费电子/Internet Explorer.md"
+      ],
+      "rationale": "页面开头即说明简称IE。"
+    },
+    {
+      "id": "QS-006",
+      "query": "拼多多的創始人是誰？",
+      "type": "company_fact",
+      "answer": "黃崢",
+      "relevant_paths": [
+        "companies/互联网/拼多多.md"
+      ],
+      "rationale": "页面指出创始人为黄峥。"
+    },
+    {
+      "id": "QS-008",
+      "query": "拼多多的总部所在地和Microsoft Access的首次发布年份分别是什么？",
+      "type": "cross_document",
+      "answer": "上海市长宁区娄山关路533号；1992年",
+      "relevant_paths": [
+        "companies/互联网/拼多多.md",
+        "concepts/软件服务/Microsoft Access.md"
+      ],
+      "rationale": "拼多多页面有总部地址，Access页面显示1.0于1992年发布。"
+    },
+    {
+      "id": "QS-009",
+      "query": "奈及利亞國家足球隊贏得非洲國家杯冠軍的次數和文獻的基本屬性數量各是多少？",
+      "type": "cross_document",
+      "answer": "3次；3個",
+      "relevant_paths": [
+        "concepts/体育/奈及利亞國家足球隊.md",
+        "concepts/文化/文献.md"
+      ],
+      "rationale": "奈及利亚页面显示三次冠军，文献页面列出三个基本属性。"
+    },
+    {
+      "id": "QS-011",
+      "query": "英伟达在2025年哪一天成为首家市值突破4万亿美元的公司？",
+      "type": "company_fact",
+      "answer": "2025年7月9日",
+      "relevant_paths": [
+        "companies/半导体/英伟达.md"
+      ],
+      "rationale": "英伟达页面明确记载“曾于2025年7月9日成为首家市值突破4万亿美元的公司”。"
+    },
+    {
+      "id": "QS-012",
+      "query": "可再生能源的定义是什么？",
+      "type": "concept",
+      "answer": "从自然过程中提取，且其补充速度在人类时间尺度上足以满足现有消耗的能源",
+      "relevant_paths": [
+        "concepts/新能源/再生能源.md"
+      ],
+      "rationale": "再生能源页面开头有明确定义。"
+    },
+    {
+      "id": "QS-014",
+      "query": "布莱克本流浪者的主场伊活公园球场可容纳多少人？",
+      "type": "long_tail",
+      "answer": "31,367人",
+      "relevant_paths": [
+        "concepts/体育/布萊克本流浪者足球俱樂部.md"
+      ],
+      "rationale": "页面明确标注伊活公园球场可容纳31,367人。"
+    },
+    {
+      "id": "QS-015",
+      "query": "New Balance的中文译名有哪些？",
+      "type": "synonym",
+      "answer": "新百伦、纽巴伦",
+      "relevant_paths": [
+        "companies/体育用品/New Balance.md"
+      ],
+      "rationale": "页面开头注明“又译新百伦、纽巴伦”。"
+    },
+    {
+      "id": "QS-017",
+      "query": "截至2024年，电动车电池的主流类型有哪些？",
+      "type": "concept",
+      "answer": "锂离子电池，包括镍钴锰酸锂(Li-NMC)、磷酸铁锂(LFP)和镍钴铝酸锂(Li-NCA)等",
+      "relevant_paths": [
+        "concepts/汽车/电动车电池.md"
+      ],
+      "rationale": "页面分类表显示主流类型为Li-NMC、LFP、Li-NCA等。"
+    },
+    {
+      "id": "QS-018",
+      "query": "得来速和互联网分别起源于哪个国家？",
+      "type": "cross_document",
+      "answer": "美国",
+      "relevant_paths": [
+        "concepts/餐饮/得來速.md",
+        "concepts/互联网/網際網路.md"
+      ],
+      "rationale": "得来速页面说最先出现在1930年代美国；互联网页面说ARPANET起源于美国。"
+    },
+    {
+      "id": "QS-020",
+      "query": "New Balance在2023年的年营收是多少？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "New Balance页面未提供营收数据。"
+    },
+    {
+      "id": "QS-021",
+      "query": "可口可乐公司是哪一年以多少金额收购了奥德瓦拉？",
+      "type": "company_fact",
+      "answer": "2001年，1.81亿美元",
+      "relevant_paths": [
+        "companies/食品饮料/奥德瓦拉.md"
+      ],
+      "rationale": "奥德瓦拉页面明确记载了收购年份和金额。"
+    },
+    {
+      "id": "QS-023",
+      "query": "南亚科技的主要产品包括哪些类型的动态随机存取存储器？",
+      "type": "near_distractor",
+      "answer": "DDR4、DDR5及低功耗记忆体",
+      "relevant_paths": [
+        "companies/半导体/南亞科技.md"
+      ],
+      "rationale": "南亚科技页面列出了其主要产品类型。"
+    },
+    {
+      "id": "QS-024",
+      "query": "广州冰室在1990年后大部分转营为何种类型的食品？",
+      "type": "long_tail",
+      "answer": "转为主营糖水、牛奶、椰汁、蜂蜜龟苓膏等甜品，或主营糕饼、煎饺等",
+      "relevant_paths": [
+        "concepts/餐饮/冰室.md"
+      ],
+      "rationale": "冰室页面详细描述了1990年后广州冰室的转型。"
+    },
+    {
+      "id": "QS-026",
+      "query": "南亚科技的股票代码是什么？",
+      "type": "company_fact",
+      "answer": "2408",
+      "relevant_paths": [
+        "companies/半导体/南亞科技.md"
+      ],
+      "rationale": "南亚科技页面显示其股票代码为2408。"
+    },
+    {
+      "id": "QS-027",
+      "query": "5G NR的独立组网模式有什么特点？",
+      "type": "concept",
+      "answer": "使用新的5G分组交换核心网架构，不依赖4G网络，有更低的成本、更高的效率",
+      "relevant_paths": [
+        "concepts/通信/5G NR.md"
+      ],
+      "rationale": "5G NR页面详细描述了独立组网模式的特点。"
+    },
+    {
+      "id": "QS-029",
+      "query": "奥德瓦拉公司和南亚科技分别成立于哪一年？",
+      "type": "cross_document",
+      "answer": "1980年和1995年",
+      "relevant_paths": [
+        "companies/食品饮料/奥德瓦拉.md",
+        "companies/半导体/南亞科技.md"
+      ],
+      "rationale": "奥德瓦拉页面显示成立于1980年；南亚科技页面显示成立于1995年。"
+    },
+    {
+      "id": "QS-030",
+      "query": "罗伊·麦克罗伊在2026年英国公开赛的成绩如何？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "罗伊·麦克罗伊页面未提及2026年英国公开赛成绩。"
+    },
+    {
+      "id": "QS-032",
+      "query": "计算机视觉的定义是什么？",
+      "type": "concept",
+      "answer": "计算机视觉是一门研究如何使机器“看”的科学，从图像或多维数据中提取信息，实现识别、跟踪和测量。",
+      "relevant_paths": [
+        "concepts/人工智能/计算机视觉.md"
+      ],
+      "rationale": "计算机视觉页面开头给出了定义。"
+    },
+    {
+      "id": "QS-033",
+      "query": "高尔夫球杆中推杆的杆面倾角允许大于10度吗？",
+      "type": "near_distractor",
+      "answer": "不允许，高爾夫規則規定推桿桿面頃角不可超過10°。",
+      "relevant_paths": [
+        "concepts/体育用品/高爾夫球桿.md"
+      ],
+      "rationale": "高尔夫球杆页面明确说明推杆的桿面頃角不可超過10°。"
+    },
+    {
+      "id": "QS-035",
+      "query": "可口可乐的中文名称是由谁翻译的？",
+      "type": "synonym",
+      "answer": "蒋彝",
+      "relevant_paths": [
+        "companies/食品饮料/可口可乐.md"
+      ],
+      "rationale": "可口可乐页面明确说明中文名字由蒋彝翻译。"
+    },
+    {
+      "id": "QS-036",
+      "query": "阿里云在2024年全球公有云IaaS市场份额排名第几？",
+      "type": "company_fact",
+      "answer": "第四，占7.2%。",
+      "relevant_paths": [
+        "companies/云计算/阿里云.md"
+      ],
+      "rationale": "阿里云页面根据高德纳报告给出该数据。"
+    },
+    {
+      "id": "QS-038",
+      "query": "戴尔收购EMC和可口可乐收购Bodyarmor分别花费了多少亿美元？",
+      "type": "cross_document",
+      "answer": "戴尔收购EMC花费670亿美元，可口可乐收购Bodyarmor花费56亿美元。",
+      "relevant_paths": [
+        "companies/消费电子/戴尔.md",
+        "companies/食品饮料/可口可乐.md"
+      ],
+      "rationale": "戴尔页面记载收购EMC金额670亿美元，可口可乐页面记载收购Bodyarmor金额56亿美元。"
+    },
+    {
+      "id": "QS-039",
+      "query": "日野汽车和阿里云的总部分别位于哪里？",
+      "type": "cross_document",
+      "answer": "日野汽车总部位于东京都日野市，阿里云总部位于杭州。",
+      "relevant_paths": [
+        "companies/汽车/日野汽车.md",
+        "companies/云计算/阿里云.md"
+      ],
+      "rationale": "日野汽车页面写明总部在东京都日野市，阿里云页面写明总部在杭州。"
+    },
+    {
+      "id": "QS-041",
+      "query": "三洋电机的创始人是谁？",
+      "type": "company_fact",
+      "answer": "井植岁男",
+      "relevant_paths": [
+        "companies/消费电子/三洋電機.md"
+      ],
+      "rationale": "三洋電機页面提供公司创始人为井植岁男。"
+    },
+    {
+      "id": "QS-042",
+      "query": "美国国家标准与技术研究院定义的云计算服务模式有哪些？",
+      "type": "concept",
+      "answer": "软件即服务（SaaS）、平台即服务（PaaS）、基础设施即服务（IaaS）",
+      "relevant_paths": [
+        "concepts/云计算.md"
+      ],
+      "rationale": "云计算页面明确列出了三种服务模式。"
+    },
+    {
+      "id": "QS-044",
+      "query": "哪种人科动物拥有已知最大的矢状嵴？",
+      "type": "long_tail",
+      "answer": "埃塞俄比亚傍人",
+      "relevant_paths": [
+        "concepts/自然/矢狀嵴.md"
+      ],
+      "rationale": "矢状嵴页面指出埃塞俄比亚傍人拥有已知最大的矢状嵴。"
+    },
+    {
+      "id": "QS-045",
+      "query": "LDA在文本挖掘中通常指什么算法？",
+      "type": "synonym",
+      "answer": "隐含狄利克雷分布（Latent Dirichlet Allocation）",
+      "relevant_paths": [
+        "concepts/人工智能/潜在狄利克雷分配模型.md"
+      ],
+      "rationale": "潜在狄利克雷分配模型页面开头说明LDA即隐含狄利克雷分布。"
+    },
+    {
+      "id": "QS-047",
+      "query": "iPadOS 14的正式版于哪一天发布？",
+      "type": "concept",
+      "answer": "2020年9月16日",
+      "relevant_paths": [
+        "concepts/软件服务/IPadOS 14.md"
+      ],
+      "rationale": "iPadOS 14页面概述部分明确正式版发布日期。"
+    },
+    {
+      "id": "QS-048",
+      "query": "万维网的发明者是谁，以及平台即服务（PaaS）的一个典型示例是什么？",
+      "type": "cross_document",
+      "answer": "蒂姆·伯纳斯-李，Google App Engine",
+      "relevant_paths": [
+        "concepts/互联网/提姆·柏內茲-李.md",
+        "concepts/云计算.md"
+      ],
+      "rationale": "提姆·柏內茲-李页面说明其发明万维网；云计算页面列出PaaS示例包括Google App Engine。"
+    },
+    {
+      "id": "QS-050",
+      "query": "德国国家足球队历史上最大比分的胜利是多少？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "德国国家足球队页面未提供历史最大比分胜利的数据，因此无法确定。"
+    },
+    {
+      "id": "QS-051",
+      "query": "丹丹漢堡的第一家店成立于哪一年，地点在哪里？",
+      "type": "company_fact",
+      "answer": "1984年于高雄市前金区创立第一间店",
+      "relevant_paths": [
+        "companies/餐饮/丹丹漢堡.md"
+      ],
+      "rationale": "页面明确记载了丹丹漢堡的创立时间和地点。"
+    },
+    {
+      "id": "QS-053",
+      "query": "所羅門·古根漢美術館的建筑师是谁？",
+      "type": "near_distractor",
+      "answer": "弗蘭克·勞埃德·賴特",
+      "relevant_paths": [
+        "concepts/文化/所羅門·古根漢美術館.md"
+      ],
+      "rationale": "页面记载该美术馆由弗蘭克·勞埃德·賴特设计。"
+    },
+    {
+      "id": "QS-054",
+      "query": "Zune 30的重量是多少克？",
+      "type": "long_tail",
+      "answer": "158.8 g",
+      "relevant_paths": [
+        "concepts/消费电子/Zune.md"
+      ],
+      "rationale": "页面规格表显示Zune 30重量为158.8 g。"
+    },
+    {
+      "id": "QS-056",
+      "query": "西山居的前身是什么？",
+      "type": "company_fact",
+      "answer": "金山游戏项目组",
+      "relevant_paths": [
+        "companies/软件服务/西山居.md"
+      ],
+      "rationale": "页面说明西山居前身为金山游戏项目组。"
+    },
+    {
+      "id": "QS-057",
+      "query": "Tesla Model X的鹰翼门有什么特点？",
+      "type": "concept",
+      "answer": "后侧门能以向上延展方式掀开，同时侦测侧边及上方的障碍物避免碰撞",
+      "relevant_paths": [
+        "concepts/汽车/Tesla Model X.md"
+      ],
+      "rationale": "页面描述了鹰翼门的功能特性。"
+    },
+    {
+      "id": "QS-059",
+      "query": "Google的成立年份和Athlon处理器的首次发布年份分别是？",
+      "type": "cross_document",
+      "answer": "Google成立于1998年，Athlon于1999年首次发布",
+      "relevant_paths": [
+        "companies/互联网/Google.md",
+        "concepts/半导体/Athlon.md"
+      ],
+      "rationale": "Google页面记载1998年创立；Athlon页面记载1999年发布。"
+    },
+    {
+      "id": "QS-060",
+      "query": "丹丹漢堡的创始人具体叫什么名字？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "页面仅提及“创始人为谢氏夫妇”，未给出具体姓名。"
+    }
+  ]
+}

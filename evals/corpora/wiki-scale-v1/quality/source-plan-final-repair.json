@@ -1,0 +1,27 @@
+{
+  "removed_count": 4,
+  "removed": {
+    "wp-2d84d1ab2088": "compile_failed",
+    "wp-30316521ec84": "compile_failed",
+    "wp-794c78f0d8b6": "compile_failed",
+    "wp-f8df9cbc4de2": "compile_failed"
+  },
+  "duplicate_groups": [],
+  "deficits": {
+    "target": 0,
+    "near": 2,
+    "far": 2
+  },
+  "replacement_doc_ids": [
+    "wp-5e0d388c22ec",
+    "wp-08e966dc9657",
+    "wp-b1c2ef9238ae",
+    "wp-13be8c948a47"
+  ],
+  "final_group_counts": {
+    "target": 150,
+    "near": 200,
+    "far": 150
+  },
+  "output": "evals/corpora/wiki-scale-v1/source-plan-500-frozen.jsonl"
+}

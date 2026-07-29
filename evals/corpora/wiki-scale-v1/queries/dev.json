@@ -1,0 +1,3848 @@
+{
+  "queries": [
+    {
+      "id": "QS-001",
+      "query": "拼多多成立于哪一年？",
+      "type": "company_fact",
+      "answer": "2015年",
+      "relevant_paths": [
+        "companies/互联网/拼多多.md"
+      ],
+      "rationale": "拼多多页面明确记载成立于2015年9月。",
+      "candidate_pool": [
+        "companies/互联网/拼多多.md",
+        "companies/互联网/腾讯.md",
+        "companies/互联网/騰訊.md",
+        "concepts/互联网/996工作制.md",
+        "concepts/半导体/工業技術研究院.md",
+        "companies/半导体/聯華電子.md",
+        "concepts/通信/北京邮电学院.md",
+        "companies/互联网/酷我音乐.md",
+        "concepts/通信/中华人民共和国邮电部.md",
+        "concepts/汽车/中国电动汽车百人会.md",
+        "companies/消费电子/三洋電機.md",
+        "companies/光通信/爱立信.md",
+        "companies/光通信/中兴通讯.md",
+        "concepts/通信/贝尔实验室.md",
+        "companies/半导体/AMD.md",
+        "companies/半导体/三星电子.md",
+        "companies/消费电子/Sony.md",
+        "companies/消费电子/帕羅奧多研究中心.md",
+        "concepts/自然/熊猫频道.md",
+        "companies/通信/上海贝尔.md",
+        "companies/互联网/UC优视.md",
+        "companies/食品饮料/太古集團.md",
+        "companies/半导体/海思半导体.md",
+        "companies/消费电子/諾基亞.md",
+        "companies/互联网/新浪微博.md",
+        "companies/互联网/阿里巴巴.md",
+        "concepts/互联网/万维网.md",
+        "concepts/汽车/Tesla Model X.md",
+        "concepts/体育/摔跤.md",
+        "concepts/新能源/锂离子电池.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/互联网/拼多多.md",
+          "grade": 3,
+          "reason": "片段明确提到拼多多成立于2015年9月"
+        },
+        {
+          "path": "companies/互联网/腾讯.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/互联网/騰訊.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/互联网/996工作制.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/半导体/工業技術研究院.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/半导体/聯華電子.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/通信/北京邮电学院.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/互联网/酷我音乐.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/通信/中华人民共和国邮电部.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/汽车/中国电动汽车百人会.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/消费电子/三洋電機.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/光通信/爱立信.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/光通信/中兴通讯.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/通信/贝尔实验室.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/半导体/AMD.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/半导体/三星电子.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/消费电子/Sony.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/消费电子/帕羅奧多研究中心.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/熊猫频道.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/通信/上海贝尔.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/互联网/UC优视.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/食品饮料/太古集團.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/半导体/海思半导体.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/消费电子/諾基亞.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/互联网/新浪微博.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/互联网/阿里巴巴.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/互联网/万维网.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model X.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/体育/摔跤.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/新能源/锂离子电池.md",
+          "grade": 0,
+          "reason": "无关内容"
+        }
+      ],
+      "ground_truth": [
+        "companies/互联网/拼多多.md"
+      ],
+      "answerable": true,
+      "grading_notes": "仅拼多多页面包含成立年份",
+      "llm_keywords": [
+        "拼多多",
+        "成立"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-004",
+      "query": "Microsoft Access從哪個版本開始使用.accdb文件格式？",
+      "type": "long_tail",
+      "answer": "Access 2007",
+      "relevant_paths": [
+        "concepts/软件服务/Microsoft Access.md"
+      ],
+      "rationale": "页面提到Access 2007起数据库改用.accdb格式。",
+      "candidate_pool": [
+        "concepts/软件服务/Microsoft Access.md",
+        "concepts/软件服务/Microsoft 365.md",
+        "concepts/消费电子/QuickTime.md",
+        "concepts/软件服务/数据库管理系统.md",
+        "companies/云计算/Windows Azure.md",
+        "concepts/互联网/Microsoft Edge.md",
+        "companies/软件服务/微软.md",
+        "concepts/软件服务/微软认证.md",
+        "concepts/云计算/信息安全.md",
+        "concepts/软件服务/FoxPro.md",
+        "concepts/软件服务/应用服务器.md",
+        "concepts/软件服务/微软出版社.md",
+        "concepts/软件服务/Windows 8.md",
+        "concepts/半导体/晶片組.md",
+        "concepts/软件服务/Microsoft SQL Server.md",
+        "concepts/消费电子/Altair 8800.md",
+        "concepts/数据库.md",
+        "concepts/云计算/开放标准.md",
+        "concepts/体育/实况足球.md",
+        "concepts/消费电子/Internet Explorer.md",
+        "companies/消费电子/Microsoft Surface.md",
+        "concepts/消费电子/Zune.md",
+        "concepts/软件服务/驅動程式.md",
+        "concepts/软件服务/光环3.md",
+        "concepts/软件服务/系统平台.md",
+        "concepts/软件服务/直譯器.md",
+        "concepts/软件服务/馬克·祖克柏.md",
+        "concepts/软件服务/Amazon DynamoDB.md",
+        "concepts/人工智能/弱人工智能.md",
+        "companies/消费电子/技嘉.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/软件服务/Microsoft Access.md",
+          "grade": 3,
+          "reason": "片段明确指出Access 2007开始使用.accdb文件格式。"
+        },
+        {
+          "path": "concepts/软件服务/Microsoft 365.md",
+          "grade": 0,
+          "reason": "未提及Access版本或.accdb格式。"
+        },
+        {
+          "path": "concepts/消费电子/QuickTime.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/数据库管理系统.md",
+          "grade": 0,
+          "reason": "未提及Access版本。"
+        },
+        {
+          "path": "companies/云计算/Windows Azure.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/互联网/Microsoft Edge.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "companies/软件服务/微软.md",
+          "grade": 0,
+          "reason": "未提及Access具体版本。"
+        },
+        {
+          "path": "concepts/软件服务/微软认证.md",
+          "grade": 0,
+          "reason": "未提及Access版本。"
+        },
+        {
+          "path": "concepts/云计算/信息安全.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/FoxPro.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/应用服务器.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/微软出版社.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/Windows 8.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/半导体/晶片組.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/Microsoft SQL Server.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/消费电子/Altair 8800.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/数据库.md",
+          "grade": 0,
+          "reason": "未提及Access版本。"
+        },
+        {
+          "path": "concepts/云计算/开放标准.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/体育/实况足球.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/消费电子/Internet Explorer.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "companies/消费电子/Microsoft Surface.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/消费电子/Zune.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/驅動程式.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/光环3.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/系统平台.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/直譯器.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/馬克·祖克柏.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/软件服务/Amazon DynamoDB.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "concepts/人工智能/弱人工智能.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        },
+        {
+          "path": "companies/消费电子/技嘉.md",
+          "grade": 0,
+          "reason": "与Access无关。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/软件服务/Microsoft Access.md"
+      ],
+      "answerable": true,
+      "grading_notes": "来自Microsoft Access文档的历史段落。",
+      "llm_keywords": [
+        "Microsoft Access",
+        ".accdb"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-007",
+      "query": "開放標準的一個典型例子是Wintel聯盟，它最初由哪家公司提出？",
+      "type": "concept",
+      "answer": "IBM",
+      "relevant_paths": [
+        "concepts/云计算/开放标准.md"
+      ],
+      "rationale": "页面提到Wintel标准最早由IBM提出。",
+      "candidate_pool": [
+        "concepts/云计算/开放标准.md",
+        "concepts/人工智能/邏輯程序設計.md",
+        "concepts/汽车/車用電子.md",
+        "companies/消费电子/蘋果公司.md",
+        "concepts/软件服务/最後一戰：戰鬥進化.md",
+        "concepts/软件服务/系统平台.md",
+        "concepts/云计算/客户端-服务器.md",
+        "concepts/软件服务/直譯器.md",
+        "companies/体育/統一7-ELEVEn獅.md",
+        "concepts/通信/光纖網路.md",
+        "companies/半导体/英特尔.md",
+        "concepts/半导体/GPU.md",
+        "concepts/半导体/記憶體.md",
+        "companies/半导体/Intel.md",
+        "concepts/半导体/工業技術研究院.md",
+        "concepts/半导体/無廠半導體公司.md",
+        "concepts/半导体/表面安装技术.md",
+        "concepts/软件服务/数据库管理系统.md",
+        "concepts/自然/兩岸互贈保育類動物.md",
+        "concepts/消费电子/個人電腦.md",
+        "concepts/半导体/ARM架構.md",
+        "concepts/汽车/再生制動.md",
+        "concepts/餐饮/得來速.md",
+        "concepts/人工智能/潜在狄利克雷分配模型.md",
+        "companies/体育用品/New Balance.md",
+        "concepts/云计算/服务器机房.md",
+        "companies/云计算/Google Cloud Platform.md",
+        "concepts/云计算/对称多处理.md",
+        "concepts/通信/电信交换.md",
+        "companies/互联网/新浪微博.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/云计算/开放标准.md",
+          "grade": 3,
+          "reason": "片段明确说明Wintel联盟最早由IBM提出，直接回答问题。"
+        },
+        {
+          "path": "concepts/人工智能/邏輯程序設計.md",
+          "grade": 0,
+          "reason": "与问题无关，讨论逻辑编程。"
+        },
+        {
+          "path": "concepts/汽车/車用電子.md",
+          "grade": 0,
+          "reason": "与问题无关，讨论汽车电子。"
+        },
+        {
+          "path": "companies/消费电子/蘋果公司.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍苹果公司。"
+        },
+        {
+          "path": "concepts/软件服务/最後一戰：戰鬥進化.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍游戏。"
+        },
+        {
+          "path": "concepts/软件服务/系统平台.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍系统平台。"
+        },
+        {
+          "path": "concepts/云计算/客户端-服务器.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍客户端-服务器架构。"
+        },
+        {
+          "path": "concepts/软件服务/直譯器.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍解释器。"
+        },
+        {
+          "path": "companies/体育/統一7-ELEVEn獅.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍棒球队。"
+        },
+        {
+          "path": "concepts/通信/光纖網路.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍光纤网络。"
+        },
+        {
+          "path": "companies/半导体/英特尔.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍英特尔公司。"
+        },
+        {
+          "path": "concepts/半导体/GPU.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍GPU。"
+        },
+        {
+          "path": "concepts/半导体/記憶體.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍内存。"
+        },
+        {
+          "path": "companies/半导体/Intel.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍Intel公司。"
+        },
+        {
+          "path": "concepts/半导体/工業技術研究院.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍工研院。"
+        },
+        {
+          "path": "concepts/半导体/無廠半導體公司.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍无厂半导体公司。"
+        },
+        {
+          "path": "concepts/半导体/表面安装技术.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍表面安装技术。"
+        },
+        {
+          "path": "concepts/软件服务/数据库管理系统.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍数据库管理系统。"
+        },
+        {
+          "path": "concepts/自然/兩岸互贈保育類動物.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍两岸互赠动物。"
+        },
+        {
+          "path": "concepts/消费电子/個人電腦.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍个人电脑。"
+        },
+        {
+          "path": "concepts/半导体/ARM架構.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍ARM架构。"
+        },
+        {
+          "path": "concepts/汽车/再生制動.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍再生制动。"
+        },
+        {
+          "path": "concepts/餐饮/得來速.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍得来速。"
+        },
+        {
+          "path": "concepts/人工智能/潜在狄利克雷分配模型.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍LDA模型。"
+        },
+        {
+          "path": "companies/体育用品/New Balance.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍New Balance。"
+        },
+        {
+          "path": "concepts/云计算/服务器机房.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍服务器机房。"
+        },
+        {
+          "path": "companies/云计算/Google Cloud Platform.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍GCP。"
+        },
+        {
+          "path": "concepts/云计算/对称多处理.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍对称多处理。"
+        },
+        {
+          "path": "concepts/通信/电信交换.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍电信交换。"
+        },
+        {
+          "path": "companies/互联网/新浪微博.md",
+          "grade": 0,
+          "reason": "与问题无关，介绍新浪微博。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/云计算/开放标准.md"
+      ],
+      "answerable": true,
+      "grading_notes": "候选文档中开放标准.md明确给出Wintel联盟由IBM提出，足以回答问题。",
+      "llm_keywords": [
+        "Wintel联盟",
+        "提出",
+        "公司"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-010",
+      "query": "拼多多在2025年的活躍用戶數是多少？",
+      "type": "insufficient_evidence",
+      "answer": "现有知识库无法提供足够证据确定该问题的答案。",
+      "relevant_paths": [],
+      "rationale": "页面仅提供2021年用户数，无2025年数据。",
+      "candidate_pool": [
+        "companies/互联网/拼多多.md",
+        "companies/互联网/腾讯.md",
+        "companies/互联网/騰訊.md",
+        "companies/消费电子/小米集團.md",
+        "concepts/体育/中国足球甲级联赛.md",
+        "concepts/汽车/小米SU7.md",
+        "companies/半导体/輝達.md",
+        "companies/新能源/宁德时代.md",
+        "companies/半导体/英伟达.md",
+        "companies/新能源/宁德时代新能源科技股份有限公司.md",
+        "concepts/体育/英超.md",
+        "concepts/体育/内马尔.md",
+        "concepts/互联网/996工作制.md",
+        "companies/消费电子/Atari.md",
+        "companies/互联网/Bilibili.md",
+        "concepts/体育/逆轉上半場.md",
+        "companies/光通信/诺基亚.md",
+        "concepts/软件服务/點對點技術.md",
+        "companies/半导体/台积电.md",
+        "companies/消费电子/諾基亞.md",
+        "concepts/体育/日本J1聯賽.md",
+        "companies/消费电子/小米科技.md",
+        "companies/半导体/意法半導體.md",
+        "companies/半导体/海思半导体.md",
+        "companies/互联网/网易考拉.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/互联网/拼多多.md",
+          "grade": 1,
+          "reason": "提及拼多多用户数，但为2021年数据，无2025年活跃用户数"
+        },
+        {
+          "path": "companies/互联网/腾讯.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/騰訊.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/小米集團.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/中国足球甲级联赛.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/汽车/小米SU7.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/輝達.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/宁德时代.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/英伟达.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/宁德时代新能源科技股份有限公司.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/英超.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/内马尔.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/互联网/996工作制.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/Atari.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/Bilibili.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/逆轉上半場.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/光通信/诺基亚.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/點對點技術.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/台积电.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/諾基亞.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/日本J1聯賽.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/小米科技.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/意法半導體.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/海思半导体.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/网易考拉.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [],
+      "answerable": false,
+      "grading_notes": "所有候选文档均未提供拼多多2025年活跃用户数",
+      "llm_keywords": [
+        "拼多多",
+        "2025年",
+        "活跃用户数"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-013",
+      "query": "Microsoft 365和Office 365有什么区别？",
+      "type": "near_distractor",
+      "answer": "Microsoft 365是2020年4月21日更名后的名称，但Office 365 A1/A3/E3/E5订阅并未受此影响",
+      "relevant_paths": [
+        "concepts/软件服务/Microsoft 365.md"
+      ],
+      "rationale": "页面详述了改名情况，指出教育版订阅未受影响。",
+      "candidate_pool": [
+        "concepts/软件服务/Microsoft 365.md",
+        "concepts/软件服务/Microsoft Access.md",
+        "companies/软件服务/微软.md",
+        "concepts/通信/联邦通信委员会.md",
+        "concepts/云计算/雲端硬碟.md",
+        "concepts/软件服务/微软认证.md",
+        "companies/云计算/Windows Azure.md",
+        "concepts/互联网/Microsoft Edge.md",
+        "concepts/软件服务/应用服务器.md",
+        "concepts/软件服务/微软出版社.md",
+        "concepts/软件服务/数据库管理系统.md",
+        "concepts/半导体/Celeron D.md",
+        "concepts/半导体/Celeron.md",
+        "concepts/通信/Kbps.md",
+        "concepts/消费电子/Altair 8800.md",
+        "companies/云计算/Google Cloud Platform.md",
+        "concepts/自然/兩岸互贈保育類動物.md",
+        "concepts/互联网.md",
+        "concepts/软件服务/系统平台.md",
+        "concepts/互联网/因特网.md",
+        "concepts/半导体/類金屬.md",
+        "concepts/软件服务/Microsoft SQL Server.md",
+        "concepts/软件服务/IPadOS 14.md",
+        "concepts/半导体/Duron.md",
+        "concepts/体育用品/運動用品.md",
+        "companies/通信/北电网络.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/软件服务/Microsoft 365.md",
+          "grade": 3,
+          "reason": "直接说明更名信息及Office 365 A1/A3/E3/E5未受影响，是回答区别的关键证据。"
+        },
+        {
+          "path": "concepts/软件服务/Microsoft Access.md",
+          "grade": 0,
+          "reason": "内容关于Access数据库，与问题无关。"
+        },
+        {
+          "path": "companies/软件服务/微软.md",
+          "grade": 0,
+          "reason": "内容为微软公司概况，未涉及Microsoft 365与Office 365的区别。"
+        },
+        {
+          "path": "concepts/通信/联邦通信委员会.md",
+          "grade": 0,
+          "reason": "内容关于FCC，与问题无关。"
+        },
+        {
+          "path": "concepts/云计算/雲端硬碟.md",
+          "grade": 0,
+          "reason": "内容关于云存储服务，未涉及Microsoft 365与Office 365。"
+        },
+        {
+          "path": "concepts/软件服务/微软认证.md",
+          "grade": 0,
+          "reason": "内容关于微软认证，与问题无关。"
+        },
+        {
+          "path": "companies/云计算/Windows Azure.md",
+          "grade": 0,
+          "reason": "内容关于Azure云平台，与问题无关。"
+        },
+        {
+          "path": "concepts/互联网/Microsoft Edge.md",
+          "grade": 0,
+          "reason": "内容关于Edge浏览器，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/应用服务器.md",
+          "grade": 0,
+          "reason": "内容关于应用服务器，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/微软出版社.md",
+          "grade": 0,
+          "reason": "内容关于微软出版社，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/数据库管理系统.md",
+          "grade": 0,
+          "reason": "内容关于数据库管理系统，与问题无关。"
+        },
+        {
+          "path": "concepts/半导体/Celeron D.md",
+          "grade": 0,
+          "reason": "内容关于处理器，与问题无关。"
+        },
+        {
+          "path": "concepts/半导体/Celeron.md",
+          "grade": 0,
+          "reason": "内容关于赛扬处理器，与问题无关。"
+        },
+        {
+          "path": "concepts/通信/Kbps.md",
+          "grade": 0,
+          "reason": "内容关于数据传输速率，与问题无关。"
+        },
+        {
+          "path": "concepts/消费电子/Altair 8800.md",
+          "grade": 0,
+          "reason": "内容关于Altair 8800计算机，与问题无关。"
+        },
+        {
+          "path": "companies/云计算/Google Cloud Platform.md",
+          "grade": 0,
+          "reason": "内容关于GCP，与问题无关。"
+        },
+        {
+          "path": "concepts/自然/兩岸互贈保育類動物.md",
+          "grade": 0,
+          "reason": "内容关于动物赠送，与问题无关。"
+        },
+        {
+          "path": "concepts/互联网.md",
+          "grade": 0,
+          "reason": "内容关于互联网，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/系统平台.md",
+          "grade": 0,
+          "reason": "内容关于系统平台，与问题无关。"
+        },
+        {
+          "path": "concepts/互联网/因特网.md",
+          "grade": 0,
+          "reason": "内容关于因特网，与问题无关。"
+        },
+        {
+          "path": "concepts/半导体/類金屬.md",
+          "grade": 0,
+          "reason": "内容关于类金属，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/Microsoft SQL Server.md",
+          "grade": 0,
+          "reason": "内容关于SQL Server，与问题无关。"
+        },
+        {
+          "path": "concepts/软件服务/IPadOS 14.md",
+          "grade": 0,
+          "reason": "内容关于iPadOS，与问题无关。"
+        },
+        {
+          "path": "concepts/半导体/Duron.md",
+          "grade": 0,
+          "reason": "内容关于Duron处理器，与问题无关。"
+        },
+        {
+          "path": "concepts/体育用品/運動用品.md",
+          "grade": 0,
+          "reason": "内容关于体育用品，与问题无关。"
+        },
+        {
+          "path": "companies/通信/北电网络.md",
+          "grade": 0,
+          "reason": "内容关于北电网络，与问题无关。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/软件服务/Microsoft 365.md"
+      ],
+      "answerable": true,
+      "grading_notes": "第一个片段包含直接回答区别所需的证据，其余均不相关。",
+      "llm_keywords": [
+        "Microsoft 365",
+        "Office 365"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-016",
+      "query": "SK电讯在2008年的市场份额是多少？",
+      "type": "company_fact",
+      "answer": "50.5%",
+      "relevant_paths": [
+        "companies/通信/SK電訊.md"
+      ],
+      "rationale": "页面明确列出“2008年拥有50.5%的市场份额”。",
+      "candidate_pool": [
+        "companies/通信/SK電訊.md",
+        "companies/半导体/SK海力士.md",
+        "companies/通信/北电网络.md",
+        "concepts/通信/電信.md",
+        "companies/半导体/Intel.md",
+        "concepts/半导体/DRAM.md",
+        "concepts/汽车/中国汽车制造业.md",
+        "concepts/5G.md",
+        "concepts/通信/隨選視訊.md",
+        "concepts/半导体/Opteron.md",
+        "companies/通信/上海贝尔.md",
+        "companies/光通信/华为技术.md",
+        "companies/汽车/比亚迪.md",
+        "companies/消费电子/Atari.md",
+        "concepts/软件服务/張宏江.md",
+        "concepts/通信/北京邮电学院.md",
+        "companies/汽车/比亚迪汽车.md",
+        "companies/光通信/中兴通讯.md",
+        "concepts/云计算/大型计算机.md",
+        "companies/通信/摩托罗拉.md",
+        "concepts/通信/全球移动通信系统.md",
+        "companies/食品饮料/百事公司.md",
+        "concepts/软件服务/點對點技術.md",
+        "concepts/通信/10G乙太網路.md",
+        "concepts/通信/联邦通信委员会.md",
+        "concepts/通信/物联网.md",
+        "concepts/消费电子/QuickTime.md",
+        "concepts/自然/珠穆朗玛峰.md",
+        "concepts/光通信/高錕.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/通信/SK電訊.md",
+          "grade": 3,
+          "reason": "直接给出2008年市场份额为50.5%"
+        },
+        {
+          "path": "companies/半导体/SK海力士.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/通信/北电网络.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/電信.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/Intel.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/DRAM.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/汽车/中国汽车制造业.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/5G.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/隨選視訊.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/Opteron.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/通信/上海贝尔.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/光通信/华为技术.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/汽车/比亚迪.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/Atari.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/張宏江.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/北京邮电学院.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/汽车/比亚迪汽车.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/光通信/中兴通讯.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算/大型计算机.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/通信/摩托罗拉.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/全球移动通信系统.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/食品饮料/百事公司.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/點對點技術.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/10G乙太網路.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/联邦通信委员会.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/物联网.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/QuickTime.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/自然/珠穆朗玛峰.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/光通信/高錕.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [
+        "companies/通信/SK電訊.md"
+      ],
+      "answerable": true,
+      "grading_notes": "只有SK电讯文档直接提供答案",
+      "llm_keywords": [
+        "SK电讯",
+        "2008",
+        "市场份额"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-019",
+      "query": "英伟达在纳斯达克的股票代码和SK电讯在韩国交易所的股票代码分别是什么？",
+      "type": "cross_document",
+      "answer": "NVDA 和 017670",
+      "relevant_paths": [
+        "companies/半导体/英伟达.md",
+        "companies/通信/SK電訊.md"
+      ],
+      "rationale": "英伟达页面有NASDAQ: NVDA；SK电讯页面有韩国交易所代码017670。",
+      "candidate_pool": [
+        "companies/半导体/英伟达.md",
+        "companies/通信/SK電訊.md",
+        "companies/半导体/SK海力士.md",
+        "companies/半导体/NVIDIA.md",
+        "companies/半导体/輝達.md",
+        "companies/半导体/台积电.md",
+        "concepts/体育/李世乭.md",
+        "concepts/互联网/互联网泡沫.md",
+        "companies/餐饮/星巴克.md",
+        "companies/互联网/Bilibili.md",
+        "companies/食品饮料/怪物饮料.md",
+        "companies/体育用品/露露柠檬.md",
+        "concepts/通信/電信.md",
+        "companies/互联网/Meta Platforms.md",
+        "companies/食品饮料/Qoo.md",
+        "companies/新能源/特斯拉公司.md",
+        "concepts/5G.md",
+        "companies/半导体/Intel.md",
+        "companies/消费电子/苹果公司.md",
+        "companies/半导体/高通.md",
+        "companies/通信/星和电信.md",
+        "companies/食品饮料/奥德瓦拉.md",
+        "companies/新能源/金龙联合汽车.md",
+        "companies/文化/CJ E&M.md",
+        "companies/食品饮料/安海斯-布希英博集團.md",
+        "companies/软件服务/微软.md",
+        "concepts/通信/隨選視訊.md",
+        "concepts/半导体/Intel Core i3.md",
+        "concepts/半导体/低功耗设计.md",
+        "concepts/消费电子/華為P系列.md",
+        "concepts/半导体/Celeron D.md",
+        "concepts/半导体/PCI Express.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/半导体/英伟达.md",
+          "grade": 3,
+          "reason": "直接给出英伟达股票代码NASDAQ: NVDA"
+        },
+        {
+          "path": "companies/通信/SK電訊.md",
+          "grade": 3,
+          "reason": "直接给出SK电讯在韩国交易所代码017670"
+        },
+        {
+          "path": "companies/半导体/SK海力士.md",
+          "grade": 0,
+          "reason": "不相关，涉及SK海力士而非SK电讯或英伟达股票代码"
+        },
+        {
+          "path": "companies/半导体/NVIDIA.md",
+          "grade": 3,
+          "reason": "直接给出英伟达股票代码NASDAQ: NVDA"
+        },
+        {
+          "path": "companies/半导体/輝達.md",
+          "grade": 3,
+          "reason": "直接给出英伟达股票代码NASDAQ: NVDA"
+        },
+        {
+          "path": "companies/半导体/台积电.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/李世乭.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/互联网/互联网泡沫.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/餐饮/星巴克.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/Bilibili.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/食品饮料/怪物饮料.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/体育用品/露露柠檬.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/電信.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/Meta Platforms.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/食品饮料/Qoo.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/特斯拉公司.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/5G.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/Intel.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/苹果公司.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/高通.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/通信/星和电信.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/食品饮料/奥德瓦拉.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/金龙联合汽车.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/文化/CJ E&M.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/食品饮料/安海斯-布希英博集團.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/软件服务/微软.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/隨選視訊.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/Intel Core i3.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/低功耗设计.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/華為P系列.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/Celeron D.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/PCI Express.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [
+        "companies/半导体/英伟达.md",
+        "companies/通信/SK電訊.md",
+        "companies/半导体/NVIDIA.md",
+        "companies/半导体/輝達.md"
+      ],
+      "answerable": true,
+      "grading_notes": "多个候选直接提供了英伟达和SK电讯的股票代码，足以回答核心问题。",
+      "llm_keywords": [
+        "英伟达",
+        "纳斯达克",
+        "SK电讯",
+        "韩国交易所",
+        "股票代码"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-022",
+      "query": "机器视觉与计算机视觉的主要区别是什么？",
+      "type": "concept",
+      "answer": "机器视觉是系统工程学科，专注于工业自动化应用；计算机视觉属于计算机科学。",
+      "relevant_paths": [
+        "concepts/人工智能/机器视觉.md"
+      ],
+      "rationale": "机器视觉页面明确区分了机器视觉与计算机视觉。",
+      "candidate_pool": [
+        "concepts/人工智能/机器视觉.md",
+        "concepts/人工智能/计算机视觉.md",
+        "concepts/人工智能/人工智能的應用.md",
+        "concepts/人工智能.md",
+        "concepts/人工智能/通用人工智能.md",
+        "concepts/人工智能/模式识别.md",
+        "companies/半导体/輝達.md",
+        "concepts/人工智能/面部识别.md",
+        "concepts/云计算/大型计算机.md",
+        "concepts/人工智能/人工神經網路.md",
+        "concepts/半导体/圖形處理器.md",
+        "concepts/半导体/中央處理器.md",
+        "concepts/半导体/半导体器件制造.md",
+        "companies/半导体/NVIDIA.md",
+        "concepts/软件服务/張宏江.md",
+        "concepts/通信/Kbps.md",
+        "concepts/云计算/信息安全.md",
+        "concepts/消费电子/Altair 8800.md",
+        "concepts/人工智能/人工智能史.md",
+        "concepts/云计算/可扩放性.md",
+        "concepts/通信/物联网.md",
+        "concepts/人工智能/强化学习.md",
+        "concepts/光通信/偏振.md",
+        "concepts/云计算/Hadoop.md",
+        "concepts/云计算/Xen.md",
+        "concepts/人工智能/虚拟助手.md",
+        "concepts/人工智能/弱人工智能.md",
+        "companies/新能源/宁德时代.md",
+        "concepts/软件服务/系统软件.md",
+        "concepts/半导体/系統單晶片.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/人工智能/机器视觉.md",
+          "grade": 3,
+          "reason": "直接指出机器视觉是系统工程学科，不同于计算机科学的计算机视觉，并强调工业自动化应用"
+        },
+        {
+          "path": "concepts/人工智能/计算机视觉.md",
+          "grade": 0,
+          "reason": "未涉及与机器视觉的区别"
+        },
+        {
+          "path": "concepts/人工智能/人工智能的應用.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "concepts/人工智能.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "concepts/人工智能/通用人工智能.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "concepts/人工智能/模式识别.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "companies/半导体/輝達.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/面部识别.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算/大型计算机.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/人工神經網路.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "concepts/半导体/圖形處理器.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/中央處理器.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/半导体器件制造.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/NVIDIA.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/張宏江.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/Kbps.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算/信息安全.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/Altair 8800.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/人工智能史.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "concepts/云计算/可扩放性.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/物联网.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/强化学习.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/光通信/偏振.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算/Hadoop.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算/Xen.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/虚拟助手.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/弱人工智能.md",
+          "grade": 0,
+          "reason": "未涉及区别"
+        },
+        {
+          "path": "companies/新能源/宁德时代.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/系统软件.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/半导体/系統單晶片.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [
+        "concepts/人工智能/机器视觉.md"
+      ],
+      "answerable": true,
+      "grading_notes": "仅机器视觉文档直接回答了区别",
+      "llm_keywords": [
+        "机器视觉",
+        "计算机视觉",
+        "主要区别"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-025",
+      "query": "可乐果的果实又称为什么？",
+      "type": "synonym",
+      "answer": "Kola nut",
+      "relevant_paths": [
+        "concepts/自然/可樂果.md"
+      ],
+      "rationale": "可乐果页面指出其果实称为Kola nut。",
+      "candidate_pool": [
+        "concepts/自然/可樂果.md",
+        "concepts/食品饮料/咖啡因.md",
+        "concepts/光通信/瑞利散射.md",
+        "companies/食品饮料/Coca-Cola.md",
+        "concepts/食品饮料/约翰·彭伯顿.md",
+        "companies/食品饮料/可口可乐.md",
+        "concepts/人工智能/通用人工智能.md",
+        "concepts/体育/球門.md",
+        "concepts/食品饮料/樱桃.md",
+        "concepts/自然/栖息地.md",
+        "concepts/食品饮料/福喜事件.md",
+        "concepts/汽车/全景泊车系统.md",
+        "companies/体育用品/奧林比亞會.md",
+        "concepts/人工智能/面部识别.md",
+        "companies/云计算/昇陽電腦.md",
+        "concepts/体育用品/耐克滑板.md",
+        "concepts/通信/4G.md",
+        "concepts/云计算/大型计算机.md",
+        "concepts/云计算/雲端硬碟.md",
+        "concepts/通信/電信.md",
+        "concepts/光通信/相干性.md",
+        "companies/互联网/KakaoTalk.md",
+        "concepts/半导体/類金屬.md",
+        "concepts/自然/尿液.md",
+        "concepts/自然/古柯.md",
+        "concepts/自然/珠穆朗玛峰.md",
+        "concepts/电动汽车.md",
+        "concepts/汽车/Tesla Model X.md",
+        "concepts/体育/林恩宇.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/自然/可樂果.md",
+          "grade": 3,
+          "reason": "直接提及可乐果的果实又称Kola nut"
+        },
+        {
+          "path": "concepts/食品饮料/咖啡因.md",
+          "grade": 1,
+          "reason": "主题相关，但未直接回答果实名称"
+        },
+        {
+          "path": "concepts/光通信/瑞利散射.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "companies/食品饮料/Coca-Cola.md",
+          "grade": 1,
+          "reason": "主题相关，但未直接回答果实名称"
+        },
+        {
+          "path": "concepts/食品饮料/约翰·彭伯顿.md",
+          "grade": 1,
+          "reason": "主题相关，但未直接回答果实名称"
+        },
+        {
+          "path": "companies/食品饮料/可口可乐.md",
+          "grade": 1,
+          "reason": "主题相关，但未直接回答果实名称"
+        },
+        {
+          "path": "concepts/人工智能/通用人工智能.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/体育/球門.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/食品饮料/樱桃.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/自然/栖息地.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/食品饮料/福喜事件.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/汽车/全景泊车系统.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "companies/体育用品/奧林比亞會.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/人工智能/面部识别.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "companies/云计算/昇陽電腦.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/体育用品/耐克滑板.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/通信/4G.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/云计算/大型计算机.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/云计算/雲端硬碟.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/通信/電信.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/光通信/相干性.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "companies/互联网/KakaoTalk.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/半导体/類金屬.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/自然/尿液.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/自然/古柯.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/自然/珠穆朗玛峰.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/电动汽车.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model X.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        },
+        {
+          "path": "concepts/体育/林恩宇.md",
+          "grade": 0,
+          "reason": "与问题无关"
+        }
+      ],
+      "ground_truth": [
+        "concepts/自然/可樂果.md"
+      ],
+      "answerable": true,
+      "grading_notes": "唯一直接相关文档提供了答案",
+      "llm_keywords": [
+        "可乐果",
+        "果实"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-028",
+      "query": "被可口可乐收购的奥德瓦拉公司，其品牌在2020年被停产，而可口可乐早期曾使用什么植物作为饮料原料？",
+      "type": "cross_document",
+      "answer": "可乐果",
+      "relevant_paths": [
+        "companies/食品饮料/奥德瓦拉.md",
+        "concepts/自然/可樂果.md"
+      ],
+      "rationale": "奥德瓦拉页面提到被可口可乐收购及停产；可乐果页面提到可口可乐曾使用可乐果。",
+      "candidate_pool": [
+        "companies/食品饮料/奥德瓦拉.md",
+        "concepts/自然/可樂果.md",
+        "companies/食品饮料/可口可乐.md",
+        "companies/食品饮料/Coca-Cola.md",
+        "companies/食品饮料/可口可樂.md",
+        "companies/食品饮料/中國食品.md",
+        "companies/食品饮料/Qoo.md",
+        "companies/食品饮料/怪物饮料.md",
+        "concepts/食品饮料/阿萨·坎德勒.md",
+        "companies/食品饮料/百事公司.md",
+        "companies/食品饮料/汇源.md",
+        "concepts/食品饮料/酒.md",
+        "concepts/自然/植食性动物.md",
+        "concepts/自然/古柯.md",
+        "concepts/食品饮料/福喜事件.md",
+        "companies/消费电子/諾基亞.md",
+        "companies/食品饮料/安海斯-布希英博集團.md",
+        "concepts/食品饮料/约翰·彭伯顿.md",
+        "companies/食品饮料/爽健美茶.md",
+        "companies/软件服务/微软.md",
+        "concepts/食品饮料/咖啡因.md",
+        "companies/光通信/诺基亚.md",
+        "companies/餐饮/麦当劳.md",
+        "companies/新能源/特斯拉公司.md",
+        "concepts/自然/食道.md",
+        "concepts/自然/大熊猫属.md",
+        "concepts/体育/日本J1聯賽.md",
+        "concepts/通信/华为相关争议.md",
+        "concepts/自然/大熊猫佳佳.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/食品饮料/奥德瓦拉.md",
+          "grade": 0,
+          "reason": "未提及可口可乐早期使用的植物原料"
+        },
+        {
+          "path": "concepts/自然/可樂果.md",
+          "grade": 3,
+          "reason": "明确说明可乐果曾是可口可乐的原料"
+        },
+        {
+          "path": "companies/食品饮料/可口可乐.md",
+          "grade": 3,
+          "reason": "提到主要成分包括古柯叶与可乐果提炼物，早期使用可乐果"
+        },
+        {
+          "path": "companies/食品饮料/Coca-Cola.md",
+          "grade": 3,
+          "reason": "提到主要成分包括古柯叶与可乐果提炼物，早期使用可乐果"
+        },
+        {
+          "path": "companies/食品饮料/可口可樂.md",
+          "grade": 3,
+          "reason": "提到主要成分包括古柯叶与可乐果提炼物，早期使用可乐果"
+        },
+        {
+          "path": "companies/食品饮料/中國食品.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/食品饮料/Qoo.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/食品饮料/怪物饮料.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/食品饮料/阿萨·坎德勒.md",
+          "grade": 0,
+          "reason": "未提及早期原料"
+        },
+        {
+          "path": "companies/食品饮料/百事公司.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/食品饮料/汇源.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/食品饮料/酒.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/植食性动物.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/古柯.md",
+          "grade": 3,
+          "reason": "明确说明可口可乐早期使用古柯叶"
+        },
+        {
+          "path": "concepts/食品饮料/福喜事件.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/消费电子/諾基亞.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/食品饮料/安海斯-布希英博集團.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/食品饮料/约翰·彭伯顿.md",
+          "grade": 3,
+          "reason": "提到彭伯顿利用古柯树叶和可乐果配制可口可乐"
+        },
+        {
+          "path": "companies/食品饮料/爽健美茶.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/软件服务/微软.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/食品饮料/咖啡因.md",
+          "grade": 0,
+          "reason": "未提及可口可乐使用"
+        },
+        {
+          "path": "companies/光通信/诺基亚.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/餐饮/麦当劳.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "companies/新能源/特斯拉公司.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/食道.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/大熊猫属.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/体育/日本J1聯賽.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/通信/华为相关争议.md",
+          "grade": 0,
+          "reason": "无关内容"
+        },
+        {
+          "path": "concepts/自然/大熊猫佳佳.md",
+          "grade": 0,
+          "reason": "无关内容"
+        }
+      ],
+      "ground_truth": [
+        "concepts/自然/可樂果.md",
+        "companies/食品饮料/可口可乐.md",
+        "companies/食品饮料/Coca-Cola.md",
+        "companies/食品饮料/可口可樂.md",
+        "concepts/自然/古柯.md",
+        "concepts/食品饮料/约翰·彭伯顿.md"
+      ],
+      "answerable": true,
+      "grading_notes": "多个片段提供了可乐果或古柯叶作为可口可乐早期原料",
+      "llm_keywords": [
+        "奥德瓦拉",
+        "可口可乐",
+        "2020",
+        "停产",
+        "早期",
+        "植物原料"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-031",
+      "query": "戴尔公司以什么商业模式闻名？",
+      "type": "company_fact",
+      "answer": "直接商业模式，即去除中间人，先接订单后组装，降低库存成本。",
+      "relevant_paths": [
+        "companies/消费电子/戴尔.md"
+      ],
+      "rationale": "戴尔页面明确描述了直接商业模式。",
+      "candidate_pool": [
+        "companies/消费电子/戴尔.md",
+        "companies/食品饮料/怪物饮料.md",
+        "companies/半导体/台积电.md",
+        "companies/互联网/网易云音乐.md",
+        "concepts/半导体/晶圆代工.md",
+        "concepts/软件服务/电子商务.md",
+        "concepts/半导体/圖形處理器.md",
+        "concepts/体育/呂政儒.md",
+        "companies/餐饮/麦当劳.md",
+        "concepts/半导体/微控制器.md",
+        "companies/软件服务/Mojang.md",
+        "concepts/半导体/Celeron.md",
+        "companies/食品饮料/可口可乐.md",
+        "companies/互联网/开心网.md",
+        "companies/互联网/拼多多.md",
+        "concepts/体育/大卫·贝克汉姆.md",
+        "concepts/半导体/晶圓代工.md",
+        "companies/消费电子/三洋電機.md",
+        "concepts/消费电子/Zune.md",
+        "concepts/消费电子/Mac App Store.md",
+        "concepts/体育/英超.md",
+        "concepts/半导体/电路.md",
+        "companies/互联网/Lazada.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/消费电子/戴尔.md",
+          "grade": 3,
+          "reason": "片段明确说明戴尔以直接商业模式闻名，去除中间人、先接订单后组装，直接回答核心问题。"
+        },
+        {
+          "path": "companies/食品饮料/怪物饮料.md",
+          "grade": 0,
+          "reason": "无关内容，讨论能量饮料公司。"
+        },
+        {
+          "path": "companies/半导体/台积电.md",
+          "grade": 0,
+          "reason": "无关内容，讨论半导体晶圆代工。"
+        },
+        {
+          "path": "companies/互联网/网易云音乐.md",
+          "grade": 0,
+          "reason": "无关内容，讨论音乐平台。"
+        },
+        {
+          "path": "concepts/半导体/晶圆代工.md",
+          "grade": 0,
+          "reason": "无关内容，讨论晶圆代工商业模式，非戴尔。"
+        },
+        {
+          "path": "concepts/软件服务/电子商务.md",
+          "grade": 0,
+          "reason": "无关内容，讨论电子商务概念。"
+        },
+        {
+          "path": "concepts/半导体/圖形處理器.md",
+          "grade": 0,
+          "reason": "无关内容，讨论GPU。"
+        },
+        {
+          "path": "concepts/体育/呂政儒.md",
+          "grade": 0,
+          "reason": "无关内容，讨论台湾篮球运动员。"
+        },
+        {
+          "path": "companies/餐饮/麦当劳.md",
+          "grade": 0,
+          "reason": "无关内容，讨论快餐连锁。"
+        },
+        {
+          "path": "concepts/半导体/微控制器.md",
+          "grade": 0,
+          "reason": "无关内容，讨论微控制器。"
+        },
+        {
+          "path": "companies/软件服务/Mojang.md",
+          "grade": 0,
+          "reason": "无关内容，讨论游戏开发商。"
+        },
+        {
+          "path": "concepts/半导体/Celeron.md",
+          "grade": 0,
+          "reason": "无关内容，讨论英特尔处理器。"
+        },
+        {
+          "path": "companies/食品饮料/可口可乐.md",
+          "grade": 0,
+          "reason": "无关内容，讨论软饮料公司。"
+        },
+        {
+          "path": "companies/互联网/开心网.md",
+          "grade": 0,
+          "reason": "无关内容，讨论社交网站。"
+        },
+        {
+          "path": "companies/互联网/拼多多.md",
+          "grade": 0,
+          "reason": "无关内容，讨论电商平台。"
+        },
+        {
+          "path": "concepts/体育/大卫·贝克汉姆.md",
+          "grade": 0,
+          "reason": "无关内容，讨论足球运动员。"
+        },
+        {
+          "path": "concepts/半导体/晶圓代工.md",
+          "grade": 0,
+          "reason": "重复条目，无关内容。"
+        },
+        {
+          "path": "companies/消费电子/三洋電機.md",
+          "grade": 0,
+          "reason": "无关内容，讨论日本电子公司。"
+        },
+        {
+          "path": "concepts/消费电子/Zune.md",
+          "grade": 0,
+          "reason": "无关内容，讨论媒体播放器。"
+        },
+        {
+          "path": "concepts/消费电子/Mac App Store.md",
+          "grade": 0,
+          "reason": "无关内容，讨论应用商店。"
+        },
+        {
+          "path": "concepts/体育/英超.md",
+          "grade": 0,
+          "reason": "无关内容，讨论足球联赛。"
+        },
+        {
+          "path": "concepts/半导体/电路.md",
+          "grade": 0,
+          "reason": "无关内容，讨论电路概念。"
+        },
+        {
+          "path": "companies/互联网/Lazada.md",
+          "grade": 0,
+          "reason": "无关内容，讨论东南亚电商。"
+        }
+      ],
+      "ground_truth": [
+        "companies/消费电子/戴尔.md"
+      ],
+      "answerable": true,
+      "grading_notes": "只有戴尔.md提供了关于戴尔商业模式的直接证据。",
+      "llm_keywords": [
+        "戴尔公司",
+        "Dell",
+        "直销模式"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-034",
+      "query": "日野汽车在1967年成为丰田子公司后，主要转向生产什么类型的车辆？",
+      "type": "long_tail",
+      "answer": "转为以生产货车、巴士为主，停止生产私家车。",
+      "relevant_paths": [
+        "companies/汽车/日野汽车.md"
+      ],
+      "rationale": "日野汽车页面提到1967年成为丰田一部分后，转为以生产货车、巴士为主。",
+      "candidate_pool": [
+        "companies/汽车/日野汽车.md",
+        "companies/汽车/丰田汽车.md",
+        "concepts/汽车/充电式电动车辆.md",
+        "concepts/汽车/新能源车.md",
+        "concepts/新能源/混合动力电动汽车.md",
+        "concepts/汽车/全景泊车系统.md",
+        "concepts/汽车/中国汽车制造业.md",
+        "companies/汽车/标致雪铁龙集团.md",
+        "companies/汽车/比亚迪.md",
+        "companies/汽车/比亚迪汽车.md",
+        "concepts/汽车/Tesla Model X.md",
+        "companies/汽车/福特汽车.md",
+        "companies/通信/星和电信.md",
+        "companies/新能源/金龙联合汽车.md",
+        "companies/软件服务/IBM.md",
+        "companies/通信/Nokia.md",
+        "concepts/汽车/再生制動.md",
+        "companies/汽车/捷豹路虎.md",
+        "companies/新能源/宁德时代.md",
+        "companies/新能源/特斯拉公司.md",
+        "companies/汽车/BMW.md",
+        "companies/新能源/宁德时代新能源科技股份有限公司.md",
+        "companies/体育用品/耐克.md",
+        "companies/消费电子/三洋電機.md",
+        "companies/互联网/高德软件.md",
+        "concepts/汽车/电动车电池.md",
+        "concepts/汽车/小米SU7.md",
+        "companies/食品饮料/奥德瓦拉.md",
+        "concepts/人工智能/人工智能史.md",
+        "concepts/人工智能/人工智能的應用.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/汽车/日野汽车.md",
+          "grade": 3,
+          "reason": "片段明确说明1967年成为丰田子公司后转为生产货车、巴士为主，停止生产私家车。"
+        },
+        {
+          "path": "companies/汽车/丰田汽车.md",
+          "grade": 0,
+          "reason": "未提及日野汽车转向生产类型。"
+        },
+        {
+          "path": "concepts/汽车/充电式电动车辆.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/新能源车.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/新能源/混合动力电动汽车.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/全景泊车系统.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/中国汽车制造业.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/标致雪铁龙集团.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/比亚迪.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/比亚迪汽车.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model X.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/福特汽车.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/通信/星和电信.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/新能源/金龙联合汽车.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/软件服务/IBM.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/通信/Nokia.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/再生制動.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/捷豹路虎.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/新能源/宁德时代.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/新能源/特斯拉公司.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/汽车/BMW.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/新能源/宁德时代新能源科技股份有限公司.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/体育用品/耐克.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/消费电子/三洋電機.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/互联网/高德软件.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/电动车电池.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/汽车/小米SU7.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "companies/食品饮料/奥德瓦拉.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/人工智能/人工智能史.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        },
+        {
+          "path": "concepts/人工智能/人工智能的應用.md",
+          "grade": 0,
+          "reason": "与日野汽车无关。"
+        }
+      ],
+      "ground_truth": [
+        "companies/汽车/日野汽车.md"
+      ],
+      "answerable": true,
+      "grading_notes": "候选文档中日野汽车.md提供了直接证据。",
+      "llm_keywords": [
+        "日野汽车",
+        "丰田",
+        "1967年",
+        "转向生产"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-037",
+      "query": "固态电池的循环寿命可以达到多少次？",
+      "type": "concept",
+      "answer": "10,000至100,000次。",
+      "relevant_paths": [
+        "concepts/新能源/固态电池.md"
+      ],
+      "rationale": "固态电池页面明确列出循环寿命可达10,000至100,000次。",
+      "candidate_pool": [
+        "concepts/新能源/固态电池.md",
+        "concepts/汽车/电动车电池.md",
+        "concepts/新能源/太阳能电池.md",
+        "concepts/新能源/镍氢电池.md",
+        "concepts/汽车/純電動車.md",
+        "concepts/新能源/锂离子电池.md",
+        "concepts/半导体/闪存.md",
+        "concepts/新能源/磷酸铁锂电池.md",
+        "concepts/电动汽车.md",
+        "concepts/新能源/储能技术.md",
+        "companies/新能源/宁德时代.md",
+        "companies/新能源/宁德时代新能源科技股份有限公司.md",
+        "concepts/汽车/特斯拉内华达超级工厂.md",
+        "concepts/消费电子/IPod Nano.md",
+        "concepts/汽车/比亚迪e6.md",
+        "concepts/新能源/太陽能板.md",
+        "companies/汽车/比亚迪汽车.md",
+        "concepts/新能源/锂矿.md",
+        "concepts/半导体/威廉·肖克利.md",
+        "companies/消费电子/松下.md",
+        "concepts/半导体/PCI Express.md",
+        "concepts/光通信/激光指示器.md",
+        "concepts/通信/無線通訊.md",
+        "concepts/半导体/半导体器件.md",
+        "concepts/消费电子/智慧型手機.md",
+        "companies/消费电子/Atari.md",
+        "concepts/新能源/再生能源.md",
+        "concepts/体育/阿森纳.md",
+        "concepts/人工智能/量子计算.md",
+        "concepts/集成电路.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/新能源/固态电池.md",
+          "grade": 3,
+          "reason": "直接提供了固态电池循环寿命为10,000–100,000次。"
+        },
+        {
+          "path": "concepts/汽车/电动车电池.md",
+          "grade": 0,
+          "reason": "未提及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/新能源/太阳能电池.md",
+          "grade": 0,
+          "reason": "不相关，讨论太阳能电池。"
+        },
+        {
+          "path": "concepts/新能源/镍氢电池.md",
+          "grade": 0,
+          "reason": "讨论镍氢电池，非固态电池。"
+        },
+        {
+          "path": "concepts/汽车/純電動車.md",
+          "grade": 0,
+          "reason": "未提及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/新能源/锂离子电池.md",
+          "grade": 0,
+          "reason": "讨论锂离子电池，非固态电池。"
+        },
+        {
+          "path": "concepts/半导体/闪存.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/新能源/磷酸铁锂电池.md",
+          "grade": 0,
+          "reason": "讨论磷酸铁锂电池，非固态电池。"
+        },
+        {
+          "path": "concepts/电动汽车.md",
+          "grade": 0,
+          "reason": "未提及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/新能源/储能技术.md",
+          "grade": 0,
+          "reason": "未提及固态电池循环寿命。"
+        },
+        {
+          "path": "companies/新能源/宁德时代.md",
+          "grade": 0,
+          "reason": "公司介绍，未涉及固态电池循环寿命。"
+        },
+        {
+          "path": "companies/新能源/宁德时代新能源科技股份有限公司.md",
+          "grade": 0,
+          "reason": "公司介绍，未涉及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/汽车/特斯拉内华达超级工厂.md",
+          "grade": 0,
+          "reason": "介绍工厂，不相关。"
+        },
+        {
+          "path": "concepts/消费电子/IPod Nano.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/汽车/比亚迪e6.md",
+          "grade": 0,
+          "reason": "讨论具体车型电池，非固态电池。"
+        },
+        {
+          "path": "concepts/新能源/太陽能板.md",
+          "grade": 0,
+          "reason": "讨论太阳能板，不相关。"
+        },
+        {
+          "path": "companies/汽车/比亚迪汽车.md",
+          "grade": 0,
+          "reason": "公司介绍，未涉及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/新能源/锂矿.md",
+          "grade": 0,
+          "reason": "讨论锂矿，不直接相关。"
+        },
+        {
+          "path": "concepts/半导体/威廉·肖克利.md",
+          "grade": 0,
+          "reason": "人物传记，不相关。"
+        },
+        {
+          "path": "companies/消费电子/松下.md",
+          "grade": 0,
+          "reason": "公司介绍，未提及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/半导体/PCI Express.md",
+          "grade": 0,
+          "reason": "总线标准，不相关。"
+        },
+        {
+          "path": "concepts/光通信/激光指示器.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/通信/無線通訊.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/半导体/半导体器件.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/消费电子/智慧型手機.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "companies/消费电子/Atari.md",
+          "grade": 0,
+          "reason": "游戏公司，不相关。"
+        },
+        {
+          "path": "concepts/新能源/再生能源.md",
+          "grade": 0,
+          "reason": "讨论可再生能源，不涉及固态电池循环寿命。"
+        },
+        {
+          "path": "concepts/体育/阿森纳.md",
+          "grade": 0,
+          "reason": "足球俱乐部，不相关。"
+        },
+        {
+          "path": "concepts/人工智能/量子计算.md",
+          "grade": 0,
+          "reason": "不相关。"
+        },
+        {
+          "path": "concepts/集成电路.md",
+          "grade": 0,
+          "reason": "不相关。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/新能源/固态电池.md"
+      ],
+      "answerable": true,
+      "grading_notes": "固态电池的循环寿命直接由路径1给出，其余均不相关。",
+      "llm_keywords": [
+        "固态电池",
+        "循环寿命"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-040",
+      "query": "戴尔公司2025年的净收入是多少？",
+      "type": "insufficient_evidence",
+      "answer": "现有知识库无法提供足够证据确定该问题的答案。",
+      "relevant_paths": [],
+      "rationale": "戴尔页面未提供2025年净收入数据，仅有2022年财务数据。",
+      "candidate_pool": [
+        "companies/消费电子/戴尔.md",
+        "companies/半导体/意法半導體.md",
+        "companies/消费电子/小米集團.md",
+        "concepts/体育/中国足球甲级联赛.md",
+        "concepts/汽车/小米SU7.md",
+        "companies/半导体/輝達.md",
+        "companies/新能源/宁德时代.md",
+        "companies/半导体/英伟达.md",
+        "companies/新能源/宁德时代新能源科技股份有限公司.md",
+        "concepts/体育/英超.md",
+        "concepts/体育/内马尔.md",
+        "companies/消费电子/Atari.md",
+        "companies/互联网/Bilibili.md",
+        "concepts/体育/逆轉上半場.md",
+        "companies/光通信/诺基亚.md",
+        "concepts/软件服务/點對點技術.md",
+        "companies/半导体/台积电.md",
+        "companies/消费电子/諾基亞.md",
+        "companies/消费电子/小米科技.md",
+        "concepts/体育/德国足球甲级联赛.md",
+        "concepts/体育/日本J1聯賽.md",
+        "concepts/人工智能/约翰·瑟尔.md",
+        "concepts/体育用品/高爾夫球桿.md",
+        "concepts/体育/奈及利亞國家足球隊.md",
+        "companies/消费电子/松下.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/消费电子/戴尔.md",
+          "grade": 0,
+          "reason": "片段仅介绍公司历史，未提及2025年净收入"
+        },
+        {
+          "path": "companies/半导体/意法半導體.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/小米集團.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/中国足球甲级联赛.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/汽车/小米SU7.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/輝達.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/宁德时代.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/英伟达.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/新能源/宁德时代新能源科技股份有限公司.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/英超.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/内马尔.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/Atari.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/互联网/Bilibili.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/逆轉上半場.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/光通信/诺基亚.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/软件服务/點對點技術.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/台积电.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/諾基亞.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/小米科技.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/德国足球甲级联赛.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/日本J1聯賽.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/约翰·瑟尔.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育用品/高爾夫球桿.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/奈及利亞國家足球隊.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/消费电子/松下.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [],
+      "answerable": false,
+      "grading_notes": "无候选文档包含戴尔2025年净收入信息",
+      "llm_keywords": [
+        "戴尔公司",
+        "2025年",
+        "净收入"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-043",
+      "query": "Fugazi乐队从哪一年起无限期暂停活动？",
+      "type": "near_distractor",
+      "answer": "2003年",
+      "relevant_paths": [
+        "concepts/文化/Fugazi.md"
+      ],
+      "rationale": "Fugazi页面说明自2003年起无限期暂停活动。",
+      "candidate_pool": [
+        "concepts/文化/Fugazi.md",
+        "companies/消费电子/苹果公司.md",
+        "concepts/消费电子/AirPods.md",
+        "concepts/软件服务/蘋果全球開發者大會.md",
+        "companies/互联网/陌陌.md",
+        "companies/食品饮料/Coca-Cola.md",
+        "companies/互联网/拼多多.md",
+        "concepts/自然/北极熊.md",
+        "concepts/文化/英国王室.md",
+        "companies/食品饮料/可口可樂.md",
+        "concepts/通信/隨選視訊.md",
+        "companies/体育用品/露露柠檬.md",
+        "concepts/体育/視像助理裁判.md",
+        "concepts/体育/中国足球甲级联赛.md",
+        "companies/光通信/中兴通讯.md",
+        "concepts/互联网/阿里巴巴员工被猥亵案.md",
+        "concepts/食品饮料/福喜事件.md",
+        "concepts/互联网/互联网泡沫.md",
+        "concepts/自然/旗舰物种.md",
+        "concepts/软件服务/电子商务.md",
+        "concepts/云计算/Xen.md",
+        "concepts/消费电子/Product Red.md",
+        "concepts/消费电子/IPod Nano.md",
+        "concepts/文化/阳关.md",
+        "concepts/文化/琉璃.md",
+        "concepts/文化/清朝.md",
+        "concepts/半导体/ARM架構.md",
+        "concepts/汽车/車用電子.md",
+        "concepts/文化/秦灭六国之战.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/文化/Fugazi.md",
+          "grade": 3,
+          "reason": "直接提到自2003年起无限期暂停活动，是回答问题的直接证据。"
+        },
+        {
+          "path": "companies/消费电子/苹果公司.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/消费电子/AirPods.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/软件服务/蘋果全球開發者大會.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/互联网/陌陌.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/食品饮料/Coca-Cola.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/互联网/拼多多.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/自然/北极熊.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/文化/英国王室.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/食品饮料/可口可樂.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/通信/隨選視訊.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/体育用品/露露柠檬.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/体育/視像助理裁判.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/体育/中国足球甲级联赛.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "companies/光通信/中兴通讯.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/互联网/阿里巴巴员工被猥亵案.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/食品饮料/福喜事件.md",
+          "grade": 0,
+          "reason": "文档讨论福喜食品安全事件，与Fugazi乐队活动暂停无关。"
+        },
+        {
+          "path": "concepts/互联网/互联网泡沫.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/自然/旗舰物种.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/软件服务/电子商务.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/云计算/Xen.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/消费电子/Product Red.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/消费电子/IPod Nano.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/文化/阳关.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/文化/琉璃.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/文化/清朝.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/半导体/ARM架構.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/汽车/車用電子.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        },
+        {
+          "path": "concepts/文化/秦灭六国之战.md",
+          "grade": 0,
+          "reason": "与Fugazi乐队无关。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/文化/Fugazi.md"
+      ],
+      "answerable": true,
+      "grading_notes": "Fugazi.md直接给出了2003年暂停活动的信息，足以回答问题。",
+      "llm_keywords": [
+        "Fugazi",
+        "无限期暂停活动"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-046",
+      "query": "比亚迪的创始人是谁？",
+      "type": "company_fact",
+      "answer": "王传福",
+      "relevant_paths": [
+        "companies/汽车/比亚迪.md"
+      ],
+      "rationale": "比亚迪页面提供公司创始人为王传福。",
+      "candidate_pool": [
+        "companies/汽车/比亚迪.md",
+        "companies/汽车/比亚迪汽车.md",
+        "concepts/汽车/比亚迪e6.md",
+        "concepts/汽车/比亞迪海豹.md",
+        "concepts/电动汽车.md",
+        "concepts/汽车/中国汽车制造业.md",
+        "companies/互联网/UC优视.md",
+        "concepts/新能源/混合动力电动汽车.md",
+        "companies/新能源/宁德时代新能源科技股份有限公司.md",
+        "concepts/软件服务/馬克·祖克柏.md",
+        "companies/互联网/酷我音乐.md",
+        "concepts/5G.md",
+        "concepts/通信/北京邮电学院.md",
+        "concepts/汽车/新能源车.md",
+        "companies/新能源/特斯拉公司.md",
+        "concepts/文化/商業內幕.md",
+        "companies/云计算/昇陽電腦.md",
+        "companies/互联网/阿里巴巴.md",
+        "companies/软件服务/IBM.md",
+        "companies/软件服务/Mojang.md",
+        "companies/软件服务/西山居.md",
+        "concepts/消费电子/Altair 8800.md",
+        "concepts/汽车/Tesla Model S.md",
+        "concepts/汽车/转矩.md",
+        "concepts/汽车/充电式电动车辆.md",
+        "concepts/通信/隨選視訊.md",
+        "companies/互联网/开心网.md",
+        "concepts/软件服务/操作系统.md"
+      ],
+      "judgments": [
+        {
+          "path": "companies/汽车/比亚迪.md",
+          "grade": 3,
+          "reason": "片段明确说明比亚迪由王传福创办，直接回答创始人问题。"
+        },
+        {
+          "path": "companies/汽车/比亚迪汽车.md",
+          "grade": 3,
+          "reason": "片段明确说明比亚迪汽车创始人为王传福，直接回答创始人问题。"
+        },
+        {
+          "path": "concepts/汽车/比亚迪e6.md",
+          "grade": 0,
+          "reason": "仅介绍车型，未提及创始人信息。"
+        },
+        {
+          "path": "concepts/汽车/比亞迪海豹.md",
+          "grade": 0,
+          "reason": "仅介绍车型，未提及创始人信息。"
+        },
+        {
+          "path": "concepts/电动汽车.md",
+          "grade": 0,
+          "reason": "未提及比亚迪创始人。"
+        },
+        {
+          "path": "concepts/汽车/中国汽车制造业.md",
+          "grade": 0,
+          "reason": "未提及比亚迪创始人。"
+        },
+        {
+          "path": "companies/互联网/UC优视.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/新能源/混合动力电动汽车.md",
+          "grade": 0,
+          "reason": "未提及比亚迪创始人。"
+        },
+        {
+          "path": "companies/新能源/宁德时代新能源科技股份有限公司.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/软件服务/馬克·祖克柏.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/互联网/酷我音乐.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/5G.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/通信/北京邮电学院.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/汽车/新能源车.md",
+          "grade": 0,
+          "reason": "未提及比亚迪创始人。"
+        },
+        {
+          "path": "companies/新能源/特斯拉公司.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/文化/商業內幕.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/云计算/昇陽電腦.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/互联网/阿里巴巴.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/软件服务/IBM.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/软件服务/Mojang.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/软件服务/西山居.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/消费电子/Altair 8800.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model S.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/汽车/转矩.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/汽车/充电式电动车辆.md",
+          "grade": 0,
+          "reason": "未提及比亚迪创始人。"
+        },
+        {
+          "path": "concepts/通信/隨選視訊.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "companies/互联网/开心网.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        },
+        {
+          "path": "concepts/软件服务/操作系统.md",
+          "grade": 0,
+          "reason": "不相关，与比亚迪无关。"
+        }
+      ],
+      "ground_truth": [
+        "companies/汽车/比亚迪.md",
+        "companies/汽车/比亚迪汽车.md"
+      ],
+      "answerable": true,
+      "grading_notes": "两个候选直接给出创始人王传福，回答所需证据充足。",
+      "llm_keywords": [
+        "比亚迪",
+        "创始人"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-049",
+      "query": "德国国家足球队的现任主教练是谁，以及华为相关争议始于哪一年？",
+      "type": "cross_document",
+      "answer": "于尔根·克洛普，2011年",
+      "relevant_paths": [
+        "concepts/体育/德国国家足球队.md",
+        "concepts/通信/华为相关争议.md"
+      ],
+      "rationale": "德国国家足球队页面显示主教练为于尔根·克洛普；华为相关争议页面提到自2011年起面临争议。",
+      "candidate_pool": [
+        "concepts/体育/德国国家足球队.md",
+        "concepts/通信/华为相关争议.md",
+        "companies/光通信/华为技术.md",
+        "concepts/消费电子/華為P系列.md",
+        "concepts/体育/阿根廷国家足球队.md",
+        "concepts/体育/德国足球甲级联赛.md",
+        "companies/体育/韦恩威斯巴登.md",
+        "concepts/体育/高原直泰.md",
+        "concepts/体育/阿森纳.md",
+        "concepts/消费电子/华为P30系列.md",
+        "concepts/体育/加纳国家足球队.md",
+        "concepts/消费电子/智能手機.md",
+        "companies/半导体/海思半导体.md",
+        "concepts/文化/世界文化遗产.md",
+        "companies/体育/國民競技.md",
+        "companies/半导体/AMD.md",
+        "concepts/文化/软实力.md",
+        "concepts/体育/英格兰足球代表队.md",
+        "companies/光通信/中兴通讯.md",
+        "companies/汽车/BMW.md",
+        "concepts/人工智能/面部识别.md",
+        "companies/餐饮/麦当劳.md",
+        "companies/半导体/中芯国际.md",
+        "concepts/消费电子/智慧型手機.md",
+        "concepts/新能源/再生能源.md",
+        "concepts/通信/電話.md",
+        "companies/通信/摩托罗拉.md",
+        "concepts/足球.md",
+        "concepts/5G.md",
+        "concepts/消费电子/Nike+iPod.md",
+        "concepts/云计算.md",
+        "concepts/通信/贝尔实验室.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/体育/德国国家足球队.md",
+          "grade": 3,
+          "reason": "直接给出主教练为于尔根·克洛普"
+        },
+        {
+          "path": "concepts/通信/华为相关争议.md",
+          "grade": 3,
+          "reason": "明确说明争议始于2011年"
+        },
+        {
+          "path": "companies/光通信/华为技术.md",
+          "grade": 0,
+          "reason": "未提及教练或争议起始年"
+        },
+        {
+          "path": "concepts/消费电子/華為P系列.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/阿根廷国家足球队.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/德国足球甲级联赛.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/体育/韦恩威斯巴登.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/高原直泰.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/阿森纳.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/华为P30系列.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/加纳国家足球队.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/智能手機.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/海思半导体.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/文化/世界文化遗产.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/体育/國民競技.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/AMD.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/文化/软实力.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/体育/英格兰足球代表队.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/光通信/中兴通讯.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/汽车/BMW.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/人工智能/面部识别.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/餐饮/麦当劳.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/半导体/中芯国际.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/智慧型手機.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/新能源/再生能源.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/電話.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "companies/通信/摩托罗拉.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/足球.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/5G.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/消费电子/Nike+iPod.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/云计算.md",
+          "grade": 0,
+          "reason": "不相关"
+        },
+        {
+          "path": "concepts/通信/贝尔实验室.md",
+          "grade": 0,
+          "reason": "不相关"
+        }
+      ],
+      "ground_truth": [
+        "concepts/体育/德国国家足球队.md",
+        "concepts/通信/华为相关争议.md"
+      ],
+      "answerable": true,
+      "grading_notes": "德国队主教练和华为争议起始年均有直接证据",
+      "llm_keywords": [
+        "德国国家足球队",
+        "华为",
+        "争议",
+        "主教练"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-052",
+      "query": "Athlon的中文官方名称是什么？",
+      "type": "concept",
+      "answer": "速龍",
+      "relevant_paths": [
+        "concepts/半导体/Athlon.md"
+      ],
+      "rationale": "页面提到“其中文官方名称为「速龍」”。",
+      "candidate_pool": [
+        "concepts/半导体/Athlon.md",
+        "concepts/半导体/Athlon 64 X2.md",
+        "concepts/半导体/Athlon 64.md",
+        "companies/半导体/AMD.md",
+        "concepts/互联网/中国互联网络信息中心.md",
+        "concepts/半导体/Duron.md",
+        "concepts/半导体/微處理器.md",
+        "concepts/半导体/Pentium 4.md",
+        "concepts/人工智能/约翰·瑟尔.md",
+        "concepts/半导体/Sempron.md",
+        "concepts/半导体/Opteron.md",
+        "concepts/通信/移动电话.md",
+        "concepts/人工智能/人工智能史.md",
+        "concepts/半导体/Intel 80286.md",
+        "companies/互联网/新浪微博.md",
+        "concepts/消费电子/IPhone 4S.md",
+        "concepts/软件服务/Amazon DynamoDB.md",
+        "concepts/半导体/晶片組.md",
+        "companies/食品饮料/Coca-Cola.md",
+        "concepts/半导体/GeForce.md",
+        "concepts/消费电子/華為P系列.md",
+        "concepts/软件服务/Microsoft 365.md",
+        "concepts/半导体/X86.md",
+        "concepts/食品饮料/沙律.md",
+        "concepts/通信/藍牙.md",
+        "concepts/半导体/Celeron D.md",
+        "concepts/半导体/芯片.md",
+        "companies/半导体/南亞科技.md",
+        "concepts/自然/食肉目.md",
+        "concepts/汽车/再生制動.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/半导体/Athlon.md",
+          "grade": 3,
+          "reason": "片段明确给出中文官方名称为「速龍」"
+        },
+        {
+          "path": "concepts/半导体/Athlon 64 X2.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/半导体/Athlon 64.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "companies/半导体/AMD.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/互联网/中国互联网络信息中心.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/Duron.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/半导体/微處理器.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/半导体/Pentium 4.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/人工智能/约翰·瑟尔.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/Sempron.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/半导体/Opteron.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/通信/移动电话.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/人工智能/人工智能史.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/Intel 80286.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "companies/互联网/新浪微博.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/消费电子/IPhone 4S.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/软件服务/Amazon DynamoDB.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/晶片組.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "companies/食品饮料/Coca-Cola.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/GeForce.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/消费电子/華為P系列.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/软件服务/Microsoft 365.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/X86.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "concepts/食品饮料/沙律.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/通信/藍牙.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/Celeron D.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/半导体/芯片.md",
+          "grade": 0,
+          "reason": "未提及Athlon的中文官方名称"
+        },
+        {
+          "path": "companies/半导体/南亞科技.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/自然/食肉目.md",
+          "grade": 0,
+          "reason": "无关文档"
+        },
+        {
+          "path": "concepts/汽车/再生制動.md",
+          "grade": 0,
+          "reason": "无关文档"
+        }
+      ],
+      "ground_truth": [
+        "concepts/半导体/Athlon.md"
+      ],
+      "answerable": true,
+      "grading_notes": "候选片段中只有Athlon.md提供了中文官方名称",
+      "llm_keywords": [
+        "Athlon",
+        "官方名称"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-055",
+      "query": "达雷尔·莫雷的英文名字是什么？",
+      "type": "synonym",
+      "answer": "Daryl Morey",
+      "relevant_paths": [
+        "concepts/体育/达雷尔·莫雷.md"
+      ],
+      "rationale": "页面开头注明“Daryl Morey”为其英文名。",
+      "candidate_pool": [
+        "concepts/体育/达雷尔·莫雷.md",
+        "companies/食品饮料/可口可乐.md",
+        "concepts/体育/加里夫·巴利.md",
+        "concepts/体育/安联竞技场.md",
+        "concepts/体育/比利时國家足球隊.md",
+        "concepts/汽车/耶德利克·阿纽什.md",
+        "companies/消费电子/Microsoft Surface.md",
+        "concepts/体育/内马尔.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/体育/达雷尔·莫雷.md",
+          "grade": 3,
+          "reason": "片段中明确给出了英文名字 Daryl Morey"
+        },
+        {
+          "path": "companies/食品饮料/可口可乐.md",
+          "grade": 0,
+          "reason": "完全不相关，未提及达雷尔·莫雷"
+        },
+        {
+          "path": "concepts/体育/加里夫·巴利.md",
+          "grade": 0,
+          "reason": "关于足球运动员，不相关"
+        },
+        {
+          "path": "concepts/体育/安联竞技场.md",
+          "grade": 0,
+          "reason": "关于足球场，不相关"
+        },
+        {
+          "path": "concepts/体育/比利时國家足球隊.md",
+          "grade": 0,
+          "reason": "关于比利时队，不相关"
+        },
+        {
+          "path": "concepts/汽车/耶德利克·阿纽什.md",
+          "grade": 0,
+          "reason": "关于匈牙利发明家，不相关"
+        },
+        {
+          "path": "companies/消费电子/Microsoft Surface.md",
+          "grade": 0,
+          "reason": "关于微软产品，不相关"
+        },
+        {
+          "path": "concepts/体育/内马尔.md",
+          "grade": 0,
+          "reason": "关于足球运动员，不相关"
+        }
+      ],
+      "ground_truth": [
+        "concepts/体育/达雷尔·莫雷.md"
+      ],
+      "answerable": true,
+      "grading_notes": "第一个候选直接提供答案",
+      "llm_keywords": [
+        "达雷尔·莫雷",
+        "英文名"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    },
+    {
+      "id": "QS-058",
+      "query": "古根汉美术馆被列为世界文化遗产的年份和BBC首次电视播送的年份分别是？",
+      "type": "cross_document",
+      "answer": "古根汉美术馆2019年，BBC首次电视播送1936年",
+      "relevant_paths": [
+        "concepts/文化/所羅門·古根漢美術館.md",
+        "companies/通信/BBC.md"
+      ],
+      "rationale": "古根汉页面显示2019年列入世界遗产；BBC页面显示1936年开始电视服务。",
+      "candidate_pool": [
+        "concepts/文化/所羅門·古根漢美術館.md",
+        "companies/通信/BBC.md",
+        "concepts/文化/世界文化遗产.md",
+        "concepts/体育/加纳国家足球队.md",
+        "concepts/故宫.md",
+        "concepts/汽车/Tesla Model X.md",
+        "concepts/体育/加里夫·巴利.md",
+        "concepts/体育/大洋洲足球協會.md",
+        "concepts/体育/大卫·贝克汉姆.md",
+        "concepts/通信/聯邦通訊委員會.md",
+        "companies/体育用品/耐克.md",
+        "concepts/长城.md",
+        "concepts/汽车/Tesla Model S.md",
+        "companies/体育/瓦斯科达伽马划艇俱乐部.md",
+        "concepts/自然/長隆野生動物世界.md",
+        "concepts/体育/意大利足球甲级联赛.md",
+        "concepts/汽车/特斯拉Model S.md",
+        "concepts/体育/皇家马德里足球俱乐部.md",
+        "concepts/通信/移动电话.md",
+        "concepts/通信/联邦通信委员会.md",
+        "concepts/文化/景仁宮.md",
+        "concepts/消费电子/華為P系列.md",
+        "concepts/通信/電報.md",
+        "companies/通信/星和电信.md",
+        "companies/文化/CJ E&M.md",
+        "companies/食品饮料/中國食品.md",
+        "concepts/通信/4G.md",
+        "concepts/软件服务/Clipper.md"
+      ],
+      "judgments": [
+        {
+          "path": "concepts/文化/所羅門·古根漢美術館.md",
+          "grade": 3,
+          "reason": "直接给出古根汉美术馆被列为世界文化遗产的年份2019年。"
+        },
+        {
+          "path": "companies/通信/BBC.md",
+          "grade": 3,
+          "reason": "直接给出BBC首次电视播送的年份1936年。"
+        },
+        {
+          "path": "concepts/文化/世界文化遗产.md",
+          "grade": 1,
+          "reason": "主题相关，提供世界文化遗产的背景知识，但未直接回答古根汉美术馆的年份。"
+        },
+        {
+          "path": "concepts/体育/加纳国家足球队.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/故宫.md",
+          "grade": 0,
+          "reason": "涉及故宫的世界文化遗产年份，但与问题无关。"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model X.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/体育/加里夫·巴利.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/体育/大洋洲足球協會.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/体育/大卫·贝克汉姆.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/通信/聯邦通訊委員會.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "companies/体育用品/耐克.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/长城.md",
+          "grade": 0,
+          "reason": "涉及长城的世遗年份，但与问题无关。"
+        },
+        {
+          "path": "concepts/汽车/Tesla Model S.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "companies/体育/瓦斯科达伽马划艇俱乐部.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/自然/長隆野生動物世界.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/体育/意大利足球甲级联赛.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/汽车/特斯拉Model S.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/体育/皇家马德里足球俱乐部.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/通信/移动电话.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/通信/联邦通信委员会.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/文化/景仁宮.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/消费电子/華為P系列.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/通信/電報.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "companies/通信/星和电信.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "companies/文化/CJ E&M.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "companies/食品饮料/中國食品.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/通信/4G.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        },
+        {
+          "path": "concepts/软件服务/Clipper.md",
+          "grade": 0,
+          "reason": "与问题完全无关。"
+        }
+      ],
+      "ground_truth": [
+        "concepts/文化/所羅門·古根漢美術館.md",
+        "companies/通信/BBC.md"
+      ],
+      "answerable": true,
+      "grading_notes": "两个关键问题均有对应文档直接提供答案。",
+      "llm_keywords": [
+        "古根汉美术馆",
+        "世界文化遗产",
+        "BBC",
+        "首次电视播送"
+      ],
+      "llm_keyword_model": "deepseek-v4-flash",
+      "llm_keyword_prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818"
+    }
+  ]
+}

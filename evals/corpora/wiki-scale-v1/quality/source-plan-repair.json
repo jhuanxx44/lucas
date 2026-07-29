@@ -1,0 +1,100 @@
+{
+  "removed_count": 22,
+  "removed": {
+    "wp-1d0b227f783f": "source_fetch_failed",
+    "wp-27c1e944f632": "source_fetch_failed",
+    "wp-2e61a3b53bd7": "source_fetch_failed",
+    "wp-eb312982763a": "source_fetch_failed",
+    "wp-f1b30bb113a8": "source_fetch_failed",
+    "wp-237ea69238fc": "source_fetch_failed",
+    "wp-06a6023d0e7d": "source_fetch_failed",
+    "wp-afa27717ab4d": "source_fetch_failed",
+    "wp-dceb41e4fc3f": "source_fetch_failed",
+    "wp-0d5769c90614": "source_fetch_failed",
+    "wp-1d3b31c25ec6": "source_fetch_failed",
+    "wp-987e23374de4": "source_fetch_failed",
+    "wp-60c636640029": "source_fetch_failed",
+    "wp-c085016c3e04": "source_fetch_failed",
+    "wp-1e42328bb8c5": "source_fetch_failed",
+    "wp-204280412109": "source_fetch_failed",
+    "wp-65ee8b690af9": "duplicate_content_of:company-coca-cola",
+    "wp-ce8d79aba7fa": "duplicate_content_of:company-intel",
+    "wp-faa208df843d": "duplicate_content_of:wp-415453f333b0",
+    "wp-52827b0f1f5e": "duplicate_content_of:wp-ec9b0f79edf5",
+    "wp-83e81a7fb100": "duplicate_content_of:wp-64f8202d0ea0",
+    "wp-f3c966ce6bff": "duplicate_content_of:wp-7e24b746016e"
+  },
+  "duplicate_groups": [
+    {
+      "keep": "company-coca-cola",
+      "remove": [
+        "wp-65ee8b690af9"
+      ]
+    },
+    {
+      "keep": "company-intel",
+      "remove": [
+        "wp-ce8d79aba7fa"
+      ]
+    },
+    {
+      "keep": "wp-415453f333b0",
+      "remove": [
+        "wp-faa208df843d"
+      ]
+    },
+    {
+      "keep": "wp-ec9b0f79edf5",
+      "remove": [
+        "wp-52827b0f1f5e"
+      ]
+    },
+    {
+      "keep": "wp-64f8202d0ea0",
+      "remove": [
+        "wp-83e81a7fb100"
+      ]
+    },
+    {
+      "keep": "wp-7e24b746016e",
+      "remove": [
+        "wp-f3c966ce6bff"
+      ]
+    }
+  ],
+  "deficits": {
+    "target": 5,
+    "near": 11,
+    "far": 6
+  },
+  "replacement_doc_ids": [
+    "wp-33d289585e06",
+    "wp-ed42aa115de7",
+    "wp-733bbe8d41af",
+    "wp-9105805ab63b",
+    "wp-e5e744f6b63a",
+    "wp-82becb2584fe",
+    "wp-5cade86393a1",
+    "wp-1260534004f4",
+    "wp-4c8c6ab42000",
+    "wp-be0759138479",
+    "wp-e487d935249d",
+    "wp-a1a617a557be",
+    "wp-5c75efe51793",
+    "wp-e327927eac43",
+    "wp-1843cfb0890c",
+    "wp-3d54c9dc5efc",
+    "wp-38de3450303a",
+    "wp-421ca69becde",
+    "wp-5876d2b26630",
+    "wp-3671953d12f8",
+    "wp-686a864eac54",
+    "wp-57674dd68c5a"
+  ],
+  "final_group_counts": {
+    "target": 150,
+    "near": 200,
+    "far": 150
+  },
+  "output": "/Users/jinghuan/code/lucas/evals/corpora/wiki-scale-v1/source-plan-500-repaired.jsonl"
+}

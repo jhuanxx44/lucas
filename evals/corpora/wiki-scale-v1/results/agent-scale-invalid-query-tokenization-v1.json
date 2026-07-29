@@ -1,0 +1,1936 @@
+{
+  "protocol": {
+    "tasks": [
+      "QS-023",
+      "QS-029",
+      "QS-059"
+    ],
+    "sizes": [
+      50,
+      200,
+      500
+    ],
+    "trials": 3,
+    "seed": 1
+  },
+  "aggregates": [
+    {
+      "task_id": "QS-023",
+      "size": 50,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.0,
+      "tool_calls_mean": 1.0,
+      "tokens_mean": 6772.333333333333,
+      "cost_usd_mean": 0.017761333333333334,
+      "latency_seconds_mean": 5.3997
+    },
+    {
+      "task_id": "QS-023",
+      "size": 50,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.3333333333333335,
+      "tool_calls_mean": 1.3333333333333333,
+      "tokens_mean": 6499.333333333333,
+      "cost_usd_mean": 0.019608666666666667,
+      "latency_seconds_mean": 8.397333333333334
+    },
+    {
+      "task_id": "QS-023",
+      "size": 200,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 0.6666666666666666,
+      "fact_coverage_mean": 0.8888888888888888,
+      "evidence_coverage_mean": 0.6666666666666666,
+      "unsupported_evidence_rate": 0.3333333333333333,
+      "steps_mean": 1.6666666666666667,
+      "tool_calls_mean": 0.6666666666666666,
+      "tokens_mean": 5343.0,
+      "cost_usd_mean": 0.014539333333333335,
+      "latency_seconds_mean": 5.0711
+    },
+    {
+      "task_id": "QS-023",
+      "size": 200,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 3.0,
+      "tool_calls_mean": 2.0,
+      "tokens_mean": 9248.0,
+      "cost_usd_mean": 0.02764933333333333,
+      "latency_seconds_mean": 12.166833333333335
+    },
+    {
+      "task_id": "QS-023",
+      "size": 500,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 0.6666666666666666,
+      "fact_coverage_mean": 0.7777777777777778,
+      "evidence_coverage_mean": 0.6666666666666666,
+      "unsupported_evidence_rate": 0.3333333333333333,
+      "steps_mean": 1.6666666666666667,
+      "tool_calls_mean": 0.6666666666666666,
+      "tokens_mean": 5658.333333333333,
+      "cost_usd_mean": 0.01778,
+      "latency_seconds_mean": 8.119533333333335
+    },
+    {
+      "task_id": "QS-023",
+      "size": 500,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 0.6666666666666666,
+      "fact_coverage_mean": 0.6666666666666666,
+      "evidence_coverage_mean": 0.6666666666666666,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.3333333333333335,
+      "tool_calls_mean": 1.3333333333333333,
+      "tokens_mean": 7363.333333333333,
+      "cost_usd_mean": 0.02015,
+      "latency_seconds_mean": 8.16
+    },
+    {
+      "task_id": "QS-029",
+      "size": 50,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.0,
+      "tool_calls_mean": 1.0,
+      "tokens_mean": 6789.333333333333,
+      "cost_usd_mean": 0.018468666666666668,
+      "latency_seconds_mean": 5.898499999999999
+    },
+    {
+      "task_id": "QS-029",
+      "size": 50,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 0.0,
+      "fact_coverage_mean": 0.0,
+      "evidence_coverage_mean": 0.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 3.0,
+      "tool_calls_mean": 3.0,
+      "tokens_mean": 9948.0,
+      "cost_usd_mean": 0.028659333333333332,
+      "latency_seconds_mean": 11.699733333333333
+    },
+    {
+      "task_id": "QS-029",
+      "size": 200,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.3333333333333335,
+      "tool_calls_mean": 1.3333333333333333,
+      "tokens_mean": 8868.0,
+      "cost_usd_mean": 0.023699333333333333,
+      "latency_seconds_mean": 7.575866666666666
+    },
+    {
+      "task_id": "QS-029",
+      "size": 200,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 0.0,
+      "fact_coverage_mean": 0.0,
+      "evidence_coverage_mean": 0.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 3.0,
+      "tool_calls_mean": 2.6666666666666665,
+      "tokens_mean": 9874.333333333334,
+      "cost_usd_mean": 0.027442000000000005,
+      "latency_seconds_mean": 9.930933333333334
+    },
+    {
+      "task_id": "QS-029",
+      "size": 500,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.6666666666666665,
+      "tool_calls_mean": 1.6666666666666667,
+      "tokens_mean": 11279.333333333334,
+      "cost_usd_mean": 0.028032,
+      "latency_seconds_mean": 7.249933333333334
+    },
+    {
+      "task_id": "QS-029",
+      "size": 500,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 0.0,
+      "fact_coverage_mean": 0.0,
+      "evidence_coverage_mean": 0.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 3.0,
+      "tool_calls_mean": 2.3333333333333335,
+      "tokens_mean": 13085.333333333334,
+      "cost_usd_mean": 0.03691066666666667,
+      "latency_seconds_mean": 16.4752
+    },
+    {
+      "task_id": "QS-059",
+      "size": 50,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 3.0,
+      "tool_calls_mean": 2.0,
+      "tokens_mean": 12049.666666666666,
+      "cost_usd_mean": 0.03519266666666667,
+      "latency_seconds_mean": 13.717133333333335
+    },
+    {
+      "task_id": "QS-059",
+      "size": 50,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.6666666666666665,
+      "tool_calls_mean": 1.6666666666666667,
+      "tokens_mean": 10945.666666666666,
+      "cost_usd_mean": 0.03164466666666667,
+      "latency_seconds_mean": 11.321333333333333
+    },
+    {
+      "task_id": "QS-059",
+      "size": 200,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.0,
+      "tool_calls_mean": 1.0,
+      "tokens_mean": 7173.666666666667,
+      "cost_usd_mean": 0.022854,
+      "latency_seconds_mean": 9.86
+    },
+    {
+      "task_id": "QS-059",
+      "size": 200,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.6666666666666665,
+      "tool_calls_mean": 1.6666666666666667,
+      "tokens_mean": 10666.666666666666,
+      "cost_usd_mean": 0.029853333333333332,
+      "latency_seconds_mean": 11.159433333333332
+    },
+    {
+      "task_id": "QS-059",
+      "size": 500,
+      "retriever": "substr_bm25",
+      "trials": 3,
+      "success_rate": 0.6666666666666666,
+      "fact_coverage_mean": 0.8333333333333334,
+      "evidence_coverage_mean": 0.8333333333333334,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.3333333333333335,
+      "tool_calls_mean": 1.3333333333333333,
+      "tokens_mean": 9532.333333333334,
+      "cost_usd_mean": 0.029828000000000004,
+      "latency_seconds_mean": 13.321866666666667
+    },
+    {
+      "task_id": "QS-059",
+      "size": 500,
+      "retriever": "jieba_tfidf",
+      "trials": 3,
+      "success_rate": 1.0,
+      "fact_coverage_mean": 1.0,
+      "evidence_coverage_mean": 1.0,
+      "unsupported_evidence_rate": 0.0,
+      "steps_mean": 2.6666666666666665,
+      "tool_calls_mean": 1.6666666666666667,
+      "tokens_mean": 11233.333333333334,
+      "cost_usd_mean": 0.03329666666666666,
+      "latency_seconds_mean": 13.851799999999999
+    }
+  ],
+  "rows": [
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6352,
+      "completion_tokens": 493,
+      "cost_usd": 0.018619999999999998,
+      "latency_seconds": 6.4612,
+      "run_dir": "results/agent-runs/qs-023-cdf3f9e5e695"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6351,
+      "completion_tokens": 397,
+      "cost_usd": 0.017466,
+      "latency_seconds": 5.023,
+      "run_dir": "results/agent-runs/qs-023-bf505bf61ccc"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5及低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6349,
+      "completion_tokens": 375,
+      "cost_usd": 0.017197999999999998,
+      "latency_seconds": 4.7149,
+      "run_dir": "results/agent-runs/qs-023-c88602fcbc80"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5、低功耗DRAM（LPDDR）"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 7085,
+      "completion_tokens": 939,
+      "cost_usd": 0.025438000000000002,
+      "latency_seconds": 11.7996,
+      "run_dir": "results/agent-runs/qs-023-dd6014ca8c28"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5及低功耗DRAM"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 5692,
+      "completion_tokens": 675,
+      "cost_usd": 0.019484,
+      "latency_seconds": 7.7891,
+      "run_dir": "results/agent-runs/qs-023-0015488918fe"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 4738,
+      "completion_tokens": 369,
+      "cost_usd": 0.013904,
+      "latency_seconds": 5.6033,
+      "run_dir": "results/agent-runs/qs-023-55a3c85d42e7"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5及低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6293,
+      "completion_tokens": 410,
+      "cost_usd": 0.017506,
+      "latency_seconds": 5.8607,
+      "run_dir": "results/agent-runs/qs-023-3e7176617111"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5 及低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6339,
+      "completion_tokens": 604,
+      "cost_usd": 0.019926,
+      "latency_seconds": 7.0982,
+      "run_dir": "results/agent-runs/qs-023-3f1c59b91e37"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.6666666666666666,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": true,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "南亚科技的主要产品包括DDR4、DDR3、DDR2、DDR和LPDDR等类型的动态随机存取存储器"
+        ],
+        "evidence_paths": [
+          "wiki/companies/电子/南亚科技.md"
+        ]
+      },
+      "steps": 1,
+      "tool_calls": 0,
+      "prompt_tokens": 2241,
+      "completion_tokens": 142,
+      "cost_usd": 0.0061860000000000005,
+      "latency_seconds": 2.2544,
+      "run_dir": "results/agent-runs/qs-023-4acbe121ad16"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 9247,
+      "completion_tokens": 1022,
+      "cost_usd": 0.030758,
+      "latency_seconds": 13.7485,
+      "run_dir": "results/agent-runs/qs-023-de6fc2017fa0"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 8586,
+      "completion_tokens": 1205,
+      "cost_usd": 0.031632,
+      "latency_seconds": 14.6739,
+      "run_dir": "results/agent-runs/qs-023-4f92c35f7a2f"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 7165,
+      "completion_tokens": 519,
+      "cost_usd": 0.020558,
+      "latency_seconds": 8.0781,
+      "run_dir": "results/agent-runs/qs-023-04cbf411d3df"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.3333333333333333,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": true,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "标准型DRAM",
+          "低功耗DRAM",
+          "服务器DRAM",
+          "消费型DRAM"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亚科技.md"
+        ]
+      },
+      "steps": 1,
+      "tool_calls": 0,
+      "prompt_tokens": 2241,
+      "completion_tokens": 136,
+      "cost_usd": 0.006114,
+      "latency_seconds": 2.3799,
+      "run_dir": "results/agent-runs/qs-023-7648e5e03850"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6407,
+      "completion_tokens": 1175,
+      "cost_usd": 0.026914,
+      "latency_seconds": 13.9234,
+      "run_dir": "results/agent-runs/qs-023-01491af07a8c"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6388,
+      "completion_tokens": 628,
+      "cost_usd": 0.020311999999999997,
+      "latency_seconds": 8.0553,
+      "run_dir": "results/agent-runs/qs-023-da515d9627d1"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4",
+          "DDR5",
+          "低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 7984,
+      "completion_tokens": 678,
+      "cost_usd": 0.024104,
+      "latency_seconds": 10.008,
+      "run_dir": "results/agent-runs/qs-023-c13075b6e64a"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [
+          "DDR4、DDR5及低功耗记忆体"
+        ],
+        "evidence_paths": [
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6265,
+      "completion_tokens": 380,
+      "cost_usd": 0.01709,
+      "latency_seconds": 6.2663,
+      "run_dir": "results/agent-runs/qs-023-51ee1185a91b"
+    },
+    {
+      "task_id": "QS-023",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-023",
+        "facts": [],
+        "evidence_paths": []
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6214,
+      "completion_tokens": 569,
+      "cost_usd": 0.019256,
+      "latency_seconds": 8.2057,
+      "run_dir": "results/agent-runs/qs-023-6cbc06e4d3df"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/食品饮料/奥德瓦拉.md",
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6337,
+      "completion_tokens": 431,
+      "cost_usd": 0.017846,
+      "latency_seconds": 5.3427,
+      "run_dir": "results/agent-runs/qs-029-0ec4ee6150fe"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/食品饮料/奥德瓦拉.md",
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6220,
+      "completion_tokens": 517,
+      "cost_usd": 0.018644,
+      "latency_seconds": 6.2178,
+      "run_dir": "results/agent-runs/qs-029-7b01a22465e7"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "companies/食品饮料/奥德瓦拉.md",
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6344,
+      "completion_tokens": 519,
+      "cost_usd": 0.018916000000000002,
+      "latency_seconds": 6.135,
+      "run_dir": "results/agent-runs/qs-029-8b641d9293f4"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 8183,
+      "completion_tokens": 1159,
+      "cost_usd": 0.030274,
+      "latency_seconds": 14.6622,
+      "run_dir": "results/agent-runs/qs-029-d983f470924b"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 9516,
+      "completion_tokens": 660,
+      "cost_usd": 0.026952,
+      "latency_seconds": 9.7019,
+      "run_dir": "results/agent-runs/qs-029-7e8f59a39c74"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 9516,
+      "completion_tokens": 810,
+      "cost_usd": 0.028752,
+      "latency_seconds": 10.7351,
+      "run_dir": "results/agent-runs/qs-029-7ec3028e77b0"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980",
+          "1995"
+        ],
+        "evidence_paths": [
+          "companies/食品饮料/奥德瓦拉.md",
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12264,
+      "completion_tokens": 372,
+      "cost_usd": 0.028992,
+      "latency_seconds": 6.1199,
+      "run_dir": "results/agent-runs/qs-029-3cfee7a0891e"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "companies/食品饮料/奥德瓦拉.md",
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6246,
+      "completion_tokens": 850,
+      "cost_usd": 0.022691999999999997,
+      "latency_seconds": 10.286,
+      "run_dir": "results/agent-runs/qs-029-966f00dad6d9"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "companies/食品饮料/奥德瓦拉.md",
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6305,
+      "completion_tokens": 567,
+      "cost_usd": 0.019414,
+      "latency_seconds": 6.3217,
+      "run_dir": "results/agent-runs/qs-029-5010b84abbb4"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 10266,
+      "completion_tokens": 780,
+      "cost_usd": 0.029892000000000002,
+      "latency_seconds": 10.4713,
+      "run_dir": "results/agent-runs/qs-029-248eb958b989"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "未知",
+          "未知"
+        ],
+        "evidence_paths": [
+          [],
+          []
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 6772,
+      "completion_tokens": 804,
+      "cost_usd": 0.023192,
+      "latency_seconds": 10.3334,
+      "run_dir": "results/agent-runs/qs-029-93854993c7fd"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 10277,
+      "completion_tokens": 724,
+      "cost_usd": 0.029242,
+      "latency_seconds": 8.9881,
+      "run_dir": "results/agent-runs/qs-029-770d584c9ed9"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/食品饮料/奥德瓦拉.md",
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6585,
+      "completion_tokens": 417,
+      "cost_usd": 0.018174,
+      "latency_seconds": 5.4068,
+      "run_dir": "results/agent-runs/qs-029-250f4a10b519"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/食品饮料/奥德瓦拉.md",
+          "wiki/companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12971,
+      "completion_tokens": 765,
+      "cost_usd": 0.035122,
+      "latency_seconds": 9.1892,
+      "run_dir": "results/agent-runs/qs-029-f7b85d3b04bb"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "1980年",
+          "1995年"
+        ],
+        "evidence_paths": [
+          "companies/食品饮料/奥德瓦拉.md",
+          "companies/半导体/南亞科技.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12640,
+      "completion_tokens": 460,
+      "cost_usd": 0.0308,
+      "latency_seconds": 7.1538,
+      "run_dir": "results/agent-runs/qs-029-dee20a578b4d"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "max_steps",
+      "error": "max steps exhausted",
+      "answer": null,
+      "steps": 3,
+      "tool_calls": 3,
+      "prompt_tokens": 10748,
+      "completion_tokens": 1165,
+      "cost_usd": 0.035476,
+      "latency_seconds": 17.7859,
+      "run_dir": "results/agent-runs/qs-029-9a8a86df69e0"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "",
+          ""
+        ],
+        "evidence_paths": []
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12637,
+      "completion_tokens": 1157,
+      "cost_usd": 0.039158,
+      "latency_seconds": 17.7476,
+      "run_dir": "results/agent-runs/qs-029-095f0c2f1447"
+    },
+    {
+      "task_id": "QS-029",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.0,
+      "evidence_coverage": 0.0,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-029",
+        "facts": [
+          "未找到",
+          "未找到"
+        ],
+        "evidence_paths": [
+          [],
+          []
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12649,
+      "completion_tokens": 900,
+      "cost_usd": 0.036098000000000005,
+      "latency_seconds": 13.8921,
+      "run_dir": "results/agent-runs/qs-029-cbf20d142dea"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12416,
+      "completion_tokens": 983,
+      "cost_usd": 0.036628,
+      "latency_seconds": 13.1658,
+      "run_dir": "results/agent-runs/qs-059-97d64a6ba641"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 7974,
+      "completion_tokens": 668,
+      "cost_usd": 0.023964,
+      "latency_seconds": 9.0164,
+      "run_dir": "results/agent-runs/qs-059-06e9e6510224"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12431,
+      "completion_tokens": 1677,
+      "cost_usd": 0.044986,
+      "latency_seconds": 18.9692,
+      "run_dir": "results/agent-runs/qs-059-0363d0fe6fb2"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 11562,
+      "completion_tokens": 956,
+      "cost_usd": 0.034596,
+      "latency_seconds": 11.2914,
+      "run_dir": "results/agent-runs/qs-059-ff3613f448a1"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12067,
+      "completion_tokens": 917,
+      "cost_usd": 0.035138,
+      "latency_seconds": 10.9898,
+      "run_dir": "results/agent-runs/qs-059-38a70419243f"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 50,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年9月4日",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6282,
+      "completion_tokens": 1053,
+      "cost_usd": 0.0252,
+      "latency_seconds": 11.6828,
+      "run_dir": "results/agent-runs/qs-059-468b652082c7"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6321,
+      "completion_tokens": 819,
+      "cost_usd": 0.02247,
+      "latency_seconds": 9.3948,
+      "run_dir": "results/agent-runs/qs-059-c39be9458bd8"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6360,
+      "completion_tokens": 846,
+      "cost_usd": 0.022872,
+      "latency_seconds": 10.3643,
+      "run_dir": "results/agent-runs/qs-059-7644380aceb1"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6288,
+      "completion_tokens": 887,
+      "cost_usd": 0.02322,
+      "latency_seconds": 9.8209,
+      "run_dir": "results/agent-runs/qs-059-6b95e4e72b51"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12204,
+      "completion_tokens": 721,
+      "cost_usd": 0.03306,
+      "latency_seconds": 10.0597,
+      "run_dir": "results/agent-runs/qs-059-42bee06b16e4"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 11245,
+      "completion_tokens": 1101,
+      "cost_usd": 0.035702,
+      "latency_seconds": 14.4313,
+      "run_dir": "results/agent-runs/qs-059-1af26c968d23"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 200,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 5995,
+      "completion_tokens": 734,
+      "cost_usd": 0.020798,
+      "latency_seconds": 8.9873,
+      "run_dir": "results/agent-runs/qs-059-0ab0d1b2e0e3"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": false,
+      "outcome_passed": false,
+      "fact_coverage": 0.5,
+      "evidence_coverage": 0.5,
+      "unsupported_evidence": false,
+      "success": false,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "未获取到",
+          "1999"
+        ],
+        "evidence_paths": [
+          "",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6523,
+      "completion_tokens": 1279,
+      "cost_usd": 0.028394000000000003,
+      "latency_seconds": 17.2092,
+      "run_dir": "results/agent-runs/qs-059-5b61933f9e7c"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12479,
+      "completion_tokens": 1251,
+      "cost_usd": 0.03997,
+      "latency_seconds": 14.9162,
+      "run_dir": "results/agent-runs/qs-059-e11aac9ba0bc"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "substr_bm25",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6366,
+      "completion_tokens": 699,
+      "cost_usd": 0.02112,
+      "latency_seconds": 7.8402,
+      "run_dir": "results/agent-runs/qs-059-cb3fc709df40"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 0,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998",
+          "1999"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 12254,
+      "completion_tokens": 773,
+      "cost_usd": 0.033783999999999995,
+      "latency_seconds": 10.6937,
+      "run_dir": "results/agent-runs/qs-059-88894191ded3"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 1,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "companies/互联网/Google.md",
+          "concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 2,
+      "tool_calls": 1,
+      "prompt_tokens": 6211,
+      "completion_tokens": 469,
+      "cost_usd": 0.01805,
+      "latency_seconds": 6.9374,
+      "run_dir": "results/agent-runs/qs-059-03fada65fc0e"
+    },
+    {
+      "task_id": "QS-059",
+      "retriever": "jieba_tfidf",
+      "size": 500,
+      "trial": 2,
+      "original_harness_success": true,
+      "outcome_passed": true,
+      "fact_coverage": 1.0,
+      "evidence_coverage": 1.0,
+      "unsupported_evidence": false,
+      "success": true,
+      "finish_reason": "completed",
+      "error": "",
+      "answer": {
+        "query_id": "QS-059",
+        "facts": [
+          "1998年",
+          "1999年"
+        ],
+        "evidence_paths": [
+          "wiki/companies/互联网/Google.md",
+          "wiki/concepts/半导体/Athlon.md"
+        ]
+      },
+      "steps": 3,
+      "tool_calls": 2,
+      "prompt_tokens": 11986,
+      "completion_tokens": 2007,
+      "cost_usd": 0.048056,
+      "latency_seconds": 23.9243,
+      "run_dir": "results/agent-runs/qs-059-838693437cca"
+    }
+  ]
+}

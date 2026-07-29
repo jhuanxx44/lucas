@@ -18,3 +18,25 @@ workspaces/
 runs/
 .firecrawl/
 tmp/
+
+# 冻结语料只入库不可重建的输入：VERSION.json、master/、queries/、
+# source-plan-500-frozen.jsonl、sources/catalog.jsonl 和 quality/ 顶层汇总。
+# 以下都是可重建产物或运行 trace，占 corpora 体积的 98%。
+# 注意：模式行不要写尾随注释，# 前的空格会被算进匹配模式。
+# Agent 运行 trace，与 runs/ 同定位；但保留 results/ 下的汇总结论文件
+evals/corpora/*/results/*/
+!evals/corpora/*/results/*.json
+!evals/corpora/*/results/*.md
+# 由 master+seed 确定性重建（generate_wiki_manifests.py，已验证 1220 个全部一致）
+evals/corpora/*/manifests/
+# Firecrawl 页面快照；catalog.jsonl 已保留 URL 与 hash
+evals/corpora/*/sources/snapshots/
+# 各阶段 LLM 原始输出与分阶段明细，保留 quality/ 顶层汇总 json
+evals/corpora/*/quality/llm-outputs/
+evals/corpora/*/quality/*/
+# 来源计划中间版本，VERSION.json 只认 -frozen
+evals/corpora/*/source-plan.jsonl
+evals/corpora/*/source-plan-500.jsonl
+evals/corpora/*/source-plan-500-repaired.jsonl
+evals/corpora/*/source-plan-500-final.jsonl
+evals/corpora/*/discovered-candidates.jsonl

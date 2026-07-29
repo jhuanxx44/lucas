@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "page_count": 500,
+  "source_count": 501,
+  "tier_1_2_source_rate": 1.0,
+  "schema_valid_rate": 1.0,
+  "exact_duplicate_groups": 0,
+  "near_duplicate_page_rate": 0.0,
+  "page_chars": {
+    "min": 610,
+    "median": 1986.0,
+    "max": 9606
+  },
+  "domains": {
+    "云计算": 21,
+    "互联网": 33,
+    "人工智能": 23,
+    "体育": 41,
+    "体育用品": 12,
+    "光通信": 18,
+    "半导体": 94,
+    "文化": 38,
+    "新能源": 19,
+    "汽车": 32,
+    "消费电子": 37,
+    "自然": 28,
+    "软件服务": 35,
+    "通信": 38,
+    "食品饮料": 24,
+    "餐饮": 7
+  },
+  "corpus_sha256": "f26b31a04df663d32e5993ff142dfe71b1486475228f2ad6fc9039eea1de3ad5",
+  "errors": [],
+  "page_errors": {}
+}

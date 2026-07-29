@@ -1,0 +1,18 @@
+{
+  "query_count": 60,
+  "dev_count": 20,
+  "test_count": 40,
+  "answerable": 50,
+  "no_ground_truth": 8,
+  "candidate_pool_min": 8,
+  "candidate_pool_max": 35,
+  "type_counts": {
+    "company_fact": 12,
+    "concept": 12,
+    "cross_document": 11,
+    "insufficient_evidence": 8,
+    "long_tail": 6,
+    "near_distractor": 5,
+    "synonym": 6
+  }
+}

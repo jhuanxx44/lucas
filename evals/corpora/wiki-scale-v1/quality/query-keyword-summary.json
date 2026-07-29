@@ -1,0 +1,7 @@
+{
+  "query_count": 60,
+  "model": "deepseek-v4-flash",
+  "prompt_sha256": "3e2e4a6fe80a63d8b2ce32217f6d53b417abad6fe7d8b8cf6ada7d9cdb6a0818",
+  "min_keywords": 2,
+  "max_keywords": 6
+}

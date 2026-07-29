@@ -1,0 +1,63 @@
+{
+  "removed_count": 22,
+  "removed": {
+    "wp-0de9537d17cd": "compile_failed",
+    "wp-2666e896dfad": "compile_failed",
+    "wp-2c9814e1c5c9": "compile_failed",
+    "wp-37df1b0d43f7": "compile_failed",
+    "wp-4c865e1a7aeb": "compile_failed",
+    "wp-551cbf8adc35": "compile_failed",
+    "wp-5ae7e885f6f6": "compile_failed",
+    "wp-672bd6d807cb": "compile_failed",
+    "wp-6d67bb42e813": "compile_failed",
+    "wp-70dffc2faba3": "compile_failed",
+    "wp-888b69a45c1c": "compile_failed",
+    "wp-8c3d2591a02c": "compile_failed",
+    "wp-a9c4b9cc4ce6": "compile_failed",
+    "wp-aa961017ae2b": "compile_failed",
+    "wp-afe77a24d7ec": "compile_failed",
+    "wp-bb71b3ba21c2": "compile_failed",
+    "wp-bcf4c4a96215": "compile_failed",
+    "wp-be0759138479": "compile_failed",
+    "wp-cf3fbeee3cf2": "compile_failed",
+    "wp-de70820d8a90": "compile_failed",
+    "wp-ea1ef1eab9cc": "compile_failed",
+    "wp-eb05333ed19e": "compile_failed"
+  },
+  "duplicate_groups": [],
+  "deficits": {
+    "target": 7,
+    "near": 7,
+    "far": 8
+  },
+  "replacement_doc_ids": [
+    "wp-546f91bd8ab5",
+    "wp-264a39fddf1d",
+    "wp-c08dc1157762",
+    "wp-6406bf048ee5",
+    "wp-b1f27f60ca3a",
+    "wp-6aebf2603fd8",
+    "wp-cdfc396028b7",
+    "wp-01c64574bca6",
+    "wp-e84ae4d549af",
+    "wp-a4a9e58fe677",
+    "wp-09affe270fb8",
+    "wp-95255655f40f",
+    "wp-794c78f0d8b6",
+    "wp-30316521ec84",
+    "wp-0cde3363686d",
+    "wp-3ee7fac90be9",
+    "wp-2c0e5d50c650",
+    "wp-a3cdd5de4949",
+    "wp-8e5098593cd3",
+    "wp-1b3b9cf194ff",
+    "wp-2d84d1ab2088",
+    "wp-f8df9cbc4de2"
+  ],
+  "final_group_counts": {
+    "target": 150,
+    "near": 200,
+    "far": 150
+  },
+  "output": "evals/corpora/wiki-scale-v1/source-plan-500-final.jsonl"
+}

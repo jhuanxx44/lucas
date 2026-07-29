@@ -1,0 +1,204 @@
+{
+  "queries": [
+    {
+      "id": "QS-001",
+      "query": "拼多多成立于哪一年？",
+      "type": "company_fact",
+      "answer": "2015年",
+      "relevant_paths": [
+        "companies/互联网/拼多多.md"
+      ],
+      "rationale": "拼多多页面明确记载成立于2015年9月。"
+    },
+    {
+      "id": "QS-004",
+      "query": "Microsoft Access從哪個版本開始使用.accdb文件格式？",
+      "type": "long_tail",
+      "answer": "Access 2007",
+      "relevant_paths": [
+        "concepts/软件服务/Microsoft Access.md"
+      ],
+      "rationale": "页面提到Access 2007起数据库改用.accdb格式。"
+    },
+    {
+      "id": "QS-007",
+      "query": "開放標準的一個典型例子是Wintel聯盟，它最初由哪家公司提出？",
+      "type": "concept",
+      "answer": "IBM",
+      "relevant_paths": [
+        "concepts/云计算/开放标准.md"
+      ],
+      "rationale": "页面提到Wintel标准最早由IBM提出。"
+    },
+    {
+      "id": "QS-010",
+      "query": "拼多多在2025年的活躍用戶數是多少？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "页面仅提供2021年用户数，无2025年数据。"
+    },
+    {
+      "id": "QS-013",
+      "query": "Microsoft 365和Office 365有什么区别？",
+      "type": "near_distractor",
+      "answer": "Microsoft 365是2020年4月21日更名后的名称，但Office 365 A1/A3/E3/E5订阅并未受此影响",
+      "relevant_paths": [
+        "concepts/软件服务/Microsoft 365.md"
+      ],
+      "rationale": "页面详述了改名情况，指出教育版订阅未受影响。"
+    },
+    {
+      "id": "QS-016",
+      "query": "SK电讯在2008年的市场份额是多少？",
+      "type": "company_fact",
+      "answer": "50.5%",
+      "relevant_paths": [
+        "companies/通信/SK電訊.md"
+      ],
+      "rationale": "页面明确列出“2008年拥有50.5%的市场份额”。"
+    },
+    {
+      "id": "QS-019",
+      "query": "英伟达在纳斯达克的股票代码和SK电讯在韩国交易所的股票代码分别是什么？",
+      "type": "cross_document",
+      "answer": "NVDA 和 017670",
+      "relevant_paths": [
+        "companies/半导体/英伟达.md",
+        "companies/通信/SK電訊.md"
+      ],
+      "rationale": "英伟达页面有NASDAQ: NVDA；SK电讯页面有韩国交易所代码017670。"
+    },
+    {
+      "id": "QS-022",
+      "query": "机器视觉与计算机视觉的主要区别是什么？",
+      "type": "concept",
+      "answer": "机器视觉是系统工程学科，专注于工业自动化应用；计算机视觉属于计算机科学。",
+      "relevant_paths": [
+        "concepts/人工智能/机器视觉.md"
+      ],
+      "rationale": "机器视觉页面明确区分了机器视觉与计算机视觉。"
+    },
+    {
+      "id": "QS-025",
+      "query": "可乐果的果实又称为什么？",
+      "type": "synonym",
+      "answer": "Kola nut",
+      "relevant_paths": [
+        "concepts/自然/可樂果.md"
+      ],
+      "rationale": "可乐果页面指出其果实称为Kola nut。"
+    },
+    {
+      "id": "QS-028",
+      "query": "被可口可乐收购的奥德瓦拉公司，其品牌在2020年被停产，而可口可乐早期曾使用什么植物作为饮料原料？",
+      "type": "cross_document",
+      "answer": "可乐果",
+      "relevant_paths": [
+        "companies/食品饮料/奥德瓦拉.md",
+        "concepts/自然/可樂果.md"
+      ],
+      "rationale": "奥德瓦拉页面提到被可口可乐收购及停产；可乐果页面提到可口可乐曾使用可乐果。"
+    },
+    {
+      "id": "QS-031",
+      "query": "戴尔公司以什么商业模式闻名？",
+      "type": "company_fact",
+      "answer": "直接商业模式，即去除中间人，先接订单后组装，降低库存成本。",
+      "relevant_paths": [
+        "companies/消费电子/戴尔.md"
+      ],
+      "rationale": "戴尔页面明确描述了直接商业模式。"
+    },
+    {
+      "id": "QS-034",
+      "query": "日野汽车在1967年成为丰田子公司后，主要转向生产什么类型的车辆？",
+      "type": "long_tail",
+      "answer": "转为以生产货车、巴士为主，停止生产私家车。",
+      "relevant_paths": [
+        "companies/汽车/日野汽车.md"
+      ],
+      "rationale": "日野汽车页面提到1967年成为丰田一部分后，转为以生产货车、巴士为主。"
+    },
+    {
+      "id": "QS-037",
+      "query": "固态电池的循环寿命可以达到多少次？",
+      "type": "concept",
+      "answer": "10,000至100,000次。",
+      "relevant_paths": [
+        "concepts/新能源/固态电池.md"
+      ],
+      "rationale": "固态电池页面明确列出循环寿命可达10,000至100,000次。"
+    },
+    {
+      "id": "QS-040",
+      "query": "戴尔公司2025年的净收入是多少？",
+      "type": "insufficient_evidence",
+      "answer": "无法从知识库确定",
+      "relevant_paths": [],
+      "rationale": "戴尔页面未提供2025年净收入数据，仅有2022年财务数据。"
+    },
+    {
+      "id": "QS-043",
+      "query": "Fugazi乐队从哪一年起无限期暂停活动？",
+      "type": "near_distractor",
+      "answer": "2003年",
+      "relevant_paths": [
+        "concepts/文化/Fugazi.md"
+      ],
+      "rationale": "Fugazi页面说明自2003年起无限期暂停活动。"
+    },
+    {
+      "id": "QS-046",
+      "query": "比亚迪的创始人是谁？",
+      "type": "company_fact",
+      "answer": "王传福",
+      "relevant_paths": [
+        "companies/汽车/比亚迪.md"
+      ],
+      "rationale": "比亚迪页面提供公司创始人为王传福。"
+    },
+    {
+      "id": "QS-049",
+      "query": "德国国家足球队的现任主教练是谁，以及华为相关争议始于哪一年？",
+      "type": "cross_document",
+      "answer": "于尔根·克洛普，2011年",
+      "relevant_paths": [
+        "concepts/体育/德国国家足球队.md",
+        "concepts/通信/华为相关争议.md"
+      ],
+      "rationale": "德国国家足球队页面显示主教练为于尔根·克洛普；华为相关争议页面提到自2011年起面临争议。"
+    },
+    {
+      "id": "QS-052",
+      "query": "Athlon的中文官方名称是什么？",
+      "type": "concept",
+      "answer": "速龍",
+      "relevant_paths": [
+        "concepts/半导体/Athlon.md"
+      ],
+      "rationale": "页面提到“其中文官方名称为「速龍」”。"
+    },
+    {
+      "id": "QS-055",
+      "query": "达雷尔·莫雷的英文名字是什么？",
+      "type": "synonym",
+      "answer": "Daryl Morey",
+      "relevant_paths": [
+        "concepts/体育/达雷尔·莫雷.md"
+      ],
+      "rationale": "页面开头注明“Daryl Morey”为其英文名。"
+    },
+    {
+      "id": "QS-058",
+      "query": "古根汉美术馆被列为世界文化遗产的年份和BBC首次电视播送的年份分别是？",
+      "type": "cross_document",
+      "answer": "古根汉美术馆2019年，BBC首次电视播送1936年",
+      "relevant_paths": [
+        "concepts/文化/所羅門·古根漢美術館.md",
+        "companies/通信/BBC.md"
+      ],
+      "rationale": "古根汉页面显示2019年列入世界遗产；BBC页面显示1936年开始电视服务。"
+    }
+  ]
+}
