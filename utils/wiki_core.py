@@ -78,6 +78,29 @@ def parse_wiki_index(wiki_dir: str) -> dict:
     return {"sections": sections}
 
 
+def parse_index_entries(index_path: str) -> list[dict]:
+    """解析 index.md 的分节链接，供结构化索引重建复用。"""
+    entries = []
+    current_section = ""
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if line.startswith("## "):
+                    current_section = line[3:].strip()
+                    continue
+                match = _LINK_RE.match(line)
+                if match:
+                    entries.append({
+                        "section": current_section,
+                        "name": match.group(1).strip(),
+                        "path": match.group(2).strip(),
+                    })
+    except (FileNotFoundError, PermissionError):
+        pass
+    return entries
+
+
 _CODE_FENCE_RE = re.compile(r'```\w*\n(.*?)```', re.DOTALL)
 
 

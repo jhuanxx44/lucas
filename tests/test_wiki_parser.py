@@ -1,5 +1,6 @@
 import pytest
 from server.services.wiki_parser import parse_wiki_index, parse_wiki_page
+from utils.wiki_core import parse_index_entries
 
 
 def test_parse_wiki_index_extracts_sections(tmp_path):
@@ -21,6 +22,36 @@ def test_parse_wiki_index_extracts_sections(tmp_path):
     assert len(company_section["items"]) == 2
     assert company_section["items"][0]["name"] == "002463-沪电股份"
     assert company_section["items"][0]["path"] == "companies/新能源/002463-沪电股份.md"
+
+
+def test_parse_index_entries_tracks_sections_and_skips_invalid_lines(tmp_path):
+    index = tmp_path / "index.md"
+    index.write_text(
+        "# Wiki 索引\n\n"
+        "## 公司档案 · 新能源\n"
+        "- [宁德时代](companies/新能源/宁德时代.md)\n"
+        "- 不是链接\n\n"
+        "## 行业概览\n"
+        "- [新能源](industries/新能源.md) — 行业页面\n",
+        encoding="utf-8",
+    )
+
+    assert parse_index_entries(str(index)) == [
+        {
+            "section": "公司档案 · 新能源",
+            "name": "宁德时代",
+            "path": "companies/新能源/宁德时代.md",
+        },
+        {
+            "section": "行业概览",
+            "name": "新能源",
+            "path": "industries/新能源.md",
+        },
+    ]
+
+
+def test_parse_index_entries_missing_file_returns_empty(tmp_path):
+    assert parse_index_entries(str(tmp_path / "missing.md")) == []
 
 
 def test_parse_wiki_page_with_frontmatter(tmp_path):

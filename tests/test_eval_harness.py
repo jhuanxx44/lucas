@@ -120,6 +120,26 @@ def test_all_process_graders_accept_valid_trace(tmp_path):
     assert grade.success is True
 
 
+def test_answer_facts_accepts_equivalent_wording_and_normalized_paths(tmp_path):
+    task = replace(_task(tmp_path), outcome_graders=[{
+        "type": "answer_facts",
+        "query_id": "Q1",
+        "fact_groups": [["DDR4"], ["低功耗記憶體", "LPDDR"]],
+        "evidence_paths": ["companies/南亞科技.md"],
+        "required": True,
+    }])
+    trace = _valid_trace(tmp_path / "trace.jsonl", "run-1")
+    result = AgentResult(answer={
+        "query_id": "Q1",
+        "facts": ["DDR4", "低功耗動態隨機存取記憶體（LPDDR）"],
+        "evidence_paths": ["wiki/companies/南亞科技.md"],
+    })
+
+    grade = grade_trial(task, task.fixture_dir, {}, result, trace.path, "run-1")
+
+    assert grade.outcome_passed is True
+
+
 @pytest.mark.parametrize(
     ("grader", "events", "finish_reason", "check_name"),
     [

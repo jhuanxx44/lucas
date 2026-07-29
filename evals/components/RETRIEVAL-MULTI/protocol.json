@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "arms": ["A", "B", "C", "D"],
+  "rrf_k": 60,
+  "single_candidates": 30,
+  "decomposed_candidates_per_query": 10,
+  "final_k": 10,
+  "rerank": "jieba TF-IDF cosine; current-manifest IDF; max over subqueries for D"
+}

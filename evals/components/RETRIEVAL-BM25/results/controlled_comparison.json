@@ -1,0 +1,652 @@
+{
+  "hypothesis": "若语料规模是 TF-IDF 优于 BM25 的主要原因，则在保持查询、相关文档、tokenizer 和候选集一致，仅增加干扰文档时，TF-IDF-BM25 的配对差值应呈稳定趋势。",
+  "corpus_documents": 46,
+  "query_count": 15,
+  "trials_per_partial_size": 2,
+  "sizes": [
+    10,
+    46
+  ],
+  "modes": {
+    "llm": {
+      "10": {
+        "trials": 2,
+        "tfidf_recall@5": 0.93,
+        "tfidf_mrr": 0.977778,
+        "tfidf_ndcg@5": 0.919263,
+        "bm25_recall@5": 0.907778,
+        "bm25_mrr": 0.961111,
+        "bm25_ndcg@5": 0.886058,
+        "paired_difference": {
+          "estimate": 0.022222,
+          "ci_low": -0.011111,
+          "ci_high": 0.066667
+        },
+        "sign_flip_pvalue": 0.5,
+        "wins_ties_losses": {
+          "tfidf_wins": 2,
+          "ties": 12,
+          "bm25_wins": 1
+        },
+        "query_mean_differences": {
+          "q01": 0.0,
+          "q02": 0.0,
+          "q03": 0.25,
+          "q04": 0.0,
+          "q05": 0.0,
+          "q06": 0.0,
+          "q07": 0.0,
+          "q08": 0.166667,
+          "q09": 0.0,
+          "q10": 0.0,
+          "q11": -0.083333,
+          "q12": 0.0,
+          "q13": 0.0,
+          "q14": 0.0,
+          "q15": 0.0
+        },
+        "query_mean_metrics": {
+          "q01": {
+            "tfidf_recall@5": 0.9,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.893007,
+            "bm25_recall@5": 0.9,
+            "bm25_mrr": 0.75,
+            "bm25_ndcg@5": 0.83042
+          },
+          "q02": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.953013,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.936747
+          },
+          "q03": {
+            "tfidf_recall@5": 0.875,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.915936,
+            "bm25_recall@5": 0.625,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.69519
+          },
+          "q04": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.936747
+          },
+          "q05": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.969361
+          },
+          "q06": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.983734,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.983734
+          },
+          "q07": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.983734
+          },
+          "q08": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.895743,
+            "bm25_recall@5": 0.833333,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.751874
+          },
+          "q09": {
+            "tfidf_recall@5": 0.8,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.861363,
+            "bm25_recall@5": 0.8,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.868795
+          },
+          "q10": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.792785,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.818341
+          },
+          "q11": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.91521,
+            "bm25_recall@5": 0.833333,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 1.0
+          },
+          "q12": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 1.0
+          },
+          "q13": {
+            "tfidf_recall@5": 0.875,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.868295,
+            "bm25_recall@5": 0.875,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.84621
+          },
+          "q14": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 0.666667,
+            "tfidf_ndcg@5": 0.75,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 0.666667,
+            "bm25_ndcg@5": 0.75
+          },
+          "q15": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.95986,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.919721
+          }
+        }
+      },
+      "46": {
+        "trials": 1,
+        "tfidf_recall@5": 0.698889,
+        "tfidf_mrr": 0.844444,
+        "tfidf_ndcg@5": 0.703342,
+        "bm25_recall@5": 0.685556,
+        "bm25_mrr": 0.835556,
+        "bm25_ndcg@5": 0.654776,
+        "paired_difference": {
+          "estimate": 0.013333,
+          "ci_low": -0.175556,
+          "ci_high": 0.166667
+        },
+        "sign_flip_pvalue": 0.90625,
+        "wins_ties_losses": {
+          "tfidf_wins": 6,
+          "ties": 7,
+          "bm25_wins": 2
+        },
+        "query_mean_differences": {
+          "q01": 0.0,
+          "q02": 0.333333,
+          "q03": 0.25,
+          "q04": 0.333333,
+          "q05": 0.25,
+          "q06": 0.0,
+          "q07": 0.0,
+          "q08": 0.333333,
+          "q09": 0.2,
+          "q10": 0.0,
+          "q11": 0.0,
+          "q12": 0.0,
+          "q13": -0.5,
+          "q14": -1.0,
+          "q15": 0.0
+        },
+        "query_mean_metrics": {
+          "q01": {
+            "tfidf_recall@5": 0.6,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.616434,
+            "bm25_recall@5": 0.6,
+            "bm25_mrr": 0.5,
+            "bm25_ndcg@5": 0.49126
+          },
+          "q02": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.946902,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.671386
+          },
+          "q03": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.753698,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 0.5,
+            "bm25_ndcg@5": 0.41443
+          },
+          "q04": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.906025,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.650821
+          },
+          "q05": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.80481,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.636682
+          },
+          "q06": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.765361,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.765361
+          },
+          "q07": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.946902
+          },
+          "q08": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.765361,
+            "bm25_recall@5": 0.333333,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.469279
+          },
+          "q09": {
+            "tfidf_recall@5": 0.8,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.853932,
+            "bm25_recall@5": 0.6,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.654809
+          },
+          "q10": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.831872,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.787702
+          },
+          "q11": {
+            "tfidf_recall@5": 0.5,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.654809,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.722727
+          },
+          "q12": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 1.0
+          },
+          "q13": {
+            "tfidf_recall@5": 0.0,
+            "tfidf_mrr": 0.166667,
+            "tfidf_ndcg@5": 0.0,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 0.333333,
+            "bm25_ndcg@5": 0.34621
+          },
+          "q14": {
+            "tfidf_recall@5": 0.0,
+            "tfidf_mrr": 0.0,
+            "tfidf_ndcg@5": 0.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 0.2,
+            "bm25_ndcg@5": 0.386853
+          },
+          "q15": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 0.5,
+            "tfidf_ndcg@5": 0.650921,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.877215
+          }
+        }
+      }
+    },
+    "nl": {
+      "10": {
+        "trials": 2,
+        "tfidf_recall@5": 0.885556,
+        "tfidf_mrr": 0.975,
+        "tfidf_ndcg@5": 0.882102,
+        "bm25_recall@5": 0.873333,
+        "bm25_mrr": 0.908333,
+        "bm25_ndcg@5": 0.83492,
+        "paired_difference": {
+          "estimate": 0.012222,
+          "ci_low": -0.022222,
+          "ci_high": 0.048889
+        },
+        "sign_flip_pvalue": 0.5625,
+        "wins_ties_losses": {
+          "tfidf_wins": 3,
+          "ties": 10,
+          "bm25_wins": 2
+        },
+        "query_mean_differences": {
+          "q01": 0.0,
+          "q02": 0.0,
+          "q03": 0.125,
+          "q04": 0.0,
+          "q05": 0.0,
+          "q06": 0.0,
+          "q07": 0.0,
+          "q08": 0.166667,
+          "q09": 0.1,
+          "q10": 0.0,
+          "q11": -0.083333,
+          "q12": 0.0,
+          "q13": -0.125,
+          "q14": 0.0,
+          "q15": 0.0
+        },
+        "query_mean_metrics": {
+          "q01": {
+            "tfidf_recall@5": 0.9,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.893007,
+            "bm25_recall@5": 0.9,
+            "bm25_mrr": 0.75,
+            "bm25_ndcg@5": 0.83042
+          },
+          "q02": {
+            "tfidf_recall@5": 0.833333,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.794689,
+            "bm25_recall@5": 0.833333,
+            "bm25_mrr": 0.75,
+            "bm25_ndcg@5": 0.732829
+          },
+          "q03": {
+            "tfidf_recall@5": 0.875,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.915936,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.784231
+          },
+          "q04": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 0.75,
+            "bm25_ndcg@5": 0.792878
+          },
+          "q05": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.792785,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.831872
+          },
+          "q06": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.983734,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.953013
+          },
+          "q07": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 1.0
+          },
+          "q08": {
+            "tfidf_recall@5": 0.833333,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.778423,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.650821
+          },
+          "q09": {
+            "tfidf_recall@5": 0.8,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.827404,
+            "bm25_recall@5": 0.7,
+            "bm25_mrr": 0.75,
+            "bm25_ndcg@5": 0.691783
+          },
+          "q10": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.818341,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.818341
+          },
+          "q11": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.849607,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.893007
+          },
+          "q12": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.957185
+          },
+          "q13": {
+            "tfidf_recall@5": 0.875,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.902405,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.952359
+          },
+          "q14": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 0.625,
+            "tfidf_ndcg@5": 0.715338,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 0.625,
+            "bm25_ndcg@5": 0.715338
+          },
+          "q15": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.95986,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.919721
+          }
+        }
+      },
+      "46": {
+        "trials": 1,
+        "tfidf_recall@5": 0.65,
+        "tfidf_mrr": 0.841667,
+        "tfidf_ndcg@5": 0.659092,
+        "bm25_recall@5": 0.542222,
+        "bm25_mrr": 0.802778,
+        "bm25_ndcg@5": 0.563491,
+        "paired_difference": {
+          "estimate": 0.107778,
+          "ci_low": -0.017778,
+          "ci_high": 0.238889
+        },
+        "sign_flip_pvalue": 0.148438,
+        "wins_ties_losses": {
+          "tfidf_wins": 6,
+          "ties": 6,
+          "bm25_wins": 3
+        },
+        "query_mean_differences": {
+          "q01": 0.0,
+          "q02": 0.0,
+          "q03": 0.5,
+          "q04": 0.666667,
+          "q05": -0.25,
+          "q06": 0.0,
+          "q07": 0.0,
+          "q08": 0.333333,
+          "q09": 0.2,
+          "q10": 0.25,
+          "q11": -0.166667,
+          "q12": 0.333333,
+          "q13": -0.25,
+          "q14": 0.0,
+          "q15": 0.0
+        },
+        "query_mean_metrics": {
+          "q01": {
+            "tfidf_recall@5": 0.4,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.470365,
+            "bm25_recall@5": 0.4,
+            "bm25_mrr": 0.333333,
+            "bm25_ndcg@5": 0.300785
+          },
+          "q02": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.765361,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.650821
+          },
+          "q03": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.904717,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.558508
+          },
+          "q04": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.906025,
+            "bm25_recall@5": 0.333333,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.469279
+          },
+          "q05": {
+            "tfidf_recall@5": 0.5,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.558508,
+            "bm25_recall@5": 0.75,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.753698
+          },
+          "q06": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.765361,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.765361
+          },
+          "q07": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.946902
+          },
+          "q08": {
+            "tfidf_recall@5": 0.666667,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.765361,
+            "bm25_recall@5": 0.333333,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.469279
+          },
+          "q09": {
+            "tfidf_recall@5": 0.6,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.654809,
+            "bm25_recall@5": 0.4,
+            "bm25_mrr": 0.25,
+            "bm25_ndcg@5": 0.277273
+          },
+          "q10": {
+            "tfidf_recall@5": 0.75,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.831872,
+            "bm25_recall@5": 0.5,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.636682
+          },
+          "q11": {
+            "tfidf_recall@5": 0.5,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 0.639945,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.786014
+          },
+          "q12": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 1.0,
+            "tfidf_ndcg@5": 1.0,
+            "bm25_recall@5": 0.666667,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.765361
+          },
+          "q13": {
+            "tfidf_recall@5": 0.0,
+            "tfidf_mrr": 0.125,
+            "tfidf_ndcg@5": 0.0,
+            "bm25_recall@5": 0.25,
+            "bm25_mrr": 0.333333,
+            "bm25_ndcg@5": 0.19519
+          },
+          "q14": {
+            "tfidf_recall@5": 0.0,
+            "tfidf_mrr": 0.0,
+            "tfidf_ndcg@5": 0.0,
+            "bm25_recall@5": 0.0,
+            "bm25_mrr": 0.125,
+            "bm25_ndcg@5": 0.0
+          },
+          "q15": {
+            "tfidf_recall@5": 1.0,
+            "tfidf_mrr": 0.5,
+            "tfidf_ndcg@5": 0.624051,
+            "bm25_recall@5": 1.0,
+            "bm25_mrr": 1.0,
+            "bm25_ndcg@5": 0.877215
+          }
+        }
+      }
+    }
+  }
+}

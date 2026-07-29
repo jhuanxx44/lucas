@@ -104,6 +104,34 @@ def _outcome_check(
             if passed and config.get("exact", False):
                 passed = set(answer) == set(expected)
             detail = "expected JSON fields matched" if passed else f"expected fields: {expected!r}"
+        elif kind == "answer_facts":
+            answer = agent_result.answer
+            if isinstance(answer, str):
+                answer = json.loads(answer)
+            fact_groups = config.get("fact_groups", [])
+            actual_facts = answer.get("facts", []) if isinstance(answer, dict) else []
+            facts_text = "\n".join(str(value) for value in actual_facts).casefold()
+            facts_passed = bool(actual_facts) and all(
+                any(str(option).casefold() in facts_text for option in options)
+                for options in fact_groups
+            )
+            normalize_path = lambda value: str(value).removeprefix("wiki/")
+            actual_paths = {
+                normalize_path(path)
+                for path in (answer.get("evidence_paths", []) if isinstance(answer, dict) else [])
+            }
+            expected_paths = {
+                normalize_path(path) for path in config.get("evidence_paths", [])
+            }
+            query_passed = (
+                isinstance(answer, dict) and answer.get("query_id") == config.get("query_id")
+            )
+            passed = query_passed and facts_passed and actual_paths == expected_paths
+            detail = (
+                "fact slots and evidence paths matched" if passed else
+                f"query={query_passed}, facts={facts_passed}, paths={sorted(actual_paths)!r}, "
+                f"expected_paths={sorted(expected_paths)!r}"
+            )
         elif kind == "file_content":
             path = _workspace_path(workspace, config["path"])
             content = path.read_text(encoding="utf-8") if path.is_file() else ""

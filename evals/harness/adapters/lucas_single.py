@@ -26,10 +26,13 @@ PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "harness" / "age
 class LucasSingleAgent:
     variant = "lucas-single"
 
-    def __init__(self, model_adapter=None):
+    def __init__(self, model_adapter=None, wiki_recall_spec=None, variant=None):
         # client 延迟到 run() 建立：system prompt 需先渲染工具说明，而工具在 run() 才装配。
         # 注入 model_adapter（测试）时直接用，不建 client。
         self.model_adapter = model_adapter
+        self.wiki_recall_spec = wiki_recall_spec or WIKI_RECALL_SPEC
+        if variant is not None:
+            self.variant = variant
 
     async def run(
         self,
@@ -53,7 +56,7 @@ class LucasSingleAgent:
             UPDATE_PLAN_SPEC,
             STOCK_QUOTE_SPEC,
             STOCK_KLINE_SPEC,
-            WIKI_RECALL_SPEC,
+            self.wiki_recall_spec,
         ])
         model_adapter = self.model_adapter
         if model_adapter is None:
