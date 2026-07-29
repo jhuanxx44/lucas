@@ -15,3 +15,4 @@ uvicorn>=0.30
 pytest>=7.0
 pytest-asyncio>=0.23
 jieba>=0.42  # 仅 evals/ 检索对照实验使用（生产召回已改为子串 BM25，不依赖分词）
+opencc-python-reimplemented>=0.1.7  # 派生 Wiki 语料的确定性繁转简
