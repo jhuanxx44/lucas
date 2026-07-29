@@ -81,10 +81,10 @@ def test_single_system_prompt_requires_complete_detailed_answers():
 def test_single_system_prompt_uses_observable_retrieval_triggers():
     prompt = build_single_system_prompt("- wiki_recall", current_date="2026-07-24")
 
-    assert "不要用自己的主观信心决定是否查证" in prompt
-    assert '给链接、给原文、给出处、给公告' in prompt
-    assert '"没有、不存在、尚未发生、从未披露"' in prompt
-    assert "不表示你掌握截至该日的最新外部事实" in prompt
+    assert "能用工具查证就查，只在明确不需要查时才跳过" in prompt
+    assert "其他所有问题" in prompt
+    assert "查找公告、招股书或监管文件原文时" in prompt
+    assert '凡涉及"最新""近期""今年"等时间判断' in prompt
     assert "把上一轮结论恢复为待验证" in prompt
     assert "非官方镜像必须明确标注" in prompt
 

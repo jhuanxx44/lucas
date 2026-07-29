@@ -27,7 +27,8 @@ def _parse_sse(chunks: list[str]) -> list[tuple[str, dict]]:
 
 def test_chat_endpoint_returns_sse():
     """路由层：验证 SSE content-type 和基本事件格式"""
-    async def fake_stream(q, history=None, user_id="default"):
+    async def fake_stream(q, history=None, user_id="default", model_override=None):
+        assert model_override is None
         yield "event: status\ndata: {\"message\": \"testing\"}\n\n"
         yield "event: done\ndata: {\"total_tokens\": 0}\n\n"
 
@@ -54,8 +55,9 @@ def test_chat_question_max_length():
 
 def test_chat_ignores_user_id_header():
     """单用户模式下，客户端请求头不能切换工作区。"""
-    async def fake_stream(q, history=None, user_id="default"):
+    async def fake_stream(q, history=None, user_id="default", model_override=None):
         assert user_id == "default"
+        assert model_override is None
         yield "event: done\ndata: {\"total_tokens\": 0}\n\n"
 
     with patch("server.routers.chat.chat_event_stream") as mock:

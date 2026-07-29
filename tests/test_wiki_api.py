@@ -43,13 +43,16 @@ def test_wiki_page_not_found():
     assert resp.status_code == 404
 
 
-def test_wiki_search():
+def test_wiki_search_reports_removed_endpoint():
     ws = _ws_mock()
     client = _make_client(ws)
     resp = client.get("/api/wiki/search?q=电池")
     assert resp.status_code == 200
     data = resp.json()
-    assert isinstance(data, list)
+    assert data == {
+        "results": [],
+        "note": "search_wiki endpoint removed; use /api/wiki/recall",
+    }
 
 
 def test_report_endpoint_reads_reports_root(tmp_path):

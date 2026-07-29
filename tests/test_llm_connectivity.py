@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.llm_client import create_client
 
 
-async def test_model(model: str):
+async def check_model(model: str):
     print(f"\n{'='*50}")
     print(f"测试模型: {model}")
     print('='*50)
@@ -32,7 +32,7 @@ async def main():
     # models.append("qwen-max")
 
     for model in models:
-        await test_model(model)
+        await check_model(model)
 
 
 if __name__ == "__main__":
