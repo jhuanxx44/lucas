@@ -1,0 +1,9 @@
+service: checkout-api
+concurrency: 24
+payment_client:
+  base_url: https://payment.internal
+  timeout_seconds: 6
+  max_retries: 1
+inventory_client:
+  base_url: https://inventory.internal
+  timeout_seconds: 2

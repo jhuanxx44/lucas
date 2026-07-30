@@ -1,0 +1,6 @@
+name: auth-gateway
+active: false
+identity_api:
+  version: 1
+  endpoint: /legacy/identity
+  timeout_seconds: 30

@@ -758,3 +758,66 @@ LLM 关键词模式：
 - **意外发现**：ollama embedding 批次受**整批 token 总和**限制而非单条长度（单条 6000 字符可过，32 条 ×6000 报超限）；中文 token 密度差异达 2 倍以上（`六氟磷酸锂.md` 约 2.3 token/字符，3500 字符即超 8k）；`prompt_eval_count` 在 bge-m3 上封顶 357，不可用于批次预算
 - **决策**：不改生产召回。本实验未与现有子串 BM25 做同语料对照，只回答"若用 embedding，chunk 该多大"，不回答"是否该引入 embedding"
 - **验证**：五档全部跑通，新增 `tests/test_chunk_experiment.py` 10 项通过，全量回归 291 项通过
+
+---
+
+## 2026-07-30 Planner 复杂任务首轮真实模型 Pilot
+
+- **完整报告**：`2026-07-30-Planner复杂任务首轮Pilot.md`
+- **Suite**：`planner-complex-experiment-v1`，当前 Optional Planner，每题 1 trial
+- **结果**：环境 outcome 修正后 3/3；42 steps、39 tool calls、173,882 tokens、$0.474544
+- **Planner 使用**：三题 `update_plan` 调用均为 0，当前可选路由仍未触发显式规划
+- **原始 summary**：2/3；PLAN-03 是 grader 假阴性，正式回滚章节顺序正确，冻结环境按修正规则复核通过
+- **结论**：任务已能产生 12–15 步执行压力，但本轮只有裸循环实际参与，不能证明 Planner 价值
+- **下一步**：实现 baseline 与 required-planner 两个独立 variant，在同一 suite 上交错运行
+- **产物**：`runs/planner-complex-experiment-v1-20260730-224142-bc709170/`
+
+---
+
+## 2026-07-30 Planner 自然目标题面 Pilot
+
+- **完整报告**：`2026-07-30-Planner自然目标题面Pilot.md`
+- **单变量**：只把 PLAN-01～03 从编号步骤改为目标、完成态和禁止事项；其余条件不变
+- **结果**：1/3，48 steps、45 tool calls、210,866 tokens、$0.594422
+- **Planner 使用**：仍为 0 次；移除预制步骤没有触发当前 Optional Planner
+- **失败**：PLAN-02 遗漏公司页来源；PLAN-03 未读发布记录，遗漏 09:40 时间线和证据路径
+- **对比**：相对结构化题面 success 3/3→1/3，steps +14.3%，tokens +21.3%，cost +25.3%
+- **结论**：自然目标任务已具区分度，当前 Planner 路由覆盖不足；下一步保持题面不变运行 required-planner
+- **产物**：`runs/planner-complex-experiment-v1-20260730-225105-833b90fd/`
+
+---
+
+## 2026-07-30 PLAN-02 极简题面 Pilot
+
+- **完整报告**：`2026-07-30-PLAN02极简题面Pilot.md`
+- **题面**：只保留“用三份 Q3 材料更新知识库并发布可追溯横向比较结果”一句话
+- **结果**：fail，13 steps、12 tool calls、49,301 tokens、$0.140632
+- **Planner 使用**：0 次
+- **实际行为**：更新三个公司页后直接 answer；没有创建报告、没有更新索引、没有写来源路径
+- **完成声明**：summary 和 answer 声称索引及报告已完成，并给出一个实际不存在的报告路径
+- **结论**：极简目标未触发 Planner，反而暴露无 outcome validation 的自报完成；该题面适合作为开放目标 probe，不适合作为含隐藏固定路径的正式 benchmark
+- **产物**：`runs/plan02-minimal-prompt-20260730-230337/plan-02-fcaa7439291e/`
+
+---
+
+## 2026-07-30 PLAN-02 极简题面模型对比 Pilot
+
+- **完整报告**：`2026-07-30-PLAN02模型对比Pilot.md`
+- **单变量**：`deepseek-v4-flash` → `deepseek-v4-pro`，其余条件不变
+- **Planner**：Flash 0 次；Pro 1 次，在三个公司页写完后的第 12 步才创建
+- **交付**：Flash 未写报告/索引却自报完成；Pro 真实写入报告并更新索引，报告包含来源
+- **事实风险**：Pro 未先读星河芯片旧页便覆盖，编造 Q2 历史数字并据此计算环比，原风险提示也被替换
+- **效率**：Pro 72,773 tokens、$0.216366、143.99s；Flash 49,301 tokens、$0.140632、46.58s
+- **结论**：Pro 更容易触发 Planner且后半段交付更完整，但计划过晚、事实保真失败；调用 Planner 不等于任务可靠完成
+- **产物**：`runs/plan02-minimal-prompt-dsv4pro-20260730-230629/plan-02-ad3ed0aabb34/`
+
+---
+
+## 2026-07-30 Planner 复杂任务阶段总结
+
+- **总结报告**：`2026-07-30-Planner复杂任务阶段总结.md`
+- **覆盖范围**：复杂任务设计、结构化/自然/极简题面对照、Flash/Pro 差异、grader 失效案例
+- **阶段判断**：任务已具区分度，Optional Planner 路由不足且受模型影响；Plan 调用尚未证明 outcome 收益
+- **P0**：对齐正式 task 与开放 probe 的 grader；实现 required-planner 同模型对照
+- **P1**：实验通用复杂度路由、候选答案 validation、事实保真与写入安全
+- **决策**：required-planner 证明收益前，不扩大生产 Planner 路由、不升级复杂状态机

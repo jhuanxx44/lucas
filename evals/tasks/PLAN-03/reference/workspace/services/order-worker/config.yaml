@@ -1,0 +1,4 @@
+service: order-worker
+queue: paid-orders
+concurrency: 12
+idempotency_key_required: true

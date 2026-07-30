@@ -1,0 +1,3 @@
+service: inventory-api
+concurrency: 16
+reservation_timeout_seconds: 2

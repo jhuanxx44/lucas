@@ -1,0 +1,11 @@
+name: billing-worker
+active: true
+queue: billing-events
+depends_on:
+  - auth-gateway
+identity_api:
+  version: 2
+  endpoint: /v2/identity
+  timeout_seconds: 8
+  headers:
+    X-Identity-Version: "2"

@@ -1,0 +1,10 @@
+name: auth-gateway
+active: true
+replicas: 3
+depends_on: []
+identity_api:
+  version: 2
+  endpoint: /v2/identity
+  timeout_seconds: 8
+  headers:
+    X-Identity-Version: "2"

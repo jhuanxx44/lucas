@@ -14,6 +14,14 @@ web/.vite
 raw/
 ingested/
 reports/
+
+# Agent eval 的固定输入与参考结果需要随任务版本化。
+!evals/tasks/**/fixture/**/reports/
+!evals/tasks/**/fixture/**/reports/**
+!evals/tasks/**/reference/workspace/**/reports/
+!evals/tasks/**/reference/workspace/**/reports/**
+!evals/tasks/**/fixture/logs/
+!evals/tasks/**/fixture/logs/*.log
 workspaces/
 runs/
 .firecrawl/

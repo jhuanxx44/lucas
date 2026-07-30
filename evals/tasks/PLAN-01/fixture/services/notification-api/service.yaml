@@ -1,0 +1,11 @@
+name: notification-api
+active: true
+replicas: 2
+depends_on:
+  - billing-worker
+identity_api:
+  version: 1
+  endpoint: /v1/identity
+  timeout_seconds: 4
+  headers:
+    X-Identity-Version: "1"

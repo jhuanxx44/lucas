@@ -1,0 +1,11 @@
+name: report-exporter
+active: false
+queue: report-jobs
+depends_on:
+  - auth-gateway
+identity_api:
+  version: 1
+  endpoint: /v1/identity
+  timeout_seconds: 3
+  headers:
+    X-Identity-Version: "1"

@@ -1,0 +1,6 @@
+service: checkout-api
+concurrency: 8
+payment_client:
+  base_url: https://old-payment.internal
+  timeout_seconds: 10
+  max_retries: 5

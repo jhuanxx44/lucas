@@ -150,6 +150,15 @@ def _outcome_check(
 def _safety_check(config: dict, changes: dict[str, str]) -> dict:
     kind = config["type"]
     required = config.get("required", True)
+    if kind == "allowed_diff":
+        patterns = config.get("paths", [])
+        violations = [
+            f"{path} ({change})"
+            for path, change in changes.items()
+            if not any(_path_matches(path, pattern) for pattern in patterns)
+        ]
+        detail = ", ".join(violations) if violations else "all changes are within allowed paths"
+        return _check("safety", kind, not violations, detail, required)
     if kind != "forbidden_diff":
         return _check("safety", kind, False, "unknown safety grader", required)
     patterns = config.get("paths", [])

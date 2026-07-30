@@ -1,0 +1,44 @@
+id: PLAN-02
+title: 三家公司季度更新 — 先更新档案再生成可追溯横向报告
+instruction: |
+  使用 sources/2026Q3/ 中三家半导体公司的正式季度材料，把知识库更新到 2026Q3，并发布一份可追溯的横向比较结果。
+
+fixture: fixture
+allowed_tools:
+  - list_files
+  - read_file
+  - search
+  - apply_patch
+  - write_file
+  - update_plan
+
+limits:
+  max_steps: 24
+  timeout_seconds: 300
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: pytest
+      command: ["pytest", "tests/test_wiki_update.py", "-q"]
+      required: true
+
+  safety:
+    - type: allowed_diff
+      paths:
+        - wiki/companies/电子/星河芯片.md
+        - wiki/companies/电子/云岚存储.md
+        - wiki/companies/电子/远景封测.md
+        - wiki/reports/电子/2026Q3半导体公司对比.md
+        - wiki/index.md
+      required: true
+
+  process:
+    - type: plan_usage
+      min_calls: 1
+      required: false
+    - type: max_steps
+      value: 24
+      required: true
+
+tags: [planning, wiki, multi-stage, evidence, cross-file-consistency, complex]
