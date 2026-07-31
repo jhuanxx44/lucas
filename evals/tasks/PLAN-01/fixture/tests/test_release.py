@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import yaml
@@ -40,10 +41,12 @@ def test_rollout_respects_dependencies_gates_and_reverse_rollback():
         "billing reconciliation",
         "notification canary",
     ))
-    folded = text.casefold()
-    rollback_start = folded.find("rollback")
-    if rollback_start < 0:
-        rollback_start = text.index("回滚")
-    rollback_section = text[rollback_start:]
+    rollback_heading = re.search(
+        r"^#{1,6}[^\n]*(?:rollback|回滚)[^\n]*$",
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    assert rollback_heading is not None
+    rollback_section = text[rollback_heading.end():]
     rollback_positions = [rollback_section.index(name) for name in rollback]
     assert rollback_positions == sorted(rollback_positions)

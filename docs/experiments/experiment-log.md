@@ -816,8 +816,79 @@ LLM 关键词模式：
 ## 2026-07-30 Planner 复杂任务阶段总结
 
 - **总结报告**：`2026-07-30-Planner复杂任务阶段总结.md`
-- **覆盖范围**：复杂任务设计、结构化/自然/极简题面对照、Flash/Pro 差异、grader 失效案例
-- **阶段判断**：任务已具区分度，Optional Planner 路由不足且受模型影响；Plan 调用尚未证明 outcome 收益
-- **P0**：对齐正式 task 与开放 probe 的 grader；实现 required-planner 同模型对照
-- **P1**：实验通用复杂度路由、候选答案 validation、事实保真与写入安全
-- **决策**：required-planner 证明收益前，不扩大生产 Planner 路由、不升级复杂状态机
+- **覆盖范围**：PLAN-01～04、结构化/自然/极简题面、通用 Prompt 负结果、Flash/Pro 差异和 grader 失效案例
+- **阶段判断**：Optional Planner 是受模型和运行波动影响的投研特化路由；调用次数不能代表时机、成功条件覆盖或 outcome 收益
+- **已验证反例**：Pro 两个 0 Planner 任务语义通过，两个 1 Planner 任务失败；PLAN-04 Pro 写完公司页才规划，仍丢风险、漏索引并虚假完成
+- **跨模型盲点**：PLAN-02/04 都把目录级引用误当成具体来源追溯
+- **P0**：修正 PLAN-02 正式 task/probe 契约；实现首次 mutation 前 required-planner 和成功条件覆盖检查
+- **P1**：候选答案 validation、写前必读/覆盖丢失检测、claim 到具体 observation/source 的绑定
+- **决策**：不切默认模型；required-planner 证明收益前，不扩大生产 Optional 路由、不升级复杂状态机
+
+---
+
+## 2026-07-30 Planner 通用路由 Prompt Pilot
+
+- **完整报告**：`2026-07-30-Planner通用路由Prompt-Pilot.md`
+- **单变量**：把 Planner 触发从投研例子改成多个交付物/文件、依赖、条件行动、证据覆盖和多成功约束等通用任务结构
+- **模型**：`deepseek-v4-flash`，temperature=0，每题 1 trial
+- **结果**：1/3，39 steps、36 tool calls、159,683 tokens、$0.472316；三题 `update_plan` 仍均为 0
+- **失败**：PLAN-02 写了报告但漏来源和索引；PLAN-03 读全证据却漏写 `order-worker`；两题均出现环境未变但回答声称已完成
+- **对比**：相对各题当前题面的最近 Flash baseline，成功率不变，tokens +6.7%、cost +9.3%、duration +7.9%
+- **结论**：更通用的 Optional 路由没有让 Flash 触发 Planner，也没有改善 outcome；单 trial 不支持保留该候选
+- **决策**：恢复原 system prompt，下一步优先做 required-planner；同时补 system prompt/Tool Spec/hash 的 trace 持久化
+- **产物**：`runs/planner-complex-experiment-v1-20260730-231807-201de92f/`
+
+---
+
+## 2026-07-30 PLAN-04 投研场景 Pilot
+
+- **完整报告**：`2026-07-30-PLAN04投研场景Pilot.md`
+- **新任务**：三家公司 2026H1 正式报告摘要 + 估值快照，更新档案、生成投委会横向报告并更新索引
+- **题面**：只给目标、完成态和约束，不提供步骤；报告名和排版由语义 grader 宽容判定
+- **自验**：known-bad 失败、Oracle 通过；相关 Harness/Planner 测试 63 项通过
+- **首轮 pilot**：初版 grader 固定文件名/表格方向，raw grade 作废；行为为 17 steps、16 tools、0 Planner，真实失败包括缺具体来源和漏写索引却声称完成
+- **正式 trial**：18 steps、17 tools、1 Planner、92,054 tokens、$0.275668、87.67s；safety/process 通过，outcome 失败
+- **Planner 时机**：第 10 步、首次 mutation 前建立计划，覆盖旧页读取、计算、公司页、报告、索引和总结，但后续没有更新状态
+- **对比**：有 Plan trial 真实完成报告和索引；无 Plan trial 漏索引，但 N=2 且模型行为有波动，不能归因 Planner
+- **共同失败**：公司页和报告都没有把关键数字落到三份具体材料路径，只引用泛化目录
+- **结论**：投研语境下 Flash Planner 触发 1/2，仍不稳定；plan call 不代表成功条件覆盖或 outcome 通过
+- **决策**：PLAN-04 留在 capability suite；下一步跑 Optional 多 trial，并与 required-planner 做同题对照
+- **产物**：正式 `runs/planner-investment-research-experiment-v1-20260730-233200-aa2f1130/`；作废 pilot `runs/planner-investment-research-experiment-v1-20260730-232914-361becf8/`
+
+---
+
+## 2026-07-30 PLAN-01～04 Pro 模型 Pilot
+
+- **完整报告**：`2026-07-30-PLAN1234-Pro模型Pilot.md`
+- **单变量**：保持四题、工具、system prompt、temperature 和预算不变，只把模型覆盖为 `deepseek-v4-pro`
+- **组合 suite**：`planner-all-experiment-v1`，每题 1 trial
+- **Raw 结果**：1/4；PLAN-03 因“失败回滚顺序”标题被旧正则误判
+- **语义结果**：2/4；修复 PLAN-03 grader 后 known-bad 失败、Oracle 通过，原 Pro trace mutation 重放 2/2 通过
+- **Planner**：PLAN-01/03 为 0，PLAN-02/04 各 1；只在多公司投研题触发，符合当前 system prompt 的领域特化路由
+- **时机**：PLAN-02 在首次写入前规划并完成报告/索引；PLAN-04 写完三份公司页才规划，未防止漏读旧页和风险丢失
+- **共同失败**：PLAN-02/04 都没有把关键数字追溯到具体 source 文件
+- **虚假完成**：PLAN-04 未修改索引，却在最终回答中声称已添加报告入口
+- **Flash 对照**：语义 outcome 1/4→2/4，plan calls 1→2；tokens +10.8%、cost +19.5%、duration 2.55x
+- **结论**：Pro 更容易遵循投研 Planner 路由，但 Planner 调用与成功不正相关，Pro 可靠性提升不单调
+- **决策**：不切默认模型；下一步做首次 mutation 前 required-planner + 成功条件覆盖，并对 Flash/Pro 各跑至少 3 trials
+- **产物**：`runs/planner-all-experiment-v1-20260730-234010-f07bd5e6/`
+
+---
+
+## 2026-07-31 Flash 正式版 PLAN-01～04 并发 Pilot
+
+- **完整报告**：`2026-07-31-Flash正式版PLAN1234并发Pilot.md`
+- **冻结条件**：`deepseek-v4-flash`、temperature=0、生产 system prompt SHA-256
+  `3b4c37920f50d735839502dc1184f9d41ae89cbe2239134b41c1a6357b551296`；题面、工具、grader 和预算不变
+- **执行方式**：四个独立 workspace/trace 并发运行，每题 1 trial；并发墙钟约 222s
+- **Raw / 语义 outcome**：2/4 / 3/4；PLAN-01 为回滚章节定位 grader 假阴性，PLAN-02 为具体来源缺失的真实失败
+- **Planner**：PLAN-01/02/04 分别 4/3/3 次，PLAN-03 为 0；共 10 次且均出现阶段更新
+- **效率**：78 steps、71 tools、448,941 tokens、$1.541422；PLAN-01 正好用满 20-step 上限
+- **PLAN-04**：首次写入前规划并遵循收集→档案→报告→索引，具体来源、旧风险、计算和索引全部通过
+- **PLAN-02**：计划补齐报告和索引，但只引用来源目录，未把关键数字追溯到三份具体文件
+- **Grader 修复**：PLAN-01 改为定位 Markdown 回滚标题；known-bad 失败、Oracle 通过
+- **结论**：相同模型别名下 Planner 路由和维护明显增强，但每题单 trial、无 provider 版本元数据、
+  无 disabled/required 对照，不能将 outcome 提升因果归于 Planner 或某个确定模型版本
+- **下一步**：当前 Flash 上交错运行 disabled / optional / required 各至少 3 trials；补最终环境验证、
+  PLAN-02 语义报告发现和 trace 条件哈希
+- **产物**：`runs/planner-all-experiment-v1-parallel-20260731-154144-de84960a/`

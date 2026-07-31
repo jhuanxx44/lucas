@@ -23,6 +23,7 @@
 | [`PLAN-01`](PLAN-01/task.yaml) | `planner-complex-experiment` | 识别三个待迁移服务，按依赖更新配置并生成部署/回滚计划 | 条件筛选、依赖排序、多文件一致性 |
 | [`PLAN-02`](PLAN-02/task.yaml) | `planner-complex-experiment` | 更新三家公司档案，再生成可追溯横向报告并更新索引 | 多阶段产物依赖、证据归属、跨文件一致性 |
 | [`PLAN-03`](PLAN-03/task.yaml) | `planner-complex-experiment` | 综合事故证据，只执行满足条件的处置并生成事故报告 | 条件行动、证据链、变更范围控制 |
+| [`PLAN-04`](PLAN-04/task.yaml) | `planner-investment-research-experiment` | 基于三家公司半年报和估值快照更新档案并发布投委会横向报告 | 多公司投研、财务推导、证据归属、跨文件一致性 |
 | [`WIKI-01`](WIKI-01/task.yaml) | `business-capability` | 从已索引公司页面回答澄海精密的产线一次良率 | Wiki 单页事实召回 |
 | [`WIKI-02`](WIKI-02/task.yaml) | `business-capability` | 从未索引公告页面回答股票代码 688559 对应公司的现金分红方案 | Wiki 未索引内容召回 |
 | [`WIKI-03`](WIKI-03/task.yaml) | `business-capability` | 综合两个公司页面，比较年产能并计算差值 | Wiki 多页召回、信息综合与计算 |

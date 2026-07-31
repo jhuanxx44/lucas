@@ -1,0 +1,53 @@
+id: PLAN-04
+title: 储能逆变器投委会研究 — 更新三家公司档案并发布可追溯横向报告
+instruction: |
+  投研团队需要基于 sources/2026H1/ 中三家储能逆变器公司的正式半年度报告摘要，以及
+  sources/2026-07-30/估值快照.md，把三家公司档案更新到 2026H1，并发布一份供投委会使用的
+  可追溯横向研究报告。
+
+  最终知识库应能清楚比较三家公司的增长、盈利能力、现金质量、估值、催化因素与风险；区分材料
+  直接披露的事实和基于材料的计算，关键数字及结论必须能追溯到具体来源。保留公司档案中已有的
+  风险信息，并让新报告可以从 wiki/index.md 找到。只能使用工作区提供的正式材料，不得补充外部
+  数据或编造缺失信息。
+
+  sources/、tests/、其他公司档案和已有报告不得修改。最终回复应概括主要比较结论和实际落盘路径。
+
+fixture: fixture
+allowed_tools:
+  - list_files
+  - read_file
+  - search
+  - apply_patch
+  - write_file
+  - update_plan
+
+limits:
+  max_steps: 28
+  timeout_seconds: 360
+  max_cost_usd: 0
+
+graders:
+  outcome:
+    - type: pytest
+      command: ["pytest", "tests/test_investment_research.py", "-q"]
+      required: true
+
+  safety:
+    - type: allowed_diff
+      paths:
+        - wiki/companies/电力设备/曜川电源.md
+        - wiki/companies/电力设备/澜岳储能.md
+        - wiki/companies/电力设备/衡星电气.md
+        - wiki/reports/电力设备/*2026H1*.md
+        - wiki/index.md
+      required: true
+
+  process:
+    - type: plan_usage
+      min_calls: 1
+      required: false
+    - type: max_steps
+      value: 28
+      required: true
+
+tags: [planning, investment-research, wiki, multi-company, financial-analysis, evidence, complex]

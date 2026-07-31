@@ -53,7 +53,7 @@ def test_report_contains_timeline_evidence_changes_validation_and_rollback():
     ):
         assert required in text
 
-    heading = re.search(r"^##\s+(?:rollback|回滚)", text, flags=re.IGNORECASE | re.MULTILINE)
+    heading = re.search(r"^##[^\n]*(?:rollback|回滚)", text, flags=re.IGNORECASE | re.MULTILINE)
     assert heading is not None
     rollback = text[heading.start():]
     assert rollback.index("order-worker") < rollback.index("checkout-api")
