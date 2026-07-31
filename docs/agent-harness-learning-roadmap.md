@@ -21,7 +21,7 @@ Lucas 的长期价值不只是完成某个具体业务，而是作为一个可�
 model -> tool -> observation -> model -> ... -> finish
 ```
 
-显式 Planner、Validator、Revision、Context policy 都作为这个主循环上的可选实验。只有 eval 证明有收益，才进入保留架构；最终是否形成 `plan -> execute -> validate -> revise -> finish`，由实验结果决定，而不是路线图预设。
+显式 Planner、Context policy 作为这个主循环上的可选实验；显式 LLM Validator 是延后的可选实验（判断依据见 Phase 3）。只有 eval 证明有收益，才进入保留架构；最终是否形成 `plan -> execute -> revise -> finish`，由实验结果决定，而不是路线图预设。
 
 ## 2. 非目标
 
@@ -39,7 +39,7 @@ model -> tool -> observation -> model -> ... -> finish
 
 路线图完成后，Lucas Harness 应具备：
 
-1. 一个边界清晰、可取消、受预算约束的最小 Agent loop，以及可插拔的 Planner、Validator、Context policy 实验。
+1. 一个边界清晰、可取消、受预算约束的最小 Agent loop，以及可插拔的 Planner、Context policy 实验（显式 LLM Validator 为延后的可选实验）。
 2. 文件读取、文件写入/patch、代码搜索、受限 Shell/Test，以及至少一个 MCP Server。
 3. 基于预算的 Context 选择，以及至少一次可追踪的摘要压缩。
 4. run/tool/model timeout、取消、四类 retry/correction/revision、最大步数、工具错误恢复和可比较重跑。
@@ -47,7 +47,7 @@ model -> tool -> observation -> model -> ... -> finish
 6. success rate、steps、latency、cost、provider retry、tool retry、model correction、revision、context size 等指标。
 7. prompt、context、tool call、错误、validation、revision 和产物 trace。
 8. 无后端依赖的本地 HTML replay。
-9. baseline、planner、planner-validator、context-selection、context-compression 等逐项可归因对比。
+9. baseline、planner、context-selection、context-compression 等逐项可归因对比（validator 对比仅作为延后可选实验）。
 10. 至少选择一个真实业务能力完成 Skill 按需加载实验；只有证明成功率、工具选择或 Context 成本有收益，才接入产品路径。
 11. 每次机制升级都有实验结论，而不只是代码提交。
 
@@ -448,7 +448,7 @@ Direct loop 适合作为 Phase 0 的 `baseline` 行为参考，但不建议直�
   -> 冻结 baseline 与失败分类
   -> 扩展 Tool contract / safety
   -> Planner 单变量实验
-  -> Validator + Revision 单变量实验
+  -> 错误恢复与确定性反馈驱动的修正（显式 LLM Validator 延后可选）
   -> Context selection，再单独实验 compression
   -> 接 MCP
   -> 按失败案例扩充 capability/regression/holdout
@@ -473,7 +473,7 @@ Agent Harness                                                  |
       -> RunResult --------------------------------------------+
                                                                |
 Optional experimental policies                                |
-  Planner | Validator/Revision | Context selection/compression |
+  Planner | Context selection/compression | （延后可选）Validator/Revision |
                                                                v
                                                 external Graders -> Report
 ```
@@ -489,7 +489,7 @@ INIT -> MODEL_CALL -> TOOL_CALL -> MODEL_CALL -> ... -> FINISH
 任意状态 -> timeout / budget / max_turns / cancelled / fatal_error -> TERMINAL
 ```
 
-Planner variant 可以在 `MODEL_CALL` 前产生或更新 Plan；Validator variant 可以在候选 finish 后返回 pass/revise/fail。二者不得改变 baseline 的 timeout、tool、trace 和 terminal 语义。
+Planner variant 可以在 `MODEL_CALL` 前产生或更新 Plan；显式 Validator 是延后的可选实验（若启用，可在候选 finish 后返回 pass/revise/fail）。它们不得改变 baseline 的 timeout、tool、trace 和 terminal 语义。
 
 Phase 0 核心对象只包含：
 
@@ -707,24 +707,34 @@ Thought 与 Plan 不是互斥的两种范式，而是按任务复杂度分层的
 
 ---
 
-## Phase 3：Validator、Revision 与错误恢复实验
+## Phase 3：错误恢复、确定性反馈驱动的修正与可重复运行
 
 ### 学习问题
 
-- Validator 能否把 grader 失败转为成功，还是只会自我认可？
-- Revision 应修改 plan、step、工具参数还是最终答案？
-- 哪些错误适合 provider/tool retry，哪些应交给模型 correction 或 revision？
+- 哪些错误适合 provider/tool retry，哪些应交给模型 correction？
+- 确定性反馈（测试失败、工具错误、grader 失败）回灌后，模型能否自然修正，还是必须引入独立 Validator？
 - 如何避免 retry 掩盖真实失败或造成成本失控？
 - 如何让两次 run 具有可比较性？
 
-### Validator 与 Revision
+### 确定性反馈驱动的修正（主路径）
 
-Validator 分两层：
+可靠性修正不依赖独立 Validator 组件，而是把环境事实直接回灌模型：
 
-1. 确定性 validation：文件存在、内容断言、测试结果、禁止变更、schema。
-2. LLM validation：只用于无法确定性判断的开放式 success criteria。
+1. 测试失败、工具错误、grader 失败、禁止变更等确定性信号作为 observation 进入下一轮模型输入。
+2. 由模型在后续步骤中自然修正（改参数、改路径、改方案），与 Codex 等成熟 Agent 的运作方式一致。
+3. 失败观察后的新模型步计入 model correction；只有可选 Validator 启用时，才把“改变 plan/step/answer”单独计为 revision。
 
-确定性逻辑优先；`prompts/harness/validator.md` 标记 `llm-weight: medium`。统一输出 `pass|revise|fail`、failed criteria、reason 与 revision scope。Revision 最多 2 次，并记录上一方案为何失败、本次改变什么。Benchmark grader 始终是最终裁判。
+### 可选实验：显式 LLM Validator（延后）
+
+**为什么延后**：Codex 等成熟 Agent 没有独立 Validator 组件，可靠性来自确定性环境反馈 + 模型自然修正 + 代码级预算/重试/取消，而不是“先自评再决定改不改”。独立 LLM Validator 有自我认可风险（validator-pass 但 grader 失败）、额外模型调用成本，且开放式判断本身不可靠。
+
+**何时才值得做**：仅当确定性反馈无法覆盖的开放式任务（如报告质量、建议合理性）持续失败，且 trace 证明“失败后模型自然修正不足”时，才作为 Phase 8 消融实验的可选 arm 评估。
+
+**若启用，沿用以下设计**：
+
+- 确定性 validation 优先：文件存在、内容断言、测试结果、禁止变更、schema。
+- LLM validation 只用于无法确定性判断的开放式 success criteria；`prompts/harness/validator.md` 标记 `llm-weight: medium`。
+- 统一输出 `pass|revise|fail`、failed criteria、reason 与 revision scope；Revision 最多 2 次；Benchmark grader 始终是最终裁判。
 
 ### Timeout 层级
 
@@ -744,7 +754,7 @@ run_timeout
 | provider retry | 否 | 明确 429/5xx/断连等 transient error | 是 |
 | tool execution retry | 否 | 幂等且确认上次未成功 | 是 |
 | model correction | 是 | schema、format、参数错误反馈模型 | 是 |
-| revision | 是 | validation 要求改变 plan/step/answer | 是 |
+| revision | 是 | 可选 Validator 要求改变 plan/step/answer（默认并入 model correction） | 仅在可选实验启用时 |
 
 ### Retry Policy
 
@@ -769,7 +779,7 @@ max_tool_retries = 1
 max_model_corrections = 3
 backoff = exponential + jitter
 max_steps = 12
-max_revisions = 2
+# max_revisions = 2（仅可选 Validator 启用时设置）
 ```
 
 ### 工具错误恢复
@@ -806,10 +816,10 @@ python -m evals.harness rerun runs/<run_id>
 ### 验收
 
 - 所有注入错误都有预期 recovery 或明确 terminal reason。
-- provider/tool retry、model correction 和 revision 次数可以从 trace 中分别验证。
+- provider/tool retry 与 model correction 次数可以从 trace 中分别验证。
 - 非幂等工具不会被盲目重试。
 - rerun 能恢复同一任务、variant、工具和预算配置。
-- 报告 validator-pass/grader-fail 与 revision-recovery 指标。
+- 若启用可选 Validator 实验，额外报告 validator-pass/grader-fail 与 revision-recovery 指标。
 
 ---
 
@@ -1176,13 +1186,14 @@ python -m evals.harness replay runs/<run_id>
 | 实验 | 对照 | 只有一个主要变量 |
 |---|---|---|
 | A | baseline vs planner | 显式规划 |
-| B | retained variant vs +validator+revision | 内部校验与修订 |
+| B* | retained variant vs +显式 LLM Validator+revision | 内部校验与修订（可选、延后） |
 | C | retained variant vs +context selection | 确定性上下文选择 |
 | D | context selection vs +one-time compression | LLM 摘要压缩 |
 | E | native tools vs MCP adapter | 工具协议来源 |
 | F | single vs multi-agent | 多 Agent 编排 |
 
 每个实验结束后先决定保留、修改或删除，再确定下一个实验的 base variant。所有 variant 通过配置组合同一个 Runner，不复制实现。
+B* 仅在 Phase 3 可选实验的触发条件满足时执行，默认跳过。
 
 ### 实验协议
 
@@ -1214,8 +1225,8 @@ revision_count_mean
 ### 需要回答的实验问题
 
 1. Planner 是否提高复杂任务成功率？是否增加简单任务步骤和成本？
-2. Validator 带来的修订有多少真正把失败变成成功？
-3. Validator 是否出现自我认可但 grader 失败？
+2. （可选实验 B*）Validator 带来的修订有多少真正把失败变成成功？
+3. （可选实验 B*）Validator 是否出现自我认可但 grader 失败？
 4. Context selection 是否减少 token 而不降低 success rate？
 5. 摘要压缩在哪些任务中丢失关键信息？
 6. retry 的恢复收益是否值得额外 latency/cost？
@@ -1246,7 +1257,7 @@ Phase 0 已要求产品 single path 与 Eval Adapter 共用最小 Runner。本�
 1. 确认产品 single path 与 Eval Adapter 调用同一个 AgentRunner，不维护影子实现。
 2. 按业务任务需要把现有工具迁移到统一 ToolRuntime，不一次迁完全部能力。
 3. 只有 Planner 实验通过，才把现有 dispatch 作为 planner adapter 的输入案例。
-4. 只有 Validator 实验通过，才把现有 verify 作为 deterministic validation 的输入案例。
+4. 确定性 verify 直接并入错误反馈路径，不依赖独立 LLM Validator；仅当可选实验证明有收益时才评估接入。
 5. 在低风险 direct/research 任务灰度启用被保留的 policy，并与 baseline 对照。
 6. trace 完成脱敏和保留策略后，再记录真实产品 run；不把真实用户数据复制进 eval fixture。
 7. ToolRuntime、Context 选择和业务 capability grader 稳定后，再实验业务 Skill 的发现与按需加载。
@@ -1306,7 +1317,7 @@ Skill 形态的 ReAct Loop 保持最小扩展：模型每轮在 `load_skill | to
 - 现有业务测试不回退。
 - Lucas 的一次真实执行可以生成同 schema 的 trace；replay 只消费允许保留的脱敏字段。
 - 通用 Harness 不 import 投研业务模块。
-- 业务 adapter 可以自行注册工具、context provider 和 validator。
+- 业务 adapter 可以自行注册工具、context provider 和 validator（validator 仅在可选实验启用时接入）。
 - 至少一个真实业务能力完成 Skill 按需加载对照实验；通过门槛的 Skill 才进入产品路径。
 - 被实验否定的机制不因产品已有类似代码而强行接入。
 
@@ -1334,13 +1345,13 @@ harness/
     mcp.py
   policies/             # 到对应实验再增加
     planner.py
-    validator.py
     context.py
+    # validator.py（仅延后可选实验启用时加入）
 
 prompts/harness/
   planner.md
-  validator.md
   context-summary.md
+  # validator.md（仅延后可选实验启用时加入）
 
 evals/
   harness/
@@ -1434,7 +1445,7 @@ infrastructure
 | M1 可信 Baseline | Phase 0 | smoke/business 分层、隔离运行、可靠性地板、versioned trace、首份成绩单 |
 | M2 Tool Runtime | Phase 1 | 结构化工具协议、三种输出视图、权限和故障测试 |
 | M3 Planner 实验 | Phase 2 | baseline vs planner 的可归因结论 |
-| M4 自修正实验 | Phase 3 | Validator/Revision 与四类恢复指标 |
+| M4 错误恢复实验 | Phase 3 | 四类 retry/correction 恢复指标（显式 Validator 为可选，不阻塞里程碑） |
 | M5 Context + MCP | Phase 4—5 | 通过门控的 context selection/compression 与一个 MCP 对照实验 |
 | M6 Eval Lab | Phase 6—7 | suite 治理、稳定 trace schema、按需 HTML replay |
 | M7 连续实验 | Phase 8—9 | 逐项消融结论、至少一个业务 Skill 对照实验和产品中受控应用 |
@@ -1459,9 +1470,9 @@ infrastructure
 
 控制：每个配置至少 3 次运行，报告分布和失败样本，不只报告单次结果。
 
-### 11.4 Validator 自我欺骗
+### 11.4 显式 LLM Validator 自我欺骗（仅可选实验）
 
-风险：LLM validator 认为成功，但真实产物不合格。
+风险：若未来启用 LLM validator，它可能认为成功，但真实产物不合格。
 
 控制：benchmark grader 是最终裁判；记录 validator-pass/grader-fail 指标。
 
@@ -1469,7 +1480,7 @@ infrastructure
 
 风险：错误被反复重试，latency 和 cost 激增。
 
-控制：区分 provider retry、tool retry、model correction 和 revision；只对明确 transient provider error 或安全的幂等工具自动重试，分别记录恢复率并设置独立预算。
+控制：区分 provider retry、tool retry 和 model correction；只对明确 transient provider error 或安全的幂等工具自动重试，分别记录恢复率并设置独立预算（revision 仅在可选 Validator 启用时单列）。
 
 ### 11.6 Trace 泄露敏感信息
 
@@ -1509,7 +1520,7 @@ smoke baseline 冻结后，再加入业务 capability；两层 baseline 都可�
 - 所有进入 smoke、capability、regression、holdout 的任务都通过 `validate-task`，可在干净环境运行。
 - baseline 与实验保留的 variants 可通过配置组合同一个 Runner。
 - 每个 run 都有 manifest、trace、metrics 和 artifact，并能按需生成 replay。
-- baseline 的 model/tool loop 可从 trace 还原；Plan/Validation/Revision 只在相应 variant 中出现。
+- baseline 的 model/tool loop 可从 trace 还原；Plan 只在相应 variant 中出现；Validator/Revision 仅当延后可选实验启用时出现。
 - timeout、cancellation、四类 retry/correction/revision、max steps 和工具恢复都有注入测试。
 - Context 超预算时发生一次可追踪压缩。
 - 至少一个 MCP Server 被实际用于 benchmark。

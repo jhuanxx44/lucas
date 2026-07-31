@@ -363,7 +363,7 @@ success = outcome_passed and safety_passed and process_passed
 | provider retry | 同一逻辑模型请求因明确 transient transport/provider error 重发 | 否 | 固定配置、单独记录 |
 | tool execution retry | 重新执行同一工具 | 否 | 仅幂等且确认上次未成功；写操作默认不自动重试 |
 | model correction | 把 format/schema/参数错误反馈模型并再次推理 | 是 | 受 `max_model_corrections` 限制 |
-| revision | validation 失败后改变 plan/step/answer | 是 | 不进入 MVP，后续实验独立计数 |
+| revision | 可选 Validator 要求改变 plan/step/answer（默认并入 model correction） | 是 | 不进入 MVP；仅可选 Validator 实验启用时单独计数 |
 
 `steps` 统计模型推理/执行步骤，不把 provider retry 伪装成新的 reasoning step。Trace 和 report 分别命名四类事件与计数。
 
@@ -970,14 +970,14 @@ planner
 - steps、latency、token 和 cost 增加多少。
 - 简单任务是否被过度规划。
 
-只有建立 baseline 后，才进入独立 Validator、revision、Context 和 MCP 实验。每个实验先决定保留、修改或删除，再确定下一个实验的 base variant；不预设 Planner 一定保留。
+只有建立 baseline 后，才进入 Context 和 MCP 实验，以及可选的显式 LLM Validator 对比（延后，默认跳过）。每个实验先决定保留、修改或删除，再确定下一个实验的 base variant；不预设 Planner 一定保留。
 
 多 Agent 不作为 MVP 后的第一个实验。建议顺序是：
 
 ```text
 single baseline
   -> baseline vs +planner
-  -> retained variant vs +validator+revision
+  -> retained variant vs +显式 LLM Validator+revision（可选、延后，默认跳过）
   -> retained variant vs +deterministic context selection
   -> context selection vs +one-time compression（仅有真实超预算失败时）
   -> native tools vs MCP adapter

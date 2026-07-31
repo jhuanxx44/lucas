@@ -11,7 +11,7 @@ Lucas 的“真实业务驱动 + 固定任务 + outcome grader + trace 复盘”
 1. **核心保持一个最小 loop**：模型返回工具调用或最终回答，工具 observation 进入下一轮；Planner、Validator、Context policy 都是可替换实验。
 2. **Baseline 自带可靠性地板**：最大模型轮次、run/model/tool timeout、取消、输出上限、进程清理、结构化终止原因和最终 trace 不能推迟到 Planner 之后。
 3. **Eval Adapter 不是内部运行时接口**：内部还需要 ModelAdapter、Environment/ToolRuntime 和 TraceSink。
-4. **Planner 与 Validator 分开实验**：先比较 baseline vs planner，再用保留的 variant 比较是否增加 validator+revision。
+4. **Planner 与 Validator 分开实验**：先比较 baseline vs planner；显式 LLM Validator 延后为可选实验，仅当确定性反馈无法覆盖的开放式任务持续失败时才作为 Phase 8 可选 arm 比较。
 5. **Trace 从第一轮开始，Replay 后做**：事件 schema 先稳定；trace 不等于 checkpoint。
 6. **任务集按失败增长**：先原子 smoke，再 Lucas 业务 capability；稳定任务进入 regression，另保留 capability 和 holdout。
 
