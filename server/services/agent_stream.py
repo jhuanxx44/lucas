@@ -9,6 +9,8 @@ web/src/hooks/useChat.ts 严格对齐：
   summary {step, text}            模型原生 function call 的 summary 参数，
                                   展示为过程摘要；不传给业务工具。
                                   模型原生 reasoning 草稿仅记入 trace，不再推送前端
+  tool_start {step, tool, args,   工具开始执行，前端立即展示运行中状态
+              message}
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
   synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
@@ -166,7 +168,7 @@ def _status_message(evt: dict) -> str:
             hint = json.dumps(args, ensure_ascii=False)
     if len(hint) > 60:
         hint = hint[:60] + "…"
-    suffix = "" if evt.get("ok") else "（失败）"
+    suffix = "（失败）" if "ok" in evt and not evt.get("ok") else ""
     return f"Lucas 调用 {tool}: {hint}{suffix}"
 
 
@@ -268,6 +270,13 @@ async def chat_event_stream(
                 step = evt.get("step", 0)
                 _pending_reasoning[step] = _pending_reasoning.get(step, "") + evt.get("text", "")
                 return
+            if kind == "tool_start":
+                yield _sse("tool_start", {
+                    "step": evt.get("step"),
+                    "tool": evt.get("tool", "?"),
+                    "args": evt.get("args") or {},
+                    "message": _status_message(evt),
+                })
             if kind == "tool_step":
                 tool_name = evt.get("tool", "?")
                 ok = bool(evt.get("ok"))

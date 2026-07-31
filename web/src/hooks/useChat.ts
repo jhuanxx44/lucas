@@ -38,6 +38,12 @@ type Action =
   | { type: "ERROR"; message: ChatMessage }
   | { type: "PLAN_UPDATE"; steps: PlanStep[] };
 
+function upsertTraceStep(steps: ChatTraceStep[], next: ChatTraceStep): ChatTraceStep[] {
+  const index = steps.findIndex((step) => step.id === next.id);
+  if (index === -1) return [...steps, next];
+  return steps.map((step, current) => current === index ? next : step);
+}
+
 function reducer(state: ChatState, action: Action): ChatState {
   switch (action.type) {
     case "USER_MESSAGE":
@@ -78,7 +84,7 @@ function reducer(state: ChatState, action: Action): ChatState {
     case "ACTIONS":
       return { ...state, actions: action.actions };
     case "TOOL_STEP":
-      return { ...state, traceSteps: [...state.traceSteps, action.step] };
+      return { ...state, traceSteps: upsertTraceStep(state.traceSteps, action.step) };
     case "SUMMARY_STEP":
       return { ...state, traceSteps: [...state.traceSteps, action.step] };
     case "PROCESS_STEP":
@@ -240,6 +246,21 @@ export function useChat(
                 streamedActions = (data as { actions: ChatAction[] }).actions;
                 dispatch({ type: "ACTIONS", actions: streamedActions });
                 break;
+              case "tool_start": {
+                const toolData = data as { step: number; tool: string; args: Record<string, unknown>; message: string };
+                const step: ChatTraceStep = {
+                  id: `tool-${toolData.step}-${toolData.tool}`,
+                  kind: "tool",
+                  label: toolData.message,
+                  status: "running",
+                  step: toolData.step,
+                  tool: toolData.tool,
+                  input: toolData.args,
+                };
+                streamedTraceSteps = upsertTraceStep(streamedTraceSteps, step);
+                dispatch({ type: "TOOL_STEP", step });
+                break;
+              }
               case "tool_step": {
                 const toolData = data as { step: number; tool: string; args: Record<string, unknown>; ok: boolean; output: string; message: string };
                 const step: ChatTraceStep = {
@@ -252,7 +273,7 @@ export function useChat(
                   input: toolData.args,
                   output: toolData.output,
                 };
-                streamedTraceSteps = [...streamedTraceSteps, step];
+                streamedTraceSteps = upsertTraceStep(streamedTraceSteps, step);
                 dispatch({ type: "TOOL_STEP", step });
                 break;
               }

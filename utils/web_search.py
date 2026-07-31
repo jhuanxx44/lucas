@@ -8,6 +8,8 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+TAVILY_TIMEOUT_SECONDS = 90.0
+
 
 async def _tavily_search(query: str, max_results: int = 5, search_type: str = "general") -> Optional[str]:
     api_key = os.environ.get("TAVILY_API_KEY")
@@ -17,8 +19,11 @@ async def _tavily_search(query: str, max_results: int = 5, search_type: str = "g
         from tavily import TavilyClient
         client = TavilyClient(api_key=api_key)
         topic = "news" if search_type == "news" else "general"
-        resp = await asyncio.to_thread(
-            client.search, query=query, max_results=max_results, topic=topic,
+        resp = await asyncio.wait_for(
+            asyncio.to_thread(
+                client.search, query=query, max_results=max_results, topic=topic,
+            ),
+            timeout=TAVILY_TIMEOUT_SECONDS,
         )
         results = resp.get("results", [])
         if not results:
@@ -30,6 +35,9 @@ async def _tavily_search(query: str, max_results: int = 5, search_type: str = "g
             url = r.get("url", "")
             parts.append(f"{i}. [{title}]({url})\n   {content}")
         return "\n\n".join(parts)
+    except asyncio.TimeoutError:
+        logger.warning("Tavily 搜索超时 (%.0fs): %s", TAVILY_TIMEOUT_SECONDS, query[:80])
+        return None
     except Exception as e:
         logger.warning("Tavily 搜索失败: %s", e)
         return None

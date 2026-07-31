@@ -90,7 +90,7 @@ async def test_native_tool_call_round_trip_uses_provider_call_id(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_summary_is_emitted_before_tool_step_and_not_forwarded_to_handler(tmp_path):
+async def test_summary_and_tool_start_are_emitted_before_tool_step(tmp_path):
     seen_args = []
 
     def handler(workspace, args):
@@ -116,8 +116,16 @@ async def test_summary_is_emitted_before_tool_step_and_not_forwarded_to_handler(
     )
 
     assert seen_args == [{"value": "x"}]
-    assert [event["kind"] for event in events[:2]] == ["summary", "tool_step"]
+    assert [event["kind"] for event in events[:3]] == [
+        "summary", "tool_start", "tool_step",
+    ]
     assert events[0]["text"] == "我先确认一下"
+    assert events[1] == {
+        "kind": "tool_start",
+        "step": 1,
+        "tool": "echo",
+        "args": {"value": "x"},
+    }
 
 
 @pytest.mark.asyncio

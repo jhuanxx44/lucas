@@ -333,6 +333,13 @@ class AgentRunner:
                 "tool": tool,
                 "args": args,
             })
+            if on_event is not None:
+                on_event({
+                    "kind": "tool_start",
+                    "step": step,
+                    "tool": tool,
+                    "args": args,
+                })
             try:
                 result = await await_before_deadline(self.tools.execute(tool, args, allowed_tools))
             except _RunDeadlineExceeded:

@@ -124,14 +124,15 @@ async def test_agent_stream_full_native_event_sequence(tmp_path):
     visible = [item for item in events if item[0] != "trace_event"]
 
     assert [name for name, _ in visible] == [
-        "dispatch", "researcher_start", "summary", "tool_step",
+        "dispatch", "researcher_start", "summary", "tool_start", "tool_step",
         "synthesis_chunk", "researcher_done", "done",
     ]
     assert visible[2][1] == {"step": 1, "text": "先查一下资料"}
     assert visible[3][1]["tool"] == "wiki_recall"
     assert visible[3][1]["args"] == {"query": "贵州茅台"}
-    assert visible[3][1]["ok"] is True
-    assert visible[4][1] == {"text": "最终答案"}
+    assert visible[3][1]["message"] == "Lucas 调用 wiki_recall: 贵州茅台"
+    assert visible[4][1]["ok"] is True
+    assert visible[5][1] == {"text": "最终答案"}
     assert visible[-1][1] == {"total_tokens": 430}
 
 

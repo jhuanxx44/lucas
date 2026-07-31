@@ -38,11 +38,14 @@ function StepList({ steps, live }: AnalysisProcessProps) {
         if (step.kind === "tool") {
           // 工具调用：淡灰底 pill + 扳手图标，一眼可辨；失败态用琥珀色扳手
           const failed = step.status === "error";
+          const running = step.status === "running";
           return (
             <li key={step.id} className="relative leading-5">
-              <span className={`absolute -left-[19px] top-2 h-1.5 w-1.5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${active ? "animate-pulse bg-indigo-500" : "bg-zinc-300 dark:bg-zinc-700"}`} />
+              <span className={`absolute -left-[19px] top-2 h-1.5 w-1.5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${running || active ? "animate-pulse bg-indigo-500" : "bg-zinc-300 dark:bg-zinc-700"}`} />
               <span className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
-                <Wrench size={11} className={failed ? "text-amber-500" : "text-zinc-400 dark:text-zinc-500"} />
+                {running
+                  ? <span className="inline-flex animate-spin"><Loader2 size={11} className="text-indigo-500" /></span>
+                  : <Wrench size={11} className={failed ? "text-amber-500" : "text-zinc-400 dark:text-zinc-500"} />}
                 <span className={failed ? "text-amber-600 dark:text-amber-400" : undefined}>{step.label}</span>
               </span>
             </li>
