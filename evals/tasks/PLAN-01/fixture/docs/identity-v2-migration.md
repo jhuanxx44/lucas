@@ -14,7 +14,7 @@ identity_api:
 迁移时必须保留服务原有的副本数、队列名和其他业务配置。已经使用 V2 的服务无需改动，
 `active: false` 的服务只保留历史状态，不参与本轮发布。
 
-发布必须遵循服务的 `depends_on`：依赖方先部署，被依赖它的服务后部署。每阶段门槛如下：
+发布必须遵循服务的 `depends_on`：被依赖方先部署，依赖它的服务后部署。每阶段门槛如下：
 
 - auth-gateway：`identity-v2 healthcheck` 通过。
 - billing-worker：`billing reconciliation` 通过。

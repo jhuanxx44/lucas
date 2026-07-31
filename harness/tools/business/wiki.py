@@ -45,6 +45,17 @@ WIKI_RECALL_SPEC = ToolSpec(
                 "返回格式：每条结果以 --- 标题（路径） --- 开头，"
                 "若页面有 frontmatter summary 则以「摘要：」标注返回，"
                 "若无 summary 则回退为正文截取（最多 500 字符）。",
-    args_description='{"query": "LLM 预分词的关键词，空格/逗号/顿号分隔"}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "LLM 预分词的关键词，以空格、逗号或顿号分隔",
+            },
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
     handler=wiki_recall,
 )

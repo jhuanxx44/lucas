@@ -128,7 +128,7 @@ async def _compile_one(client, prompt_template: str, source: dict,
         if cache.is_file() and not force:
             result = json.loads(cache.read_text(encoding="utf-8"))["result"]
         else:
-            text, usage = await client.chat(
+            text, usage = await client.generate_text(
                 prompt, response_mime_type="application/json", temperature=0,
             )
             result = extract_json(text)
@@ -150,7 +150,7 @@ async def _compile_one(client, prompt_template: str, source: dict,
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps({
             "doc_id": source["doc_id"],
-            "model": getattr(client, "model", os.environ.get("OPENAI_MODEL", "")),
+            "model": getattr(client, "model", os.environ.get("DEEPSEEK_MODEL", "")),
             "source_hashes": [record["content_sha256"] for record in records],
             "raw_result": raw_result,
             "result": result,
@@ -172,7 +172,7 @@ async def _compile_one(client, prompt_template: str, source: dict,
             "status": "ok",
             "path": source["target_path"],
             "chars": len(page),
-            "model": getattr(client, "model", os.environ.get("OPENAI_MODEL", "")),
+            "model": getattr(client, "model", os.environ.get("DEEPSEEK_MODEL", "")),
             "prompt_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
             "completion_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
         }
@@ -218,7 +218,7 @@ async def compile_corpus(plan_path: Path, corpus_root: Path, workers: int,
         else:
             ready.append((source, records))
 
-    client = create_client(model=os.environ.get("OPENAI_MODEL"))
+    client = create_client(model=os.environ.get("DEEPSEEK_MODEL"))
     prompt = _load_prompt()
     semaphore = asyncio.Semaphore(workers)
 

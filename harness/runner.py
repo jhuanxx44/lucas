@@ -6,14 +6,13 @@ from pathlib import Path
 from typing import Callable
 
 from harness.model_adapter import ModelAdapter
-from harness.models import AgentResult, RunLimits, StepContext
-from harness.streaming import AnswerStreamParser
+from harness.models import AgentResult, ModelRequest, ModelTurn, RunLimits, StepContext
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
 
-# 单次 observation 截断上限：极大值，实际永不触发（LLM 上下文窗口是真正的瓶颈）
 MAX_OBSERVATION_CHARS = 10_000_000
+MAX_MODEL_CORRECTIONS = 3
 
 
 class _RunDeadlineExceeded(Exception):
@@ -21,14 +20,12 @@ class _RunDeadlineExceeded(Exception):
 
 
 class _NullTrace:
-    """trace 为空时的 no-op 替代，保持 Runner 主循环不做分支判断"""
-
     def record(self, event: str, data: dict | None = None) -> None:
         return None
 
 
 def load_prompt_template(path: str | Path) -> str:
-    """加载 prompt 模板并剥离 frontmatter（--- ... ---）"""
+    """Load a prompt template and strip its llm-weight frontmatter."""
     text = Path(path).read_text(encoding="utf-8")
     if text.startswith("---"):
         end = text.find("\n---", 3)
@@ -38,12 +35,21 @@ def load_prompt_template(path: str | Path) -> str:
 
 
 class AgentRunner:
-    """通用最小 Agent 循环：模型每轮返回一个 JSON（tool 或 answer）"""
+    """Native Responses loop; Lucas owns execution and explicit context items."""
 
-    def __init__(self, model: ModelAdapter, tools: ToolRuntime, prompt_template: str):
+    def __init__(
+        self,
+        model: ModelAdapter,
+        tools: ToolRuntime,
+        prompt_template: str,
+        instructions: str = "",
+        temperature: float = 0.0,
+    ):
         self.model = model
         self.tools = tools
         self.prompt_template = prompt_template
+        self.instructions = instructions
+        self.temperature = temperature
 
     async def run(
         self,
@@ -55,27 +61,16 @@ class AgentRunner:
         stream_answer: bool = False,
         on_trace_event: Callable[[dict], None] | None = None,
     ) -> AgentResult:
-        """on_event：可选的 step 事件钩子（同步回调，零开销缺省）。
-
-        工具执行完成时回调 {"kind": "tool_step", "step", "tool", "args", "ok",
-        "observation"}；
-        answer 产出时回调 {"kind": "answer", "step", "answer"}。
-        不改变任何终止语义，仅用于外部观察（如 SSE 桥）。
-        on_trace_event 单独承接完整模型输入与原始输出，不污染上述展示事件协议。
-
-        stream_answer=True 且 adapter 实现 complete_stream 且传了 on_event 时，
-        模型输出改走流式：AnswerStreamParser 确认是字符串 reply 后逐段回调
-        {"kind": "answer_chunk", "step", "text"}；完整 raw 仍走与非流式
-        一字不差的 _parse_action / trace / 全量回放逻辑，answer 事件额外带
-        streamed_chars（已推送字符数，供下游补尾）。默认 False，evals 零变化。
-        流式调用抛异常时记 trace 后回退 complete()，run 不中断。
-        """
-        context = StepContext(step_id="", instruction=instruction)
+        initial_input = self.prompt_template.format(instruction=instruction)
+        context = StepContext(
+            step_id="",
+            instruction=instruction,
+            input_items=[{"role": "user", "content": initial_input}],
+        )
         last_failed_signature = None
-        # 无进展检测：成功调用的 observation 指纹 → 首次出现的 step。
-        # 判"打转"看结果是否重复（拿回相同信息），而非参数是否重复（换措辞查询也能抓到）。
         seen_result_steps: dict[str, int] = {}
-        stall_count = 0  # 累计"拿回已见过的结果"次数
+        stall_count = 0
+        correction_count = 0
         total_observation_chars = 0
         total_usage: TokenUsage | None = None
         cost_usd = 0.0
@@ -101,9 +96,9 @@ class AgentRunner:
                 raise _RunDeadlineExceeded
             try:
                 return await asyncio.wait_for(awaitable, timeout=remaining)
-            except TimeoutError as e:
+            except TimeoutError as error:
                 if time.monotonic() >= deadline:
-                    raise _RunDeadlineExceeded from e
+                    raise _RunDeadlineExceeded from error
                 raise
 
         def timeout_result(phase: str) -> AgentResult:
@@ -117,7 +112,8 @@ class AgentRunner:
             return AgentResult(
                 finish_reason="timeout",
                 error=f"elapsed {elapsed:.1f}s exceeded timeout {limits.timeout_seconds}s",
-                usage=total_usage, cost_usd=cost_usd,
+                usage=total_usage,
+                cost_usd=cost_usd,
             )
 
         step = 0
@@ -127,128 +123,103 @@ class AgentRunner:
                 return timeout_result("between_steps")
             context.step_id = f"step-{step}"
             trace.record("step_started", {"step_id": context.step_id})
-            prompt = self._render(context, allowed_tools)
-            if on_trace_event is not None:
-                on_trace_event({"kind": "model_input", "step": step, "prompt": prompt})
-            # 大 payload 写 artifact，trace 只留引用；prompt 不含敏感信息（工作区隔离、env 已净化）
-            prompt_ref = (
-                _write_artifact(artifacts, f"prompt-{context.step_id}.txt", prompt)
+
+            request = ModelRequest(
+                instructions=self.instructions,
+                input_items=list(context.input_items),
+                tools=self.tools.available(allowed_tools),
+                temperature=self.temperature,
+            )
+            serialized_input = json.dumps(request.input_items, ensure_ascii=False, indent=2)
+            input_ref = (
+                _write_artifact(artifacts, f"input-{context.step_id}.json", serialized_input)
                 if artifacts is not None else None
             )
-            trace.record("prompt_rendered", {
+            trace.record("model_input_prepared", {
                 "step_id": context.step_id,
-                "prompt_chars": len(prompt),
-                "artifact": prompt_ref,
+                "input_items": len(request.input_items),
+                "input_chars": len(serialized_input),
+                "artifact": input_ref,
             })
+            if on_trace_event is not None:
+                on_trace_event({"kind": "model_input", "step": step, "input": request.input_items})
             trace.record("model_call_started", {
-                "step_id": context.step_id, "model_call_id": f"model-{step}",
+                "step_id": context.step_id,
+                "model_call_id": f"model-{step}",
             })
+            trace.record("response_started", {"step_id": context.step_id})
+
+            use_stream = stream_answer and on_event is not None and hasattr(self.model, "complete_stream")
+            streamed_chunks: list[str] = []
             started = time.monotonic()
-            # 流式路径需 on_event 承接 answer_chunk；evals 默认走非流式 complete()
-            use_stream = (
-                stream_answer
-                and on_event is not None
-                and hasattr(self.model, "complete_stream")
-            )
-            stream_state = {"streamed": 0}
             try:
                 if use_stream:
                     try:
-                        raw, usage = await await_before_deadline(
-                            self._complete_streaming(prompt, step, on_event, stream_state))
+                        turn, streamed_chunks = await await_before_deadline(
+                            self._complete_streaming(request, step, on_event)
+                        )
                     except _RunDeadlineExceeded:
                         return timeout_result("model_call")
-                    except Exception as e:
+                    except Exception as error:
                         trace.record("answer_stream_fallback", {
-                            "step_id": context.step_id, "error": str(e)[:200],
+                            "step_id": context.step_id,
+                            "error": str(error)[:200],
                         })
-                        raw, usage = await await_before_deadline(
-                            self.model.complete(prompt))
+                        turn = await await_before_deadline(self.model.complete(request))
+                        streamed_chunks = []
                 else:
-                    raw, usage = await await_before_deadline(
-                        self.model.complete(prompt))
+                    turn = await await_before_deadline(self.model.complete(request))
             except _RunDeadlineExceeded:
                 return timeout_result("model_call")
+
             duration_ms = (time.monotonic() - started) * 1000
-            if usage is not None:
-                total_usage = usage if total_usage is None else total_usage.merge(usage)
+            if turn.usage is not None:
+                total_usage = turn.usage if total_usage is None else total_usage.merge(turn.usage)
             cost_usd = total_usage.total_cost if total_usage is not None else 0.0
+            output_json = json.dumps(turn.response_items, ensure_ascii=False, indent=2)
             output_ref = (
-                _write_artifact(artifacts, f"output-{context.step_id}.txt", raw)
+                _write_artifact(artifacts, f"output-{context.step_id}.json", output_json)
                 if artifacts is not None else None
             )
             trace.record("model_call_finished", {
                 "step_id": context.step_id,
                 "model_call_id": f"model-{step}",
                 "duration_ms": round(duration_ms, 1),
-                "output_chars": len(raw),
+                "output_chars": len(turn.output_text),
+                "output_items": len(turn.response_items),
+                "response_id": turn.response_id,
                 "artifact": output_ref,
-                **(_usage_trace_data(usage)),
+                **_usage_trace_data(turn.usage),
             })
-            if on_trace_event is not None:
-                on_trace_event({"kind": "model_output", "step": step, "output": raw})
-            # 全量回放：模型自己的原始输出（包括格式错误的）进入后续上下文
-            context.history.append({"role": "assistant", "content": raw})
-            action = _parse_action(raw)
-            if action is None:
-                trace.record("action_parsed", {
-                    "step_id": context.step_id, "kind": "invalid",
-                })
-                context.history.append({"role": "tool", "content": (
-                    "你的上一条回复格式不对。请返回且只返回一个 JSON 对象："
-                    '调用工具用 {"action": "tool", "tool": "工具名", "args": {...}}；'
-                    '最终作答用 {"action": "answer", "reply": "答案"}。'
-                    "如果答案本身是 JSON，请把它作为 reply 的字符串值或直接用其内容作答。"
-                )})
-                trace.record("step_finished", {"step_id": context.step_id})
-                continue
-
-            # summary：面向用户的一句话旁白，解析后即刻发出（先于工具执行/答案返回）
-            summary = action.get("summary")
-            if summary and on_event is not None:
-                on_event({"kind": "summary", "step": step, "text": summary})
-
-            if action["kind"] == "answer":
-                answer_text = action["answer"]
-                trace.record("action_parsed", {
+            trace.record("response_completed", {
+                "step_id": context.step_id,
+                "response_id": turn.response_id,
+                "output_items": len(turn.response_items),
+            })
+            for retry in turn.provider_retries:
+                trace.record("provider_retry", {
                     "step_id": context.step_id,
-                    "kind": "answer",
-                    "answer_preview": str(answer_text)[:500],
+                    **retry,
                 })
-                trace.record("step_finished", {"step_id": context.step_id})
-                if on_event is not None:
-                    event = {"kind": "answer", "step": step, "answer": answer_text}
-                    if use_stream:
-                        # 已推送字符数（含回退前部分推送），供下游补尾防缺字
-                        event["streamed_chars"] = stream_state["streamed"]
-                    on_event(event)
-                return AgentResult(
-                    answer=answer_text, finish_reason="completed",
-                    usage=total_usage, cost_usd=cost_usd,
-                )
+            if turn.reasoning:
+                trace.record("model_reasoning", {
+                    "step_id": context.step_id,
+                    "text": turn.reasoning,
+                })
+            if turn.commentary:
+                trace.record("model_commentary", {
+                    "step_id": context.step_id,
+                    "text": turn.commentary,
+                })
+            if on_trace_event is not None:
+                on_trace_event({
+                    "kind": "model_output",
+                    "step": step,
+                    "response_id": turn.response_id,
+                    "output_text": turn.output_text,
+                    "items": turn.response_items,
+                })
 
-            tool, args = action["tool"], action["args"]
-            trace.record("action_parsed", {
-                "step_id": context.step_id, "kind": "tool", "tool": tool, "args": args,
-            })
-            signature = (tool, json.dumps(args, sort_keys=True, ensure_ascii=False))
-            if signature == last_failed_signature:
-                trace.record("tool_call_repeated_failure", {
-                    "step_id": context.step_id, "tool": tool, "args": args,
-                })
-                context.history.append({"role": "tool", "content": (
-                    f"警告：{tool} 连续两次以相同参数调用失败。"
-                    "请换用其他工具、换一组参数，或基于已有信息作答。"
-                )})
-                trace.record("step_finished", {"step_id": context.step_id})
-                if on_event is not None:
-                    on_event({
-                        "kind": "tool_step", "step": step, "tool": tool,
-                        "args": args, "ok": False,
-                        "observation": "repeated failure; prompt injected",
-                    })
-                continue
-            # 预算在执行下一个工具前检查：已产出的最终答案不会被预算拦截丢弃
             if limits.max_cost_usd and cost_usd > limits.max_cost_usd:
                 trace.record("budget_exceeded", {
                     "step_id": context.step_id,
@@ -259,21 +230,115 @@ class AgentRunner:
                 return AgentResult(
                     finish_reason="budget_exceeded",
                     error=f"cost {cost_usd:.4f} USD exceeded budget {limits.max_cost_usd} USD",
-                    usage=total_usage, cost_usd=cost_usd,
+                    usage=total_usage,
+                    cost_usd=cost_usd,
                 )
-            call_id = f"call-{step}"
+
+            decision_error = _decision_error(turn)
+            if decision_error:
+                correction_count += 1
+                trace.record("model_correction", {
+                    "step_id": context.step_id,
+                    "reason": decision_error,
+                    "correction_count": correction_count,
+                })
+                trace.record("step_finished", {"step_id": context.step_id})
+                if correction_count > MAX_MODEL_CORRECTIONS:
+                    return AgentResult(
+                        finish_reason="protocol_error",
+                        error=f"model protocol correction exhausted: {decision_error}",
+                        usage=total_usage,
+                        cost_usd=cost_usd,
+                    )
+                context.input_items.append({
+                    "role": "user",
+                    "content": (
+                        f"上一响应不符合工具协议：{decision_error}。"
+                        "请重新作出一次决策：需要工具时只返回一个 function_call item；"
+                        "任务完成时只返回最终答案。"
+                    ),
+                })
+                continue
+
+            correction_count = 0
+            if not turn.function_calls:
+                answer_text = turn.output_text
+                if streamed_chunks and "".join(streamed_chunks) != answer_text:
+                    streamed_chunks = [answer_text] if answer_text else []
+                trace.record("assistant_answer", {
+                    "step_id": context.step_id,
+                    "answer_preview": answer_text[:500],
+                })
+                trace.record("step_finished", {"step_id": context.step_id})
+                streamed_chars = 0
+                if on_event is not None:
+                    for chunk in streamed_chunks:
+                        streamed_chars += len(chunk)
+                        on_event({"kind": "answer_chunk", "step": step, "text": chunk})
+                    on_event({
+                        "kind": "answer",
+                        "step": step,
+                        "answer": answer_text,
+                        "streamed_chars": streamed_chars,
+                    })
+                return AgentResult(
+                    answer=answer_text,
+                    finish_reason="completed",
+                    usage=total_usage,
+                    cost_usd=cost_usd,
+                )
+
+            call = turn.function_calls[0]
+            tool, args = call.name, call.arguments
+            trace.record("function_call_received", {
+                "step_id": context.step_id,
+                "tool_call_id": call.call_id,
+                "tool": tool,
+                "args": args,
+                "summary": call.summary,
+            })
+            if on_event is not None:
+                on_event({"kind": "summary", "step": step, "text": call.summary})
+
+            signature = (tool, json.dumps(args, sort_keys=True, ensure_ascii=False))
+            if signature == last_failed_signature:
+                observation = (
+                    f"警告：{tool} 连续两次以相同参数调用失败。"
+                    "请换用其他工具、换一组参数，或基于已有信息作答。"
+                )
+                trace.record("tool_call_repeated_failure", {
+                    "step_id": context.step_id,
+                    "tool": tool,
+                    "args": args,
+                })
+                _append_function_output(context, turn, call.call_id, observation)
+                trace.record("function_call_output", {
+                    "tool_call_id": call.call_id,
+                    "observation": observation,
+                })
+                trace.record("step_finished", {"step_id": context.step_id})
+                if on_event is not None:
+                    on_event({
+                        "kind": "tool_step",
+                        "step": step,
+                        "tool": tool,
+                        "args": args,
+                        "ok": False,
+                        "observation": observation,
+                    })
+                continue
+
             trace.record("tool_call_started", {
-                "tool_call_id": call_id, "tool": tool, "args": args,
+                "tool_call_id": call.call_id,
+                "tool": tool,
+                "args": args,
             })
             try:
-                result = await await_before_deadline(
-                    self.tools.execute(tool, args, allowed_tools))
+                result = await await_before_deadline(self.tools.execute(tool, args, allowed_tools))
             except _RunDeadlineExceeded:
                 return timeout_result("tool_call")
             full_observation = _format_observation(tool, result)
-            remaining_observation_chars = (
-                max(0, MAX_OBSERVATION_CHARS - total_observation_chars)
-            )
+            remaining_observation_chars = max(0, MAX_OBSERVATION_CHARS - total_observation_chars)
             observation, was_truncated = _truncate_observation(
                 full_observation,
                 min(MAX_OBSERVATION_CHARS, remaining_observation_chars),
@@ -281,9 +346,10 @@ class AgentRunner:
             if was_truncated:
                 result.truncated = True
             total_observation_chars += len(observation)
+
             if result.ok:
                 trace.record("tool_call_finished", {
-                    "tool_call_id": call_id,
+                    "tool_call_id": call.call_id,
                     "observation_chars": len(observation),
                     "total_observation_chars": total_observation_chars,
                     "observation": observation,
@@ -293,33 +359,31 @@ class AgentRunner:
                 result_hash = hashlib.sha256(observation.encode("utf-8")).hexdigest()
                 first_step = seen_result_steps.get(result_hash)
                 if first_step is not None:
-                    # 无进展：不把重复正文再塞进 history（省预算），只回注一条提示。
-                    # raw（模型本轮输出）已在 model_call 后入 history，此处只补 tool 反馈。
                     stall_count += 1
-                    stall_note = _stall_note(tool, first_step)
-                    context.history.append({"role": "tool", "content": stall_note})
+                    function_output = _stall_note(tool, first_step)
                     trace.record("no_progress_detected", {
                         "step_id": context.step_id,
                         "tool": tool,
                         "repeated_from_step": first_step,
                         "stall_count": stall_count,
-                                            })
-                    trace.record("step_finished", {"step_id": context.step_id})
-                    if on_event is not None:
-                        on_event({
-                            "kind": "tool_step", "step": step, "tool": tool,
-                            "args": args, "ok": result.ok, "observation": observation,
-                        })
-                    continue
-                seen_result_steps[result_hash] = step
+                    })
+                else:
+                    seen_result_steps[result_hash] = step
+                    function_output = observation
             else:
                 trace.record("tool_call_error", {
-                    "tool_call_id": call_id,
+                    "tool_call_id": call.call_id,
                     "status": result.status,
                     "error_code": result.error_code,
                 })
                 last_failed_signature = signature
-            context.history.append({"role": "tool", "content": observation})
+                function_output = observation
+
+            _append_function_output(context, turn, call.call_id, function_output)
+            trace.record("function_call_output", {
+                "tool_call_id": call.call_id,
+                "observation": function_output,
+            })
             trace.record("step_finished", {"step_id": context.step_id})
             if on_event is not None:
                 on_event({
@@ -330,55 +394,60 @@ class AgentRunner:
                     "ok": result.ok,
                     "observation": observation,
                 })
+
         return AgentResult(
-            finish_reason="max_steps", error="max steps exhausted",
-            usage=total_usage, cost_usd=cost_usd,
+            finish_reason="max_steps",
+            error="max steps exhausted",
+            usage=total_usage,
+            cost_usd=cost_usd,
         )
 
     async def _complete_streaming(
         self,
-        prompt: str,
+        request: ModelRequest,
         step: int,
         on_event: Callable[[dict], None],
-        stream_state: dict,
-    ) -> tuple[str, TokenUsage | None]:
-        """流式调用模型：区分模型原生的思考通道与答案通道。
+    ) -> tuple[ModelTurn, list[str]]:
+        """Buffer answer deltas until the completed turn proves it is not a tool call."""
+        chunks: list[str] = []
+        completed_turn: ModelTurn | None = None
+        async for event in self.model.complete_stream(request):
+            if event.kind == "reasoning_delta":
+                if event.text:
+                    on_event({"kind": "thought", "step": step, "text": event.text})
+            elif event.kind == "output_text_delta":
+                chunks.append(event.text)
+            elif event.kind == "completed":
+                completed_turn = event.turn
+        if completed_turn is None:
+            raise RuntimeError("model stream did not produce a completed turn")
+        return completed_turn, chunks
 
-        - reasoning 段：逐段回调 {"kind":"thought"}，展示为过程思考；不进 raw。
-        - content 段：累积为 raw（喂 _parse_action / 全量回放），并经
-          AnswerStreamParser 提取字符串 reply 后回调 answer_chunk。
-          工具调用/结构化 answer/非法输出不发 answer_chunk。
-        流式无 usage，记 None。
-        """
-        parser = AnswerStreamParser()
-        parts: list[str] = []
-        async for kind, text in self.model.complete_stream(prompt):
-            if kind == "reasoning":
-                # 原生思考通道：逐段推送为过程 thought，不进 raw（不影响动作解析与回放）
-                if text:
-                    on_event({"kind": "thought", "step": step, "text": text})
-                continue
-            # content 段：累积为 raw（喂 _parse_action / 全量回放），并经 parser 提取 reply
-            parts.append(text)
-            for delta in parser.feed(text):
-                stream_state["streamed"] += len(delta)
-                on_event({"kind": "answer_chunk", "step": step, "text": delta})
-        for delta in parser.finalize():
-            stream_state["streamed"] += len(delta)
-            on_event({"kind": "answer_chunk", "step": step, "text": delta})
-        return "".join(parts), None
 
-    def _render(self, context: StepContext, allowed_tools: list[str]) -> str:
-        # 工具说明由调用方拼进 system prompt（稳定指令层），此处只渲染每轮变化的
-        # 任务与历史观察。allowed_tools 仍传入以保持 run() 签名不变（execute 用）。
-        labels = {"assistant": "【你】", "tool": "【工具】"}
-        observations = "\n\n".join(
-            f"{labels[m['role']]}{m['content']}" for m in context.history
-        ) or "（暂无）"
-        return self.prompt_template.format(
-            instruction=context.instruction,
-            observations=observations,
-        )
+def _decision_error(turn: ModelTurn) -> str:
+    if turn.protocol_error:
+        return turn.protocol_error
+    if len(turn.function_calls) > 1:
+        return "response returned more than one function call"
+    if turn.function_calls and turn.output_text.strip():
+        return "response mixed a function call with final output text"
+    if not turn.function_calls and not turn.output_text.strip():
+        return "response contained neither a function call nor final output text"
+    return ""
+
+
+def _append_function_output(
+    context: StepContext,
+    turn: ModelTurn,
+    call_id: str,
+    output: str,
+) -> None:
+    context.input_items.extend(turn.response_items)
+    context.input_items.append({
+        "type": "function_call_output",
+        "call_id": call_id,
+        "output": output,
+    })
 
 
 def _write_artifact(artifacts: Path, name: str, content: str) -> str:
@@ -393,38 +462,9 @@ def _usage_trace_data(usage: TokenUsage | None) -> dict:
     return {
         "prompt_tokens": usage.prompt_tokens,
         "completion_tokens": usage.completion_tokens,
+        "thinking_tokens": usage.thinking_tokens,
         "total_tokens": usage.total_tokens,
     }
-
-
-def _parse_action(raw: str) -> dict | None:
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]) if len(lines) >= 2 else text.strip("`")
-    try:
-        value = json.loads(text.strip())
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(value, dict):
-        return None
-    # summary：给用户看的一句话旁白（可选），不影响动作语义
-    raw_summary = value.get("summary")
-    summary = raw_summary.strip() if isinstance(raw_summary, str) and raw_summary.strip() else None
-    if value.get("action") == "answer":
-        answer = value.get("reply", value.get("answer"))
-        if answer is None:
-            return None
-        return {"kind": "answer", "answer": answer, "summary": summary}
-    if value.get("action") == "tool" and isinstance(value.get("tool"), str):
-        args = value.get("args", {})
-        if not isinstance(args, dict):
-            return None
-        return {"kind": "tool", "tool": value["tool"], "args": args, "summary": summary}
-    if "action" not in value:
-        # 宽容解析：模型直接输出答案 JSON（无 action 外壳）时按 answer 接受
-        return {"kind": "answer", "answer": value, "summary": summary}
-    return None
 
 
 def _format_observation(tool: str, result) -> str:
@@ -433,7 +473,6 @@ def _format_observation(tool: str, result) -> str:
 
 
 def _stall_note(tool: str, first_step: int) -> str:
-    """无进展回注：结果与前面某步相同即"没拿到新信息"，引导 LLM 换策略。"""
     return (
         f"⚠️ 停滞：{tool} 返回结果与第 {first_step} 步完全相同，"
         "继续当前方式不会获得新信息。\n"

@@ -14,8 +14,9 @@ from utils.llm_client import create_client
 WIKI_ROOT = os.path.join(os.path.dirname(__file__), "fixture", "wiki")
 QUERIES_PATH = os.path.join(os.path.dirname(__file__), "queries.json")
 OUT_DIR = os.path.join(os.path.dirname(__file__), "results")
-MODEL = "deepseek-chat"
+MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
+# llm-weight: light
 KW_SYSTEM_PROMPT = """你是一个中文关键词提取器。给定一个自然语言问题，提取用于文档检索的关键词。
 
 规则：
@@ -28,7 +29,7 @@ KW_SYSTEM_PROMPT = """你是一个中文关键词提取器。给定一个自然�
 
 async def extract_llm_keywords(client, query: str) -> list[str]:
     try:
-        text, _ = await client.chat(query)
+        text, _ = await client.generate_text(query)
         keywords = [k.strip() for k in text.split() if k.strip()]
         if keywords:
             return keywords
@@ -41,7 +42,7 @@ async def main():
     with open(QUERIES_PATH) as f:
         queries_data = json.load(f)
 
-    client = create_client(MODEL, system_prompt=KW_SYSTEM_PROMPT)
+    client = create_client(MODEL, instructions=KW_SYSTEM_PROMPT)
     os.makedirs(OUT_DIR, exist_ok=True)
 
     kw_results = []

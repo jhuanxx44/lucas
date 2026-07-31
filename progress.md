@@ -1,3 +1,42 @@
+# Current Progress: Review, Fix, Commit, and Push Responses Migration
+
+## Session: 2026-07-31
+
+### Phase 1: Scope and Baseline
+- **Status:** in progress
+- Activated the required code-review and file-planning skills.
+- Confirmed the dedicated Codex collaboration MCP is unavailable; no global installation was attempted.
+- Confirmed current branch `feature/dev` is aligned with `origin/feature/dev` at `4d79259` before this review.
+- Recovered the completed migration context and current dirty-file inventory.
+- Began line-level review of the Responses client, adapter, Runner, SSE bridge, and frontend trace projection.
+- Identified two testable Runner issues: final-answer cost budget bypass and possible streamed commentary/final-answer divergence.
+- Completed the remaining transport, tool runtime, schema, configuration, direct-caller, trace, and path-safety review.
+- Added four focused regression tests and confirmed all four fail before implementation: final-answer budget bypass, streamed commentary leakage, invalid tool-handler return escape, and blank model configuration.
+
+### Phase 3: Targeted Fixes
+- **Status:** in progress
+- Moved the post-response cost check ahead of all protocol/answer/tool decisions.
+- Normalized buffered output deltas against the adapter's completed final answer before publishing chunks.
+- Converted invalid tool-handler return values into the existing structured `handler_exception` boundary.
+- Made blank explicit/environment model values fall back to `deepseek-v4-flash`.
+- Added and reproduced three more release-boundary checks: incomplete Responses rejection, provider-retry trace separation, and retry metadata sanitization.
+- Rejected non-completed response status through bounded model correction and added one `provider_retry` trace event per transient transport retry.
+- Focused transport/Runner/stream/schema suite passed: 73 tests.
+
+### Phase 4: Release Validation
+- **Status:** complete
+- Full non-live backend suite passed: 283 tests.
+- Frontend `CI=1 npm run build` and changed-file ESLint passed.
+- Live DeepSeek official Responses smoke passed with `deepseek-v4-flash` and usage returned.
+- Prompt weight audit, forbidden executable/current-reference scan, `git diff --check`, and `raw/` status passed; matches are limited to historical documents and the migration deletion checklist.
+
+### Phase 5: Commit and Push
+- **Status:** complete
+- Final file attribution and secret-pattern checks passed; all dirty files belong to the reviewed Responses migration, its eval evidence, or the release fixes.
+- Staged the reviewed migration for one Chinese-language commit and verified the staged diff before pushing `feature/dev`.
+
+---
+
 # Current Progress: Open-source review of the Lucas harness roadmap
 
 ## Session: 2026-07-17
@@ -205,3 +244,48 @@
 | What's the goal? | Persistent multi-turn chat sessions replace raw-material navigation |
 | What have I learned? | See `findings.md` |
 | What have I done? | Implemented and verified persistent multi-turn sessions and responsive navigation |
+## 2026-07-31 — Native Responses Migration
+
+### Phase 1–6: Probe, Migration, Eval, and Delivery
+- **Status:** complete
+- Actions taken:
+  - Read the authoritative migration plan and project instructions.
+  - Activated the `planning-with-files` workflow and preserved existing historical planning records.
+  - Inspected current dirty-worktree scope; Responses text compatibility changes are present alongside unrelated user work.
+  - Confirmed the current production loop still parses custom action JSON and ToolSpec still exposes string argument descriptions.
+  - Audited Runner and eval construction: deterministic safety/budget/stall behavior is separable from the raw JSON decision protocol and will be preserved.
+  - Audited direct LLM consumers and dependencies: knowledge/corpus scripts need a text-only Responses path; the eval adapter already exercises production AgentRunner.
+  - Completed a real DeepSeek capability probe: native function calling, strict schema, explicit call-output continuation, streaming events, reasoning, structured output, and usage all work. Recorded the `tool_choice="required"` thinking-mode incompatibility.
+  - Captured baseline: deterministic 161 tests passed; LOOP-01 and PLAN-01 real trials passed with trace/token/latency evidence under `/tmp/lucas-responses-baseline`.
+  - Completed repository-wide impact audit across production, eval, tests, SSE/frontend trace, scripts, configuration, dependencies, and documentation.
+  - Added provider-neutral ModelRequest, ModelTurn, FunctionCall, and ModelEvent types with explicit input items and multi-call visibility.
+  - Replaced the legacy multi-provider transport with a single DeepSeek official Responses client, native usage extraction, structured text helper, official-endpoint enforcement, and provider retry.
+  - Replaced the old model adapter with native Responses tool-schema conversion, response item serialization, function-call normalization, and real streaming event normalization.
+  - Rewrote AgentRunner around native function calls, provider call IDs, explicit function_call_output items, direct output_text answers, bounded protocol correction, buffered safe streaming, and Responses trace/artifacts while retaining execution budgets/deadlines/stall detection.
+  - Completed ToolSpec migration for all production and experiment tools; 60 tool/schema/business tests and focused metadata checks passed in the subtask.
+  - Rewrote LLM/adapter tests for official-only configuration, text generation, usage, summary schema injection, function-call normalization, preserved output items, and native stream events; 37 focused tests passed.
+  - Ran a real production READ_FILE_SPEC strict-schema probe. DeepSeek accepted omitted optional properties and returned a valid native read_file call with summary.
+  - Rewrote native Runner streaming tests for safe buffered final deltas, reasoning, tool-call non-leakage, mixed-decision correction, and non-stream fallback; focused Runner/LLM/schema tests reached 60 passing.
+  - Migrated product SSE to native adapter/Runner construction, structured input/output trace payloads, function-call summaries, Responses tool schemas in run config, and complete run lifecycle trace events.
+  - Updated frontend trace config/export to protocol + structured tools and schema version 4.
+  - Completed config/prompt/dependency/current-doc cleanup: provider routing removed, prompts native, providers files deleted, Google GenAI removed, current LLM docs single-Responses.
+  - Migrated all knowledge/corpus/stock direct LLM consumers to generate_text and DEEPSEEK_MODEL; relevant 78 tests passed in the subtask.
+  - Migrated eval production adapter and planner/business FakeModels to native ModelTurn/FunctionCall; relevant 61 tests passed in the subtask.
+  - Product SSE/config/knowledge integration check passed 49 tests.
+  - Deleted `harness/streaming.py` and migrated the connectivity script to generate_text.
+  - Static forbidden-reference scan is clean across production, current prompts/config/docs, tests, scripts, and eval code; remaining matches are historical plans/specs or unrelated stock/search provider terminology.
+  - Full deterministic backend suite passed: 272 tests in 3.51s (connectivity test intentionally excluded because it is a live smoke script).
+  - Confirmed `raw/` has no Git changes.
+  - Re-ran the canonical tool/planner/business/Runner slice after schema hardening: 102 tests passed.
+  - Diagnosed native message phases: DeepSeek commentary next to a single function call is valid tool-turn prose, not a final answer.
+  - Added phase-aware message normalization, strict one-function-call prompt wording, bare-JSON final-answer guidance, and removed eval-adapter JSON extraction compatibility.
+  - Corrected PLAN-01 fixture wording so dependency order agrees with its deterministic grader; task validation still accepts Oracle and rejects known-bad output.
+  - Final real eval completed without repository writes: LOOP-01 3/3 and PLAN-01 3/3 passed; PLAN-01～04 was 3/4 with PLAN-02 still failing at max_steps.
+  - Final LOOP-01 averages: 2.33 steps, 1.33 tools, 6,668 tokens, 3.92s, $0.016112, zero model corrections.
+  - Final PLAN-01 averages: 19 steps, 16.67 tools, 1.33 multi-call corrections, 138,192 tokens, 56.49s, $0.347348.
+  - Wrote the experiment report, experiment-log entry, and Responses learning document.
+  - Final deterministic backend suite passed: 277 tests in 3.34s; live connectivity smoke separately returned `1+1等于2。` with usage.
+  - Changed frontend ESLint and `CI=1 npm run build` passed. The first non-CI Vite build idled and was stopped before the clean CI rerun.
+  - Final forbidden-reference scan, `git diff --check`, and `git status -- raw` were clean.
+
+---

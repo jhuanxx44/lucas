@@ -1,394 +1,223 @@
-"""Answer 阶段逐 token 流式：AnswerStreamParser 单测 + Runner / agent_stream 集成。
+"""Native Responses streaming behavior at the AgentRunner boundary."""
 
-规划：docs/plans/2026-07-20-answer-streaming.md
-"""
 import json
-from pathlib import Path
 
 import pytest
 
-from harness.models import RunLimits
-from harness.runner import AgentRunner, load_prompt_template
-from harness.streaming import AnswerStreamParser
-from harness.trace import TraceRecorder, read_trace
-from harness.tools.registry import ToolRuntime
+from harness.models import FunctionCall, ModelEvent, ModelTurn, RunLimits
+from harness.runner import AgentRunner
 from harness.tools.generic.filesystem import READ_FILE_SPEC
-
-LIMITS = RunLimits(max_steps=5, timeout_seconds=30)
-PROMPT = load_prompt_template(
-    Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
-)
+from harness.tools.registry import ToolRuntime
+from utils.token_tracker import TokenUsage
 
 
-def _feed_all(parser: AnswerStreamParser, text: str, size: int = 3) -> list[str]:
-    out = []
-    for i in range(0, len(text), size):
-        out.extend(parser.feed(text[i:i + size]))
-    out.extend(parser.finalize())
-    return out
+PROMPT = "任务：{instruction}"
 
 
-# ---------- AnswerStreamParser ----------
-
-def test_tool_call_no_chunks():
-    raw = json.dumps({"action": "tool", "tool": "wiki_recall",
-                      "args": {"query": "贵州茅台"}}, ensure_ascii=False)
-    assert _feed_all(AnswerStreamParser(), raw) == []
-
-
-def test_string_answer_chunks_join_to_reply():
-    reply = "你好，世界！这是最终答案。"
-    raw = json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False)
-    chunks = _feed_all(AnswerStreamParser(), raw)
-    assert len(chunks) > 1
-    assert "".join(chunks) == reply
+def _answer(text="done", response_id="answer"):
+    return ModelTurn(
+        output_text=text,
+        response_id=response_id,
+        response_items=[{"type": "message", "id": response_id, "content": text}],
+    )
 
 
-def test_markdown_fence_prefix():
-    reply = "围栏里的答案"
-    raw = "```json\n" + json.dumps(
-        {"action": "answer", "reply": reply}, ensure_ascii=False) + "\n```"
-    assert "".join(_feed_all(AnswerStreamParser(), raw, size=2)) == reply
+def _tool(path="a.txt", call_id="call_1"):
+    raw = json.dumps({"path": path, "summary": "先读取文件"}, ensure_ascii=False)
+    return ModelTurn(
+        function_calls=[FunctionCall(
+            call_id=call_id,
+            name="read_file",
+            arguments={"path": path},
+            summary="先读取文件",
+            raw_arguments=raw,
+        )],
+        response_id=f"resp_{call_id}",
+        response_items=[{
+            "type": "function_call",
+            "call_id": call_id,
+            "name": "read_file",
+            "arguments": raw,
+        }],
+    )
 
-
-@pytest.mark.parametrize("size", [1, 2, 3, 5, 7])
-def test_escapes_across_chunk_boundaries(size):
-    # ensure_ascii=True → 中文/emoji 走 \uXXXX（emoji 为代理对），换行等走简单转义
-    reply = '换行\n引号"反斜杠\\制表\temoji😀中文'
-    raw = json.dumps({"action": "answer", "reply": reply})
-    assert "\\u" in raw  # 确认确实覆盖了 \uXXXX 路径
-    assert "".join(_feed_all(AnswerStreamParser(), raw, size=size)) == reply
-
-
-def test_reply_before_action():
-    raw = '{"reply": "先答", "action": "answer"}'
-    assert "".join(_feed_all(AnswerStreamParser(), raw)) == "先答"
-
-
-def test_non_string_reply_no_chunks():
-    raw = json.dumps({"action": "answer", "reply": {"a": 1}})
-    assert _feed_all(AnswerStreamParser(), raw) == []
-
-
-def test_invalid_json_no_chunks():
-    assert _feed_all(AnswerStreamParser(), "这不是 JSON") == []
-
-
-def test_empty_stream():
-    assert _feed_all(AnswerStreamParser(), "") == []
-
-
-def test_bare_json_answer_no_chunks():
-    # 宽容解析的无 action 外壳答案：不流式，由最终 answer 整段返回
-    assert _feed_all(AnswerStreamParser(), '{"y2022": 2606, "y2023": 2891}') == []
-
-
-# ---------- Runner 集成 ----------
 
 class FakeStreamModel:
-    """complete / complete_stream 双通道。
+    def __init__(self, streams, fallbacks=None):
+        self.streams = list(streams)
+        self.fallbacks = list(fallbacks or [])
+        self.requests = []
 
-    每个响应可以是：
-    - str：content（chunk_size 切分，模拟逐 token 到达）
-    - {"reasoning": "...", "content": "..."}：先逐段产出 reasoning，再产出 content
-    - Exception：模拟中途失败
-    complete_stream 产出 (kind, text)，与真实 adapter 一致。
-    """
+    async def complete_stream(self, request):
+        self.requests.append(request)
+        stream = self.streams.pop(0)
+        if isinstance(stream, Exception):
+            raise stream
+        for event in stream:
+            yield event
 
-    def __init__(self, responses: list, chunk_size: int = 4):
-        self.responses = list(responses)
-        self.chunk_size = chunk_size
-        self.prompts: list[str] = []
-
-    def _content_of(self, item) -> str:
-        return item["content"] if isinstance(item, dict) else item
-
-    async def complete(self, prompt: str):
-        self.prompts.append(prompt)
-        item = self.responses.pop(0)
-        if isinstance(item, Exception):
-            raise item
-        return self._content_of(item), None
-
-    async def complete_stream(self, prompt: str):
-        self.prompts.append(prompt)
-        item = self.responses.pop(0)
-        if isinstance(item, Exception):
-            raise item
-        if isinstance(item, dict):
-            reasoning = item.get("reasoning", "")
-            for i in range(0, len(reasoning), self.chunk_size):
-                yield "reasoning", reasoning[i:i + self.chunk_size]
-        content = self._content_of(item)
-        for i in range(0, len(content), self.chunk_size):
-            yield "content", content[i:i + self.chunk_size]
+    async def complete(self, request):
+        self.requests.append(request)
+        return self.fallbacks.pop(0)
 
 
-def _runner(tmp_path: Path, model) -> AgentRunner:
-    return AgentRunner(model, ToolRuntime(tmp_path, [READ_FILE_SPEC]), PROMPT)
-
-
-def _trace(tmp_path: Path) -> TraceRecorder:
-    trace = TraceRecorder(tmp_path / "trace.jsonl", "run-test")
-    trace.record("run_started")
-    return trace
-
-
-async def test_streaming_answer_emits_ordered_chunks(tmp_path):
-    reply = "流式答案逐字到达，包含换行\n和引号\"测试"
-    raw = json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False)
-    model = FakeStreamModel([raw], chunk_size=3)
-    events: list[dict] = []
-    result = await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=events.append, stream_answer=True,
+def _runner(tmp_path, model):
+    return AgentRunner(
+        model,
+        ToolRuntime(tmp_path, [READ_FILE_SPEC]),
+        PROMPT,
+        instructions="system",
     )
 
-    assert result.finish_reason == "completed"
-    assert result.answer == reply
-    chunks = [e["text"] for e in events if e["kind"] == "answer_chunk"]
-    assert len(chunks) > 1
-    assert "".join(chunks) == reply
-    answer_evt = next(e for e in events if e["kind"] == "answer")
-    assert answer_evt["streamed_chars"] == len(reply)
 
-
-async def test_streaming_tool_step_emits_no_chunks(tmp_path):
-    """工具步骤经流式通道但解析器判定 BUFFER：只发 tool_step，不发 answer_chunk"""
-    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
-    model = FakeStreamModel([
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}),
-        json.dumps({"action": "answer", "reply": "读完啦"}),
-    ])
-    events: list[dict] = []
-    result = await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=events.append, stream_answer=True,
-    )
-
-    assert result.finish_reason == "completed"
-    kinds = [e["kind"] for e in events]
-    assert kinds[0] == "tool_step"
-    assert "answer_chunk" in kinds
-    # 工具 step 之前没有任何 answer_chunk
-    assert kinds.index("tool_step") < kinds.index("answer_chunk")
-    chunks = [e["text"] for e in events if e["kind"] == "answer_chunk"]
-    assert "".join(chunks) == "读完啦"
-
-
-async def test_stream_disabled_no_chunks(tmp_path):
-    """stream_answer=False（默认，eval 路径）：即使 adapter 支持流式也不发 chunk"""
-    model = FakeStreamModel([
-        json.dumps({"action": "answer", "reply": "非流式"}),
-    ])
-    events: list[dict] = []
-    result = await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path), on_event=events.append,
-    )
-
-    assert result.answer == "非流式"
-    assert [e["kind"] for e in events] == ["answer"]
-    assert "streamed_chars" not in events[0]
-
-
-async def test_stream_fallback_on_exception(tmp_path):
-    """流式中途异常 → 记 trace 后回退 complete()，run 不中断"""
-    reply = "回退后的答案"
-    model = FakeStreamModel([
-        RuntimeError("stream boom"),
-        json.dumps({"action": "answer", "reply": reply}),
-    ])
-    events: list[dict] = []
-    trace = _trace(tmp_path)
-    result = await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, trace,
-        on_event=events.append, stream_answer=True,
-    )
-
-    assert result.finish_reason == "completed"
-    assert result.answer == reply
-    fallback = [e for e in read_trace(trace.path)
-                if e["event"] == "answer_stream_fallback"]
-    assert len(fallback) == 1
-    assert "stream boom" in fallback[0]["data"]["error"]
-
-
-async def test_streaming_history_replay_identical(tmp_path):
-    """流式路径的全量回放与非流式一字不差：下一轮 prompt 含模型原始输出"""
-    (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
-    first = json.dumps({"action": "tool", "tool": "read_file",
-                        "args": {"path": "a.txt"}}, ensure_ascii=False)
-    model = FakeStreamModel([first, json.dumps({"action": "answer", "reply": "done"})])
-    await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=lambda e: None, stream_answer=True,
-    )
-
-    assert f"【你】{first}" in model.prompts[1]
-    assert "【工具】[read_file] status=ok" in model.prompts[1]
-
-
-async def test_reasoning_emits_thought_before_answer(tmp_path):
-    """原生 reasoning 段 → thought 事件，早于 answer_chunk；答案不含思考"""
-    reply = "白酒行业"
-    model = FakeStreamModel([{
-        "reasoning": "先判断这属于哪个行业，应该是白酒。",
-        "content": json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False),
-    }], chunk_size=3)
-    events: list[dict] = []
-    result = await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=events.append, stream_answer=True,
-    )
-
-    assert result.answer == reply
-    kinds = [e["kind"] for e in events]
-    assert "thought" in kinds and "answer_chunk" in kinds
-    assert kinds.index("thought") < kinds.index("answer_chunk")
-    thought = "".join(e["text"] for e in events if e["kind"] == "thought")
-    assert thought == "先判断这属于哪个行业，应该是白酒。"
-    # 思考不泄漏进答案
-    answer_chunks = "".join(e["text"] for e in events if e["kind"] == "answer_chunk")
-    assert answer_chunks == reply
-
-
-async def test_reasoning_not_in_raw_replay(tmp_path):
-    """含 reasoning 的流式轮：下一轮 prompt 的 raw 只含 content，不含思考"""
-    (tmp_path / "a.txt").write_text("hi", encoding="utf-8")
-    first_content = json.dumps({"action": "tool", "tool": "read_file",
-                                "args": {"path": "a.txt"}}, ensure_ascii=False)
-    model = FakeStreamModel([
-        {"reasoning": "我需要先读文件确认内容。", "content": first_content},
-        json.dumps({"action": "answer", "reply": "done"}),
-    ])
-    await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=lambda e: None, stream_answer=True,
-    )
-
-    # 回放里是干净的 content JSON，思考文本不进历史
-    assert f"【你】{first_content}" in model.prompts[1]
-    assert "我需要先读文件" not in model.prompts[1]
-
-
-async def test_reasoning_only_tool_call_no_answer_chunk(tmp_path):
-    """reasoning + 工具调用（content 为 tool JSON）：产 thought，不产 answer_chunk"""
-    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
-    model = FakeStreamModel([
-        {"reasoning": "读一下这个文件。",
-         "content": json.dumps({"action": "tool", "tool": "read_file",
-                                "args": {"path": "a.txt"}})},
-        json.dumps({"action": "answer", "reply": "看完了"}),
-    ])
-    events: list[dict] = []
-    await _runner(tmp_path, model).run(
-        "t", ["read_file"], LIMITS, _trace(tmp_path),
-        on_event=events.append, stream_answer=True,
-    )
-
-    first_round = []
-    for e in events:
-        if e["kind"] == "tool_step":
-            first_round.append(e)
-            break
-        first_round.append(e)
-    # 第一轮（工具调用）里有 thought，但没有 answer_chunk
-    kinds = [e["kind"] for e in first_round]
-    assert "thought" in kinds
-    assert "answer_chunk" not in kinds
-
-
-# ---------- agent_stream 契约 ----------
-
-def _parse_sse(chunks: list[str]) -> list[tuple[str, dict]]:
+@pytest.mark.asyncio
+async def test_final_output_text_deltas_are_forwarded_after_completed_turn(tmp_path):
+    turn = _answer("你好世界")
+    turn.usage = TokenUsage(prompt_tokens=2, completion_tokens=2, total_tokens=4, model="m")
+    model = FakeStreamModel([[
+        ModelEvent(kind="reasoning_delta", text="先想"),
+        ModelEvent(kind="output_text_delta", text="你好"),
+        ModelEvent(kind="output_text_delta", text="世界"),
+        ModelEvent(kind="completed", turn=turn),
+    ]])
     events = []
-    for chunk in chunks:
-        event = data = None
-        for line in chunk.strip().splitlines():
-            if line.startswith("event: "):
-                event = line[len("event: "):]
-            elif line.startswith("data: "):
-                data = json.loads(line[len("data: "):])
-        events.append((event, data))
-    return events
 
-
-async def _collect(question, model, workspace):
-    from server.services.agent_stream import chat_event_stream
-    chunks = []
-    async for chunk in chat_event_stream(
-        question, workspace=workspace, model_adapter=model,
-    ):
-        chunks.append(chunk)
-    return _parse_sse(chunks)
-
-
-async def test_agent_stream_incremental_synthesis_chunks(tmp_path):
-    """多个 synthesis_chunk 依序到达，拼接 == 最终答案，无重复补尾"""
-    reply = "流式答案逐字到达前端"
-    model = FakeStreamModel(
-        [json.dumps({"action": "answer", "reply": reply}, ensure_ascii=False)],
-        chunk_size=3,
+    result = await _runner(tmp_path, model).run(
+        "hello",
+        [],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=events.append,
+        stream_answer=True,
     )
-    events = await _collect("问题", model, tmp_path)
 
-    kinds = [e for e, _ in events]
-    assert kinds[0] == "dispatch" and kinds[1] == "researcher_start"
-    assert kinds[-2:] == ["researcher_done", "done"]
-    chunks = [d["text"] for e, d in events if e == "synthesis_chunk"]
-    assert len(chunks) > 1
-    assert "".join(chunks) == reply
-    # 流式无 usage：done 如实反映 0
-    assert events[-1][1] == {"total_tokens": 0}
+    assert result.answer == "你好世界"
+    assert [(event["kind"], event.get("text")) for event in events[:-1]] == [
+        ("thought", "先想"),
+        ("answer_chunk", "你好"),
+        ("answer_chunk", "世界"),
+    ]
+    assert events[-1]["kind"] == "answer"
+    assert events[-1]["streamed_chars"] == 4
+    assert result.usage.total_tokens == 4
 
 
-async def test_agent_stream_tool_step_then_streamed_answer(tmp_path):
-    """结构化工具 step 先于 answer 的增量 chunk；工具步不产生 synthesis_chunk"""
-    (tmp_path / "wiki").mkdir()
+@pytest.mark.asyncio
+async def test_tool_turn_does_not_leak_buffered_output_text(tmp_path):
+    (tmp_path / "a.txt").write_text("content", encoding="utf-8")
+    tool_turn = _tool()
+    answer_turn = _answer("完成")
     model = FakeStreamModel([
-        json.dumps({"action": "tool", "tool": "wiki_recall",
-                    "args": {"query": "茅台"}}),
-        json.dumps({"action": "answer", "reply": "答案在这里"}),
+        [
+            ModelEvent(kind="output_text_delta", text="不应展示"),
+            ModelEvent(kind="completed", turn=tool_turn),
+        ],
+        [
+            ModelEvent(kind="output_text_delta", text="完成"),
+            ModelEvent(kind="completed", turn=answer_turn),
+        ],
     ])
-    events = await _collect("查一下", model, tmp_path)
+    events = []
 
-    kinds = [e for e, _ in events]
-    assert kinds.index("tool_step") < kinds.index("synthesis_chunk")
-    assert kinds.count("tool_step") == 1
-    chunks = [d["text"] for e, d in events if e == "synthesis_chunk"]
-    assert "".join(chunks) == "答案在这里"
+    result = await _runner(tmp_path, model).run(
+        "read",
+        ["read_file"],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=events.append,
+        stream_answer=True,
+    )
 
-
-async def test_agent_stream_buffered_answer_tail_fill(tmp_path):
-    """解析器保守缓冲（非字符串 reply）时整段补尾，一个字不缺"""
-    raw = json.dumps({"action": "answer", "reply": {"y2022": 2606}})
-    model = FakeStreamModel([raw])
-    events = await _collect("结构化", model, tmp_path)
-
-    chunks = [d["text"] for e, d in events if e == "synthesis_chunk"]
-    assert len(chunks) == 1
-    assert json.loads(chunks[0]) == {"y2022": 2606}
+    chunks = [event["text"] for event in events if event["kind"] == "answer_chunk"]
+    assert result.answer == "完成"
+    assert chunks == ["完成"]
+    assert "不应展示" not in "".join(chunks)
+    assert any(event["kind"] == "summary" for event in events)
+    assert any(event["kind"] == "tool_step" for event in events)
 
 
-async def test_agent_stream_summary_event(tmp_path):
-    """action JSON 的 summary 字段 → summary 事件，早于 synthesis_chunk；
-    模型原生 reasoning 草稿不再转发前端（仅 trace 记录）"""
-    reply = "白酒行业"
-    model = FakeStreamModel([{
-        "reasoning": "这是白酒龙头。",
-        "content": json.dumps(
-            {"summary": "直接判断行业归属", "action": "answer", "reply": reply},
-            ensure_ascii=False),
-    }], chunk_size=3)
-    events = await _collect("茅台是什么行业", model, tmp_path)
+@pytest.mark.asyncio
+async def test_final_stream_discards_commentary_deltas_not_in_normalized_answer(tmp_path):
+    model = FakeStreamModel([[
+        ModelEvent(kind="output_text_delta", text="先总结一下。"),
+        ModelEvent(kind="output_text_delta", text="最终答案"),
+        ModelEvent(kind="completed", turn=_answer("最终答案")),
+    ]])
+    events = []
 
-    kinds = [e for e, _ in events]
-    # reasoning 草稿不再进前端
-    assert "thought" not in kinds
-    # summary 事件产出（answer 步的 reply 边流边推，summary 于整段解析后发出，
-    # 两者分属不同 UI 区域，不强制先后；工具步的 summary 先于动作见 runner 测试）
-    assert "summary" in kinds
-    summary = "".join(d["text"] for e, d in events if e == "summary")
-    assert summary == "直接判断行业归属"
-    synth = "".join(d["text"] for e, d in events if e == "synthesis_chunk")
-    assert synth == reply
+    result = await _runner(tmp_path, model).run(
+        "answer",
+        [],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=events.append,
+        stream_answer=True,
+    )
+
+    chunks = [event["text"] for event in events if event["kind"] == "answer_chunk"]
+    assert result.answer == "最终答案"
+    assert "".join(chunks) == "最终答案"
+    assert events[-1]["streamed_chars"] == len("最终答案")
+
+
+@pytest.mark.asyncio
+async def test_mixed_tool_and_final_text_is_corrected_without_stream_leak(tmp_path):
+    mixed = _tool()
+    mixed.output_text = "错误正文"
+    model = FakeStreamModel([
+        [
+            ModelEvent(kind="output_text_delta", text="错误正文"),
+            ModelEvent(kind="completed", turn=mixed),
+        ],
+        [
+            ModelEvent(kind="output_text_delta", text="已修正"),
+            ModelEvent(kind="completed", turn=_answer("已修正")),
+        ],
+    ])
+    events = []
+
+    result = await _runner(tmp_path, model).run(
+        "task",
+        ["read_file"],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=events.append,
+        stream_answer=True,
+    )
+
+    assert result.answer == "已修正"
+    chunks = "".join(event["text"] for event in events if event["kind"] == "answer_chunk")
+    assert chunks == "已修正"
+
+
+@pytest.mark.asyncio
+async def test_stream_transport_failure_falls_back_to_non_stream_response(tmp_path):
+    model = FakeStreamModel([RuntimeError("stream disconnected")], [_answer("fallback")])
+    events = []
+
+    result = await _runner(tmp_path, model).run(
+        "task",
+        [],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=events.append,
+        stream_answer=True,
+    )
+
+    assert result.answer == "fallback"
+    assert [event for event in events if event["kind"] == "answer_chunk"] == []
+    assert events[-1]["kind"] == "answer"
+    assert events[-1]["streamed_chars"] == 0
+
+
+@pytest.mark.asyncio
+async def test_stream_without_completed_event_falls_back(tmp_path):
+    model = FakeStreamModel(
+        [[ModelEvent(kind="output_text_delta", text="partial")]],
+        [_answer("complete")],
+    )
+
+    result = await _runner(tmp_path, model).run(
+        "task",
+        [],
+        RunLimits(max_steps=3, timeout_seconds=0),
+        on_event=lambda event: None,
+        stream_answer=True,
+    )
+
+    assert result.answer == "complete"

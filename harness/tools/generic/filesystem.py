@@ -326,21 +326,50 @@ def search(workspace: Path, args: dict) -> ToolResult:
 READ_FILE_SPEC = ToolSpec(
     name="read_file",
     description="读取工作区内文件内容（只读）",
-    args_description='{"path": "相对工作区的文件路径", "max_chars": 可选，最大返回字符数，默认 16000", "offset": 可选，起始字符偏移量，默认 0}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "相对工作区的文件路径"},
+            "max_chars": {"type": "integer", "minimum": 1, "default": 16000,
+                          "description": "最大返回字符数"},
+            "offset": {"type": "integer", "minimum": 0, "default": 0,
+                       "description": "起始字符偏移量"},
+        },
+        "required": ["path"],
+        "additionalProperties": False,
+    },
     handler=read_file,
 )
 
 APPLY_PATCH_SPEC = ToolSpec(
     name="apply_patch",
     description="对工作区内文件做精确字符串替换（old 必须在文件中唯一出现）",
-    args_description='{"path": "相对工作区的文件路径", "old": "被替换的原文", "new": "替换后的内容"}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "相对工作区的文件路径"},
+            "old": {"type": "string", "minLength": 1, "description": "被替换的原文，必须唯一出现"},
+            "new": {"type": "string", "description": "替换后的内容"},
+        },
+        "required": ["path", "old", "new"],
+        "additionalProperties": False,
+    },
     handler=apply_patch,
 )
 
 LIST_FILES_SPEC = ToolSpec(
     name="list_files",
     description="列出工作区内目录结构（含文件大小，只读）",
-    args_description='{"path": "可选，相对工作区的子目录，默认工作区根", "max_depth": 可选，展开深度，默认 2}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "相对工作区的子目录；省略时使用工作区根目录"},
+            "max_depth": {"type": "integer", "minimum": 1, "default": 2,
+                          "description": "目录展开深度"},
+        },
+        "required": [],
+        "additionalProperties": False,
+    },
     handler=list_files,
 )
 
@@ -349,13 +378,34 @@ WRITE_FILE_SPEC = ToolSpec(
     description="在工作区内新建文件并整体写入内容；文件已存在时默认拒绝，需 overwrite: true 才覆盖。"
                 "写入 wiki/*.md 时，内容必须包含 frontmatter 且其中 summary 字段非空（2-4 句中文 TL;DR），"
                 "否则返回 missing_summary 错误。index.md / glossary.md 除外。",
-    args_description='{"path": "相对工作区的文件路径", "content": "完整文件内容", "overwrite": 可选，传 true 才允许覆盖已存在文件}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "相对工作区的文件路径"},
+            "content": {"type": "string", "description": "完整文件内容"},
+            "overwrite": {"type": "boolean", "default": False,
+                          "description": "仅传 true 时允许覆盖已存在文件"},
+        },
+        "required": ["path", "content"],
+        "additionalProperties": False,
+    },
     handler=write_file,
 )
 
 SEARCH_SPEC = ToolSpec(
     name="search",
     description="在工作区内搜索文本（默认字面匹配；query 以 re: 开头时按正则处理）",
-    args_description='{"query": "搜索字符串，re: 前缀表示正则", "path": "可选，相对工作区的子目录或文件，默认整个工作区", "max_results": 可选，默认 10}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "minLength": 1,
+                      "description": "搜索字符串；re: 前缀表示正则"},
+            "path": {"type": "string", "description": "相对工作区的子目录或文件；省略时搜索整个工作区"},
+            "max_results": {"type": "integer", "minimum": 1, "default": 10,
+                            "description": "最大返回结果数"},
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
     handler=search,
 )

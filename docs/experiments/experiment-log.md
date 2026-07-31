@@ -892,3 +892,27 @@ LLM 关键词模式：
 - **下一步**：当前 Flash 上交错运行 disabled / optional / required 各至少 3 trials；补最终环境验证、
   PLAN-02 语义报告发现和 trace 条件哈希
 - **产物**：`runs/planner-all-experiment-v1-parallel-20260731-154144-de84960a/`
+
+---
+
+## 2026-07-31 Responses 原生工具调用迁移
+
+- **完整报告**：`2026-07-31-Responses原生工具调用迁移.md`
+- **机制变化**：删除私有 `action/tool/args/reply` loop，改为 Responses 原生 `function_call`、
+  `function_call_output`、message phase 和直接 final answer；显式提交完整上下文 items
+- **真实能力**：strict function schema、call ID 续接、streaming、reasoning、structured output 和 usage 通过；
+  thinking 模式不支持 `tool_choice=required`，`parallel_tool_calls=false` 仍偶发多 call
+- **重复结果**：最终 LOOP-01 3/3、PLAN-01 3/3；LOOP 平均 2.33 steps / 6,668 tokens / $0.016112，
+  PLAN-01 平均 19 steps / 138,192 tokens / $0.347348
+- **扩展覆盖**：PLAN-01～04 为 3/4，PLAN-02 仍在 max_steps 前未完成报告/索引；与最近可比旧 loop 的
+  语义 outcome 相同
+- **边界修复**：按 `message.phase` 分离 commentary/final answer；JSON 任务要求裸 JSON；修正 PLAN-01
+  fixture 依赖方向笔误；多 call 继续由 Runner 拒绝并有界 correction
+- **效率结论**：Outcome 恢复但长任务输入 token 显著增加；PLAN-01 平均 token 比迁移 baseline +102.6%，
+  后续将上下文选择/压缩作为独立实验，不依赖 `previous_response_id` 隐式状态
+- **质量门禁**：发布审查后端 283 tests、前端 build/ESLint、真实 Responses smoke、trace、禁止项和 `raw/`
+  检查均通过
+- **发布审查修复**：补齐最终答案成本预算、流式 final/commentary 一致性、incomplete 响应拒绝、
+  provider retry 独立 trace、ToolResult 返回边界和空白模型 fallback；新增回归均通过
+- **决策**：保留断代迁移，不恢复 legacy 兼容层；把 DeepSeek 多 call 和上下文成本作为已知限制记录
+- **真实产物**：`/tmp/lucas-responses-native-final-trials/`

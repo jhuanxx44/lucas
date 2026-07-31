@@ -60,14 +60,14 @@ export interface ChatRuntimeTraceEvent {
 
 export interface ChatRunConfig {
   agent: string;
-  provider: string;
+  protocol: "openai_responses";
   model: string;
   temperature: number;
   allowed_tools: string[];
   max_steps: number;
   timeout_seconds: number;
   system_prompt: string;
-  tools_description: string;
+  tools: Record<string, unknown>[];
   prompt_template: string;
 }
 

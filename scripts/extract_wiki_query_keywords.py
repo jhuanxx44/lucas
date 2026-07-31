@@ -45,10 +45,8 @@ async def extract_keywords(corpus_root: Path, workers: int) -> list[dict]:
     config = load_agent_config()
     prompt = _prompt_body()
     client = create_client(
-        provider=config.provider,
         model=config.model,
-        system_prompt=prompt,
-        enable_thinking=False,
+        instructions=prompt,
     )
     semaphore = asyncio.Semaphore(workers)
     cache_dir = corpus_root / "quality/query-keywords"
@@ -66,7 +64,7 @@ async def extract_keywords(corpus_root: Path, workers: int) -> list[dict]:
                 usage = None
                 result = None
                 for _ in range(2):
-                    text, usage = await client.chat(
+                    text, usage = await client.generate_text(
                         query["query"], response_mime_type="application/json", temperature=0,
                     )
                     candidate = extract_json(text)

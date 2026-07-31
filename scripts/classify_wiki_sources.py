@@ -31,7 +31,7 @@ async def classify_candidates(corpus_root: Path, candidates_path: Path,
     prompt_template = PROMPT_PATH.read_text(encoding="utf-8")
     if prompt_template.startswith("---\n"):
         prompt_template = prompt_template.split("---", 2)[2].strip()
-    client = create_client(model=os.environ.get("OPENAI_MODEL"))
+    client = create_client(model=os.environ.get("DEEPSEEK_MODEL"))
     cache_dir = corpus_root / "quality/source-selection"
     cache_dir.mkdir(parents=True, exist_ok=True)
     semaphore = asyncio.Semaphore(workers)
@@ -56,7 +56,7 @@ async def classify_candidates(corpus_root: Path, candidates_path: Path,
             if cached and cached.get("input_sha256") == digest:
                 result = cached["result"]
             else:
-                text, usage = await client.chat(
+                text, usage = await client.generate_text(
                     prompt, response_mime_type="application/json", temperature=0,
                 )
                 result = extract_json(text)

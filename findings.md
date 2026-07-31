@@ -207,6 +207,40 @@ Consult references when Lucas has a concrete design question or failure. Do not 
 
 ---
 
+# Review Findings: Responses Migration Release Audit
+
+## Scope Baseline
+- Current branch is `feature/dev`; local HEAD and `origin/feature/dev` both start at `4d79259`.
+- The worktree contains the completed Responses migration and its documentation/tests. File attribution must be checked before staging because project instructions require preserving unrelated user edits.
+- The `codex-collab` skill's required `mcp__codex__codex` tool is not available in this Codex desktop environment; review proceeds with local read-only inspection and deterministic evidence.
+
+## Runner and Streaming Review
+- **Fixed P1:** `max_cost_usd` was checked only on the function-call branch. A regression test proved that an over-budget final answer returned `completed`; the post-response budget check now runs before protocol, answer, or tool decisions.
+- **Fixed P1:** streamed output deltas were replayed without checking that they equaled normalized final-answer text. A regression test reproduced commentary leakage; non-empty buffered deltas are now reconciled with the completed authoritative answer before publication.
+- **Fixed P1:** Responses with `status=incomplete` could be accepted as final answers. The adapter now turns every non-completed response status into a bounded protocol correction instead of accepting partial output.
+- Raw reasoning deltas are not rendered as user-visible process steps. They are accumulated into `trace_event/model_reasoning` for trace export, while visible steps continue to use the required function-call `summary`; the earlier hidden-reasoning requirement is preserved.
+- The Runner still rejects multiple calls and true final-answer/tool mixtures, preserves provider call IDs, and appends complete response items before `function_call_output`.
+- **Fixed trace gap:** transient provider retries occurred inside the client but were not separately observable. The transport now reports sanitized retry metadata through the adapter, and Runner records one `provider_retry` event per retry without counting it as a model correction.
+- Unknown tool names currently reach `ToolRuntime` and become model-visible `invalid_input` observations rather than protocol corrections. This remains safe because allowlist enforcement is local, but classification should be checked against existing intended semantics before changing it.
+
+## Tool Schema and Runtime Review
+- All production tools expose closed object schemas, and model-only `summary` is injected on a deep copy, so business handlers never receive it.
+- Filesystem paths are resolved through `resolve_within` after symlink resolution; write tools cannot escape the workspace, and the product layer further limits writes to `wiki/`.
+- The local schema validator covers every constraint currently relied upon for execution safety (types, required fields, closed objects, enum, numeric bounds, nested items). Stock-code `pattern` is additionally enforced by the handler, so the validator's lack of generic pattern support is not a bypass.
+- **Fixed P2:** a registered handler returning a non-`ToolResult` value raised outside the handler exception boundary. The runtime now validates the return type inside that boundary and emits a structured `handler_exception`.
+- **Fixed configuration edge:** a whitespace-only `DEEPSEEK_MODEL` value previously reached the SDK unchanged; explicit and environment model values are stripped and fall back to `deepseek-v4-flash` when blank.
+- No new path-safety or raw-write regression was found in the schema migration.
+
+## Release Validation
+- Focused review regressions: 73 passed.
+- Full non-live backend suite: 283 passed.
+- Frontend production build and changed-file ESLint: passed.
+- Live DeepSeek official Responses smoke: passed with `deepseek-v4-flash` and usage returned.
+- `git diff --check`, prompt weight audit, forbidden production-reference scan, and `raw/` status: clean.
+- Remaining forbidden-reference matches are confined to historical plans/experiments and the migration deletion checklist; they describe past behavior and are not executable/current configuration.
+
+---
+
 # Findings & Decisions
 
 ## Requirements
@@ -300,3 +334,87 @@ Consult references when Lucas has a concrete design question or failure. Do not 
 - Added as required: `对话`, `新对话`, date group labels, and persisted session titles.
 - Preserved: `Lucas`, `投研认知的复利引擎`, `Wiki`, search, theme, and linked-navigation controls.
 - Intentional visual state difference: final evidence uses the user's persisted dark theme; the supplied screenshot used light theme. Component colors remain paired light/dark tokens.
+## 2026-07-31 — Native Responses Migration Findings
+
+### Initial authoritative findings
+- The current direct DeepSeek path uses `responses.create`, but only for text/JSON transport; AgentRunner still owns a custom `action/tool/args/reply` text protocol.
+- Native migration affects more than `utils/llm_client.py`: Runner history/decision parsing, ToolSpec schemas, streaming, SSE, config, knowledge services, scripts, tests, trace, dependencies, and current documentation all contain legacy assumptions.
+- `ToolSpec.args_description` is prose, so every production tool needs an explicit JSON Schema before strict native function calling is possible.
+- Current provider configuration is only partially authoritative: `providers.yaml` declares providers, while LLM routing also hard-codes model prefixes and environment overrides.
+- Existing planning files contain completed historical tasks; the migration plan is prepended and old records are preserved as archive data.
+
+### Decisions
+- Target is a single DeepSeek official Responses implementation, with no Chat Completions/Gemini/provider compatibility layer.
+- Lucas will submit explicit response/function-call/function-output items rather than depend on `previous_response_id`.
+- User-visible step summary will be a required model-facing function argument and stripped before ToolRuntime execution.
+- Final answer will be direct output_text; JSON reply extraction and action parsing will be deleted.
+
+### Code-shape findings
+- `AgentRunner` currently couples four responsibilities to raw JSON text: prompt rendering, action parsing/correction, assistant/tool textual history, and answer streaming through `AnswerStreamParser`. The native rewrite must change these together rather than patching only the model client.
+- Existing deadline, cost, observation truncation, repeated failed-call detection, repeated-result stall detection, tool events, trace artifacts, and max-step termination are valuable provider-neutral logic and should be retained around the new `ModelTurn` decision.
+- Eval production adapter (`evals/harness/adapters/lucas_single.py`) constructs the same product `AgentRunner`, so the migration can test production behavior without a parallel harness; its model adapter and config wiring must change.
+- Knowledge/corpus scripts call the generic text client directly and need a simple Responses text method independent of Agent function calling.
+- `requirements.txt` only needs `openai` after the migration; `google-genai` is used by the legacy client path and is a deletion candidate after repository-wide verification.
+- Current `ToolRuntime.describe()` and system-prompt tool injection become obsolete once every `ToolSpec` has a strict JSON Schema; ToolRuntime execution itself remains the authoritative allowlist/handler boundary.
+
+### Real DeepSeek Responses capability probe
+- Native function calls work with flat Responses function tool definitions, strict JSON Schema, `tool_choice="auto"`, and `parallel_tool_calls=False`.
+- DeepSeek thinking mode rejects `tool_choice="required"` with HTTP 400; the implementation must use `auto` and validate decisions in Runner code.
+- Explicit continuation without `previous_response_id` works by submitting `[*response.output, function_call_output]`; the full prior output includes reasoning and function_call items and must be preserved.
+- Strict structured text works with `text.format.type=json_schema` and returns parseable output_text.
+- Actual streaming types include `response.reasoning_text.delta`, `response.output_text.delta`, `response.function_call_arguments.delta`, and the corresponding done/output-item events.
+- The complete tool call is reliably available from `response.output_item.done.item`; it contains provider `call_id`, name, JSON-string arguments, and status.
+- Usage exposes input_tokens, output_tokens, total_tokens, cached input detail, and reasoning token detail.
+
+### Baseline evidence
+- Deterministic migration-relevant suite: 161 passed in 8.17s; only a Google GenAI dependency deprecation warning appeared.
+- LOOP-01 baseline passed in 2 model steps with 1 wiki tool call, 5.880s, 5,337 tokens, and $0.016534 recorded cost.
+- PLAN-01 baseline passed in 14 model steps with 12 tool calls, 87.936s, 68,197 tokens, and $0.249934 recorded cost; one empty/invalid model output self-corrected, and optional update_plan usage did not pass.
+- Baseline artifacts are under `/tmp/lucas-responses-baseline`; task/grader validation for LOOP-01 and PLAN-01 passed.
+
+### Impact-audit additions
+- Keep high-level trace event names used by graders where their semantics remain valid, while adding Responses-specific response/call events; this limits unrelated grader churn without retaining the old protocol.
+- Eval task fixtures and graders can remain; fake model contracts and the production lucas-single adapter must migrate to ModelTurn/ModelEvent.
+- Frontend SSE can remain stable, but ChatRunConfig and TracePanel trace completeness/export must be updated if provider/tool-description or model input/output fields change.
+- Direct structured-output consumers and the agent loop need distinct methods on the same Responses transport; native tools must not be forced into knowledge/corpus calls.
+- Strict schemas should use canonical model-facing inputs. Legacy handler tolerance may remain if it is business input tolerance rather than model-protocol compatibility.
+
+### Implementation decisions now encoded
+- `ModelTurn.function_calls` is a list so Runner can reject multiple provider calls instead of silently selecting one.
+- Invalid/missing call IDs, malformed arguments, missing summary, multi-call, mixed tool+text, and empty decisions are protocol corrections with a separate bound, not ToolRuntime errors.
+- Final text deltas are buffered until `response.completed` proves the turn is an answer; this prevents a mixed tool/text response from leaking partial final UI output.
+- Provider response items are serialized once and reused both for trace artifacts and the next explicit Responses input before appending function_call_output.
+- Responses output token details are split into completion and thinking tokens so existing cost calculation does not double-charge reasoning tokens.
+- A real call using the production read_file schema confirmed DeepSeek accepts strict schemas whose optional properties are not listed in required; the adapter does not need nullable placeholders or forced defaults.
+
+### Product SSE/trace findings
+- Product SSE already has the desired stable visible events (`summary`, `tool_step`, `synthesis_chunk`, `done`, `error`); only internal model input/output payloads and construction need migration.
+- Existing server code buffers native reasoning and emits it as hidden `trace_event/model_reasoning`; this behavior should remain while source events switch to ModelEvent.
+- Frontend ChatRunConfig currently requires provider and prose tools_description. The native config should instead expose a fixed protocol and structured tool schemas, and trace export schema must be bumped.
+- Trace completeness can retain high-level model_input/model_output/assistant_answer events because they remain meaningful with native items; Responses-specific response/call events supplement rather than replace them.
+
+### Integration findings
+- Visible product SSE did not need a breaking event change; summary now comes from native function arguments, while tool_step and synthesis_chunk retain their UI contracts.
+- The previous product runtime trace omitted authoritative run lifecycle/assistant-answer events required by its own frontend completeness check; the migration now emits run_started, assistant_answer, and run_finished explicitly.
+- Direct knowledge and corpus generation can share the Responses transport through generate_text without acquiring Agent tool-loop semantics.
+- Existing eval graders rely on stable tool_call_started/finished/error events, which the native Runner retained; task fixtures and grader implementations therefore remain production-relevant without protocol compatibility code.
+- Historical `docs/superpowers` plans still describe the implementation that existed when they were written; per the migration plan they remain immutable factual history rather than current documentation.
+- Remaining `provider` terminology in stock_data and daily stock source documentation refers to market/search data providers, not LLM routing, and must not be mechanically deleted.
+
+### Post-migration eval regression findings
+- The latest native implementation remains deterministically sound: the schema/planner/business/Runner slice passes 102 tests and the full non-live backend suite passes 271 tests.
+- `LOOP-01` asks for a bare JSON object, but the production Runner currently has no task-specific final-output schema. This is a final-answer contract issue, not a native function-call parsing issue.
+- The eval adapter still contains `extract_json` post-processing. That convenience must not become the production protocol again; any JSON requirement should be represented explicitly at request/task boundary or enforced by the grader/task prompt, while normal product answers remain direct text.
+- `PLAN-01` is a genuine execution regression: rejecting native multi-call and mixed text/tool decisions consumed three of twenty model turns before useful work. The correction path needs targeted prompt/loop treatment without executing parallel calls or reviving the old JSON envelope.
+- DeepSeek emits tool-turn prose as a Responses `message` with `phase=commentary`; `response.output_text` aggregates it even though it is not a `final_answer`. The adapter must separate message phases before Runner decision validation.
+- The first PLAN response still contained two function calls despite `parallel_tool_calls=False`. Lucas must keep code-side single-call validation and explicitly ask for at most one `function_call` item per response.
+- Model correction continues to consume a model turn by design, consistent with Lucas's existing retry taxonomy; it has an independent correction bound and still counts toward model-step budget. The targeted phase fix removes false corrections without redefining max-step semantics during this migration.
+- After phase separation, LOOP-01 returned bare `{"in_wiki": false}` and passed all graders in two steps. This confirms the answer-format prompt is sufficient without reintroducing eval-side JSON extraction.
+- PLAN-01 after phase separation passed its actual pytest outcome and allowed-diff safety checks, but ended at max steps immediately after a final corrective patch. The remaining waste was one provider multi-call correction, reading tests/archive without task need, and three read-after-write checks; prompt policy should prioritize required outputs and evidence-based completion.
+- The PLAN-01 fixture sentence had dependency direction reversed relative to both its listed gates and deterministic test. It was corrected to “被依赖方先部署，依赖它的服务后部署” so the evaluation no longer rewards test-file discovery over following the stated specification.
+- On the final implementation, three independent LOOP-01 trials all passed and three independent PLAN-01 trials all passed. Outcome stability is restored, but PLAN-01 averages 19 model turns and 138k tokens versus the migration baseline's 14 turns and 68k tokens.
+- Every final PLAN-01 trial still had 1–2 genuine multi-call corrections even with `parallel_tool_calls=False` and explicit prompt wording. This is a measured DeepSeek compatibility boundary, not a remaining Lucas parsing bug.
+- Final PLAN-01～04 outcome is 3/4: PLAN-01, PLAN-03, and PLAN-04 pass; PLAN-02 exhausts 24 steps before report/index completion. The latest comparable legacy run also had semantic 3/4 with PLAN-02 as the failure, so migration does not reduce that suite's observed outcome, but it materially increases context tokens on long tasks.
+- Explicitly resubmitting full Responses output items makes trace/replay self-contained, but input growth is now the dominant efficiency cost. Context selection/compaction should be a separate eval-driven experiment rather than folded into this protocol migration.
+
+---

@@ -1,208 +1,100 @@
-# LLM 调用指南（最小可复用版）
+# Lucas LLM 调用指南
 
-> 本项目通过 Google GenAI SDK 调用 LLM，但**不直连 Google**，而是走内部代理（Beats）。
-> 核心思路：用 `vertexai=True` 的协议格式 + 自定义 `base_url` 指向代理。
+Lucas 只支持 **DeepSeek 官网 Responses API**。
 
----
+## 配置
 
-## 1. 环境变量
+复制 `.env.example`，至少填写 API Key：
 
 ```bash
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=http://llmapi.bilibili.co/v1   # 内部代理地址
-OPENAI_MODEL=deepseek-v4-flash                  # 默认模型
+DEEPSEEK_API_KEY=your-deepseek-api-key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-> 裸调用默认使用 DeepSeek V4 Flash；`OPENAI_*` 保留为 OpenAI 兼容代理兜底。也可以配置 `DEEPSEEK_API_KEY` 和 `DEEPSEEK_BASE_URL` 直连 DeepSeek provider。
+- `DEEPSEEK_API_KEY`：必填。
+- `DEEPSEEK_BASE_URL`：可选，默认 `https://api.deepseek.com`，并且必须指向
+  DeepSeek 官网。
+- `DEEPSEEK_MODEL`：当调用方和 `lucas.yaml` 都没有指定模型时使用，默认
+  `deepseek-v4-flash`。
 
----
+产品 Agent 和 wiki 服务使用的模型在 `lucas.yaml` 中显式配置。代码中的显式
+`model` 参数优先级最高。
 
-## 2. 核心客户端（`utils/llm.py`）
+## 普通文本调用
 
-### 初始化
+知识分类、规划、编译等不需要工具循环的场景使用 `generate_text`：
 
 ```python
-from google import genai
-from google.genai import types
+from utils.llm_client import create_client
 
-client = genai.Client(
-    api_key=api_key,
-    vertexai=True,                    # 仅表示用 Vertex AI 协议格式
-    http_options={
-        "base_url": f"{base_url}/gemini/",  # 实际请求地址，拼接 /gemini/
-        "timeout": 1200000,
-    },
+client = create_client(model="deepseek-v4-flash")
+text, usage = await client.generate_text(
+    "用一句话解释市盈率。",
+    instructions="你是一个严谨的投研助手。",
+    temperature=0,
 )
 ```
 
-关键点：
-- `vertexai=True` **不等于直连 Google**，只是协议格式
-- 实际请求地址由 `base_url` 决定（指向内部代理）
-
-### 非流式调用
+需要 JSON 对象时声明响应类型：
 
 ```python
-from utils.llm import GeminiClient
-
-client = GeminiClient(
-    model="gemini-3.1-pro",
-    system_prompt="你是一个助手",     # 可选
-    enable_thinking=True,             # 默认开启 thinking 模式
-)
-
-text, token_usage = await client.chat(
-    prompt="你的问题",
-    images=["https://example.com/img.jpg"],   # 可选，支持 URL 和本地路径
-    videos=["local_video.mp4"],               # 可选
-    response_mime_type="application/json",     # text/plain 或 application/json
-    temperature=0.7,                           # 可选，默认 1.0
-    thinking_budget=24576,                     # 可选，默认 24576
+text, usage = await client.generate_text(
+    "返回一个包含 ok 字段的 JSON 对象。",
+    response_mime_type="application/json",
 )
 ```
 
-返回值：`(str, Optional[TokenUsage])`
+`usage` 是统一的 `TokenUsage`，包含输入、普通输出、reasoning、总 token 和延迟。
 
-### 流式调用
+## 原生 Responses 调用
 
-```python
-async for chunk in client.chat_stream(
-    prompt="你的问题",
-    response_mime_type="text/plain",
-):
-    print(chunk, end="", flush=True)
-```
-
-### 便捷工厂函数
+底层能力可以通过 `create` 直接使用：
 
 ```python
-from utils.llm import create_client
-
-client = create_client(model="deepseek-v4-flash", system_prompt="...")
-```
-
----
-
-## 3. System Prompt 实现方式
-
-SDK 不直接支持 system role，项目用 **user/model 对话模拟**：
-
-```python
-contents = [
-    Content(role="user",  parts=[Part(text=system_prompt)]),
-    Content(role="model", parts=[Part(text="好的，我明白了。")]),
-    Content(role="user",  parts=[Part(text=user_prompt)]),
-]
-```
-
----
-
-## 4. 重试机制
-
-内置自动重试，无需调用方处理：
-
-- 可重试错误：`429`（限流）、`499`（代理断连）、`500/502/503/504`
-- 空响应也会重试
-- 固定退避：3s → 5s → 10s，最多 3 次
-
----
-
-## 5. 多模型路由
-
-`utils/llm_client.py` 中的 `create_client()` 根据模型名前缀自动选择客户端：
-
-| 前缀 | 客户端 | 说明 |
-|------|--------|------|
-| `gemini-*` | `_GeminiClient` | Google GenAI SDK |
-| `deepseek-*` / `claude-*` / `qwen*` / `glm-*` | `_OpenAICompatClient` | OpenAI SDK 兼容 |
-| `ppio/*` / `huawei/*` / `zai/*` / `MiniMax-*` | `_OpenAICompatClient` | OpenAI SDK 兼容 |
-
-### 已验证可用模型（内部代理 llmapi.bilibili.co）
-
-| 模型 | 路由 | 验证时间 |
-|------|------|----------|
-| `gemini-3.1-pro` | Gemini SDK | 2026-04 |
-| `deepseek-v3.2` | OpenAI 兼容 | 2026-04 |
-| `claude-4.6-opus` | OpenAI 兼容 | 2026-04 |
-| `glm-5-turbo` | OpenAI 兼容 | 2026-04 |
-| `qwen3.5-plus` | OpenAI 兼容 | 2026-04 |
-
-三个客户端接口统一：`await client.chat(prompt, ...) → (str, TokenUsage)`
-
----
-
-## 6. 多模态输入
-
-`GeminiClient` 支持图片和视频，自动处理 URL 下载和本地文件读取：
-
-```python
-text, _ = await client.chat(
-    prompt="描述这张图片",
-    images=[
-        "https://example.com/photo.jpg",       # URL
-        "/local/path/image.png",               # 本地路径
-        {"path": "img.jpg", "alias": "封面"},   # dict 格式，带别名
-    ],
-    videos=["https://example.com/video.mp4"],
+response = await client.create(
+    input="Hi, how are you?",
+    instructions="You are a helpful assistant.",
 )
+print(response.output_text)
 ```
 
----
+`create` 支持 `input`、`instructions`、`tools`、`temperature`、`text`、
+`stream` 和 `max_output_tokens`。传入工具时，调用层固定设置：
 
-## 7. Token 统计
-
-每次调用返回 `TokenUsage` 对象：
-
-```python
-text, token_usage = await client.chat(prompt="...")
-if token_usage:
-    print(f"输入: {token_usage.prompt_tokens}")
-    print(f"输出: {token_usage.completion_tokens}")
-    print(f"思考: {token_usage.thinking_tokens}")
-    print(f"耗时: {token_usage.latency_ms}ms")
-    print(f"费用: ${token_usage.total_cost:.4f}")
+```text
+tool_choice = auto
+parallel_tool_calls = false
 ```
 
----
+## Agent 工具循环
 
-## 8. 最小可运行示例
+Agent 不再要求模型输出 `action/tool/args/reply` JSON。工具通过 Responses 的
+function tools schema 下发，模型返回 `function_call`，Lucas 执行后以带
+`call_id` 的 `function_call_output` 回传。任务完成时，最终回答直接取
+`output_text`。
 
-```python
-import asyncio
-from utils.llm import GeminiClient
+职责分工：
 
-async def main():
-    client = GeminiClient(model="gemini-3.1-pro")
+- `utils/llm_client.py`：请求、流式传输、重试和 usage；
+- `harness/model_adapter.py`：工具 schema、Responses item 与 Lucas 类型转换；
+- `harness/runner.py`：工具执行、权限、预算、超时、上下文和 trace。
 
-    # 纯文本
-    text, usage = await client.chat(prompt="用一句话介绍 Python")
-    print(text)
+上下文由 Lucas 显式保存，不使用 `previous_response_id`。这样 eval、trace、恢复
+和 provider 请求输入都可复现。
 
-    # 要求 JSON 输出
-    json_text, _ = await client.chat(
-        prompt="列出 3 种编程语言，返回 JSON 数组",
-        response_mime_type="application/json",
-    )
-    print(json_text)
+## 流式事件
 
-asyncio.run(main())
-```
+Agent adapter 只消费并归一化需要的 Responses 事件：
 
----
+- reasoning delta → 推理 trace；
+- output text delta → 最终答案流；
+- completed → 完整 `ModelTurn`、response id 和 usage。
 
-## 9. 架构总结
+function call 参数在完成后统一校验，工具调用内容不会混入最终答案文本。
 
-```
-调用方代码
-    │
-    ▼
-GeminiClient / ZhipuClient / DeepSeekClient   ← 统一接口
-    │
-    ▼
-Google GenAI SDK (vertexai=True)  /  OpenAI SDK
-    │
-    ▼
-内部代理 (Beats: llmapi.bilibili.co)          ← base_url 控制
-    │
-    ▼
-实际 LLM 服务 (Gemini / GLM / DeepSeek / ...)
-```
+## 错误与重试
+
+调用层只对限流、服务端错误和连接重置等短暂故障做有限重试。工具参数错误、
+非法工具名和循环无进展属于 Agent 层校正，不计入 provider retry。API Key 缺失
+或 endpoint 不是 `api.deepseek.com` 时会立即报错。

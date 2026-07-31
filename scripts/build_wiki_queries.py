@@ -88,7 +88,7 @@ async def build_queries(corpus_root: Path, query_count: int, workers: int) -> li
     chosen = select_pages(master, batch_count * 12)
     batches = [chosen[index * 12:(index + 1) * 12] for index in range(batch_count)]
     prompt_template = _prompt_body()
-    client = create_client(model=os.environ.get("OPENAI_MODEL"))
+    client = create_client(model=os.environ.get("DEEPSEEK_MODEL"))
     semaphore = asyncio.Semaphore(workers)
     cache_dir = corpus_root / "quality/query-generation"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -113,7 +113,9 @@ async def build_queries(corpus_root: Path, query_count: int, workers: int) -> li
             result = None
             usage = None
             for _ in range(2):
-                text, usage = await client.chat(prompt, response_mime_type="application/json", temperature=0)
+                text, usage = await client.generate_text(
+                    prompt, response_mime_type="application/json", temperature=0,
+                )
                 candidate = extract_json(text)
                 if _valid_batch(candidate, allowed):
                     result = candidate

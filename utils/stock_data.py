@@ -435,12 +435,12 @@ async def _extract_company_names(text: str) -> list[str]:
     """用轻量 LLM 调用从用户问题中提取公司名称 [llm-weight: light]"""
     from utils.llm_client import create_client
     try:
-        client = create_client(model=None, system_prompt="你是一个实体提取工具。", enable_thinking=False)
+        client = create_client(model=None, instructions="你是一个实体提取工具。")
         prompt = (
             "从以下文本中提取所有A股上市公司名称，只返回公司名称列表，用逗号分隔。"
             f"如果没有公司名称，返回'无'。\n\n文本：{text}"
         )
-        resp, _ = await client.chat(prompt=prompt, temperature=0)
+        resp, _ = await client.generate_text(prompt=prompt, temperature=0)
         if not resp or "无" in resp.strip():
             return []
         names = [n.strip() for n in resp.split(",") if n.strip()]

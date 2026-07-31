@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.models import RunLimits
+from harness.models import FunctionCall, ModelRequest, ModelTurn, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.base import ToolResult, ToolSpec
 from harness.tools.generic.filesystem import READ_FILE_SPEC, LIST_FILES_SPEC
@@ -13,24 +13,46 @@ from harness.tools.generic.planning import UPDATE_PLAN_SPEC, _update_plan
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder, read_trace
 from evals.harness.grader import _process_check
-from utils.token_tracker import TokenUsage
 
 LIMITS = RunLimits(max_steps=8, timeout_seconds=30)
 
 
-class FakeModel:
-    def __init__(self, responses: list):
-        self.responses = list(responses)
-        self.prompts: list[str] = []
+def _tool_turn(name: str, arguments: dict, call_id: str) -> ModelTurn:
+    summary = f"执行 {name}"
+    raw_arguments = json.dumps(
+        {**arguments, "summary": summary},
+        ensure_ascii=False,
+    )
+    return ModelTurn(
+        function_calls=[FunctionCall(
+            call_id=call_id,
+            name=name,
+            arguments=arguments,
+            summary=summary,
+        )],
+        response_items=[{
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": raw_arguments,
+        }],
+    )
 
-    async def complete(self, prompt: str) -> tuple[str, TokenUsage | None]:
-        self.prompts.append(prompt)
+
+def _answer_turn(answer: str) -> ModelTurn:
+    return ModelTurn(output_text=answer)
+
+
+class FakeModel:
+    def __init__(self, responses: list[ModelTurn]):
+        self.responses = list(responses)
+        self.requests: list[ModelRequest] = []
+
+    async def complete(self, request: ModelRequest) -> ModelTurn:
+        self.requests.append(request)
         if self.responses:
-            item = self.responses.pop(0)
-            if isinstance(item, tuple):
-                return item
-            return item, None
-        return json.dumps({"action": "answer", "reply": "fallback"}), None
+            return self.responses.pop(0)
+        return _answer_turn("fallback")
 
 
 def _make_runner(tmp_path, model, specs=None):
@@ -47,6 +69,16 @@ def _trace(tmp_path, run_id="test-run") -> TraceRecorder:
     t = TraceRecorder(tmp_path / "trace.jsonl", run_id)
     t.record("run_started")
     return t
+
+
+def test_agent_loop_prompt_uses_native_single_call_and_direct_json_rules():
+    template = load_prompt_template(
+        Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
+    )
+
+    assert "最多只能包含一个 `function_call` item" in template
+    assert "只输出可直接解析的 JSON" in template
+    assert '"action"' not in template
 
 
 # ===================== update_plan 工具单元测试 =====================
@@ -86,17 +118,15 @@ def test_update_plan_invalid_status_defaults_to_pending():
 
 
 def test_update_plan_steps_not_list():
-    """steps 是字符串 → 自动转为单步计划（宽容）"""
+    """原生 schema 只接受 canonical steps 列表。"""
     result = _update_plan(Path("/tmp"), {"steps": "not_a_list"})
-    assert result.status == "ok"
-    assert "🔵 not_a_list" in result.observation
+    assert result.status == "invalid_input"
 
 
 def test_update_plan_step_not_dict():
-    """step 是字符串 → 自动包装为 dict（宽容）"""
+    """原生 schema 的 steps 元素必须是对象。"""
     result = _update_plan(Path("/tmp"), {"steps": ["not a dict"]})
-    assert result.status == "ok"
-    assert "⬜ not a dict" in result.observation
+    assert result.status == "invalid_input"
 
 
 def test_update_plan_missing_step_field():
@@ -121,11 +151,11 @@ async def test_runner_plan_then_read_then_answer(tmp_path):
     """模型先 update_plan，再 read_file，最后 answer"""
     (tmp_path / "data.txt").write_text("营收: 60.6亿元\n利润: 12.0亿元")
     model = FakeModel([
-        json.dumps({"action": "tool", "tool": "update_plan", "args": {
+        _tool_turn("update_plan", {
             "steps": [{"step": "读取数据文件", "status": "in_progress"}]
-        }}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "data.txt"}}),
-        json.dumps({"action": "answer", "reply": "完成"}),
+        }, "call-plan"),
+        _tool_turn("read_file", {"path": "data.txt"}, "call-read"),
+        _answer_turn("完成"),
     ])
     trace = _trace(tmp_path, "plan-test")
     runner = _make_runner(tmp_path, model)
@@ -133,10 +163,11 @@ async def test_runner_plan_then_read_then_answer(tmp_path):
 
     assert result.finish_reason == "completed"
     # plan observation 进入了后续上下文
-    assert "## 当前计划" in model.prompts[1]
-    assert "🔵 读取数据文件" in model.prompts[1]
+    second_input = str(model.requests[1].input_items)
+    assert "## 当前计划" in second_input
+    assert "🔵 读取数据文件" in second_input
     # 数据内容进入了后续上下文
-    assert "60.6" in model.prompts[2]
+    assert "60.6" in str(model.requests[2].input_items)
 
     # trace 中有 tool_call_finished for update_plan
     events = read_trace(trace.path)
@@ -152,20 +183,20 @@ async def test_runner_plan_update_twice(tmp_path):
     """模型两次调用 update_plan 更新进度"""
     (tmp_path / "a.txt").write_text("a")
     model = FakeModel([
-        json.dumps({"action": "tool", "tool": "update_plan", "args": {
+        _tool_turn("update_plan", {
             "steps": [
                 {"step": "读 A", "status": "in_progress"},
                 {"step": "读 B", "status": "pending"},
             ]
-        }}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "a.txt"}}),
-        json.dumps({"action": "tool", "tool": "update_plan", "args": {
+        }, "call-plan-1"),
+        _tool_turn("read_file", {"path": "a.txt"}, "call-read"),
+        _tool_turn("update_plan", {
             "steps": [
                 {"step": "读 A", "status": "completed"},
                 {"step": "读 B", "status": "in_progress"},
             ]
-        }}),
-        json.dumps({"action": "answer", "reply": "完成"}),
+        }, "call-plan-2"),
+        _answer_turn("完成"),
     ])
     trace = _trace(tmp_path, "plan-twice")
     runner = _make_runner(tmp_path, model)
@@ -271,21 +302,19 @@ async def test_multi01_full_pipeline(tmp_path):
 
     # FakeModel：先 plan → 逐个读文件 → answer
     model = FakeModel([
-        json.dumps({"action": "tool", "tool": "update_plan", "args": {
+        _tool_turn("update_plan", {
             "steps": [
                 {"step": "列出 reports 目录", "status": "in_progress"},
                 {"step": "读取 Q1-Q4 报告", "status": "pending"},
                 {"step": "汇总计算结果", "status": "pending"},
             ]
-        }}),
-        json.dumps({"action": "tool", "tool": "list_files", "args": {"path": "reports"}}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "reports/2024-Q1.md"}}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "reports/2024-Q2.md"}}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "reports/2024-Q3.md"}}),
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "reports/2024-Q4.md"}}),
-        json.dumps({"action": "answer", "reply": json.dumps({
-            "total_revenue": 60.6, "total_profit": 12.0
-        })}),
+        }, "call-plan"),
+        _tool_turn("list_files", {"path": "reports"}, "call-list"),
+        _tool_turn("read_file", {"path": "reports/2024-Q1.md"}, "call-q1"),
+        _tool_turn("read_file", {"path": "reports/2024-Q2.md"}, "call-q2"),
+        _tool_turn("read_file", {"path": "reports/2024-Q3.md"}, "call-q3"),
+        _tool_turn("read_file", {"path": "reports/2024-Q4.md"}, "call-q4"),
+        _answer_turn('{"total_revenue": 60.6, "total_profit": 12.0}'),
     ])
 
     trace = _trace(tmp_path, "multi01-test")
@@ -319,12 +348,13 @@ async def test_multi01_full_pipeline(tmp_path):
 # ===================== UPDATE_PLAN_SPEC 元数据校验 =====================
 
 def test_update_plan_spec_metadata():
-    """验证 ToolSpec 的 name/description/args_description 完整性"""
+    """验证 ToolSpec 的 name/description/parameters 完整性"""
     assert UPDATE_PLAN_SPEC.name == "update_plan"
     assert "仅当面对需要多步骤" in UPDATE_PLAN_SPEC.description
     assert "不要调用" in UPDATE_PLAN_SPEC.description
-    assert "steps" in UPDATE_PLAN_SPEC.args_description
-    assert "pending" in UPDATE_PLAN_SPEC.args_description
+    assert "steps" in UPDATE_PLAN_SPEC.parameters["properties"]
+    step_object = UPDATE_PLAN_SPEC.parameters["properties"]["steps"]["items"]
+    assert "pending" in step_object["properties"]["status"]["enum"]
     assert callable(UPDATE_PLAN_SPEC.handler)
 
 
@@ -334,8 +364,8 @@ async def test_simple_task_no_plan_needed(tmp_path):
     """简单读取任务，agent 不调用 update_plan 也应成功"""
     (tmp_path / "hello.txt").write_text("hello world")
     model = FakeModel([
-        json.dumps({"action": "tool", "tool": "read_file", "args": {"path": "hello.txt"}}),
-        json.dumps({"action": "answer", "reply": "hello world"}),
+        _tool_turn("read_file", {"path": "hello.txt"}, "call-read"),
+        _answer_turn("hello world"),
     ])
     trace = _trace(tmp_path, "simple-test")
     runner = _make_runner(tmp_path, model)
@@ -350,41 +380,9 @@ async def test_simple_task_no_plan_needed(tmp_path):
     assert plan_check["passed"], f"simple task shouldn't use plan: {plan_check['detail']}"
 
 
-# ===================== 宽容输入测试（模型可能用 Codex 式参数名） =====================
-
-def test_update_plan_accepts_plan_key_string():
-    """模型传 plan 字段（字符串）→ 转为单步 pending"""
-    result = _update_plan(Path("/tmp"), {"plan": "首先搜索资料"})
-    assert result.ok
-    assert "🔵 首先搜索资料" in result.observation
-
-
-def test_update_plan_accepts_plan_key_list():
-    """模型传 plan 字段（列表）→ 正常解析"""
-    result = _update_plan(Path("/tmp"), {
-        "plan": [{"step": "搜索", "status": "completed"}, {"step": "汇总", "status": "pending"}]
-    })
-    assert result.ok
-    assert "✅ 搜索" in result.observation
-    assert "⬜ 汇总" in result.observation
-
-
-def test_update_plan_steps_key_takes_priority():
-    """steps 和 plan 同时存在 → 优先用 steps"""
-    result = _update_plan(Path("/tmp"), {
-        "steps": [{"step": "正式步骤"}],
-        "plan": [{"step": "忽略我"}],
-    })
-    assert result.ok
-    assert "正式步骤" in result.observation
-    assert "忽略我" not in result.observation
-
-
 def test_update_plan_string_elements_in_list():
-    """steps 列表中元素是字符串 → 自动包装为 dict"""
+    """不再兼容字符串步骤元素。"""
     result = _update_plan(Path("/tmp"), {
         "steps": ["第一步", "第二步"]
     })
-    assert result.ok
-    assert "⬜ 第一步" in result.observation
-    assert "⬜ 第二步" in result.observation
+    assert result.status == "invalid_input"

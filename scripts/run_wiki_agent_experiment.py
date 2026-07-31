@@ -80,7 +80,18 @@ TFIDF_WIKI_RECALL_SPEC = ToolSpec(
     name="wiki_recall",
     description="从本地 wiki 知识库召回相关页面（TF-IDF 相关性排序）。"
                 "query 应为预分词关键词（空格、逗号或顿号分隔），返回标题、路径和摘要。",
-    args_description='{"query": "预分词关键词，空格、逗号或顿号分隔"}',
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "预分词关键词，以空格、逗号或顿号分隔",
+            },
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
     handler=tfidf_wiki_recall,
 )
 

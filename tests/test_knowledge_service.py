@@ -37,7 +37,7 @@ class FakeClient:
         self._responses = list(responses or [])
         self.calls = []
 
-    async def chat(self, **kwargs):
+    async def generate_text(self, **kwargs):
         self.calls.append(kwargs)
         if self._responses:
             return self._responses.pop(0), None
@@ -536,19 +536,18 @@ async def test_ingest_skips_already_compiled_source(tmp_path):
 def test_load_wiki_config_reads_wiki_section(tmp_path):
     cfg_path = tmp_path / "lucas.yaml"
     cfg_path.write_text(
-        "wiki:\n  provider: deepseek\n  index_title: 自定义索引\n  industries: [电子, 新能源]\n",
+        "wiki:\n  model: deepseek-v4-flash\n  index_title: 自定义索引\n  industries: [电子, 新能源]\n",
         encoding="utf-8",
     )
     cfg = load_wiki_config(cfg_path)
-    assert cfg.provider == "deepseek"
-    assert cfg.model  # 已解析为 provider 默认模型
+    assert cfg.model == "deepseek-v4-flash"
     assert cfg.index_title == "自定义索引"
     assert cfg.industries == ["电子", "新能源"]
 
 
 def test_load_wiki_config_defaults(tmp_path):
     cfg = load_wiki_config(tmp_path / "不存在.yaml")
-    assert cfg.provider == "deepseek"
+    assert cfg.model
     assert cfg.industries == []
     assert cfg.index_title
     assert cfg.source_max_chars > 0

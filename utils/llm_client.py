@@ -1,360 +1,153 @@
+"""DeepSeek official Responses API transport.
+
+Lucas deliberately supports one LLM protocol: OpenAI Responses as exposed by
+the DeepSeek official endpoint. Agent decisions are normalized in
+``harness.model_adapter``; simple knowledge/corpus calls use ``generate_text``.
 """
-Lucas LLM 统一调用层
 
-对外只暴露一个入口：create_client(model) → LLMClient
-根据模型名前缀自动路由到 Gemini / OpenAI 兼容客户端。
+from __future__ import annotations
 
-用法：
-    from utils.llm_client import create_client
-
-    client = create_client("deepseek-v4-flash", system_prompt="你是股市分析师")
-    text, usage = await client.chat("分析宁德时代")
-
-    client2 = create_client("deepseek-v3.2")
-    text2, usage2 = await client2.chat("同样的问题")
-"""
-import os
-import abc
-import json
-import re
-import time
 import asyncio
-import logging
-from typing import AsyncGenerator, Optional, Tuple, List
+import os
+import time
+from typing import Any, Callable
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
-from utils.token_tracker import TokenUsage, extract_token_usage
-from utils.providers import get_provider_config, resolve_env_vars, get_provider_model
+from utils.token_tracker import TokenUsage
 
 load_dotenv()
-logger = logging.getLogger(__name__)
 
-# 路由规则：模型名前缀 → 客户端类型
-_OPENAI_COMPAT_PREFIXES = ('glm-', 'ppio/', 'huawei/', 'zai/', 'MiniMax-', 'deepseek-', 'qwen', 'claude-')
-
-# 特定模型前缀 → 独立的 API_KEY / BASE_URL 环境变量
-_PROVIDER_ENV_OVERRIDES = {
-    'MiniMax-': ('MINIMAX_API_KEY', 'MINIMAX_BASE_URL'),
-    'deepseek-': ('DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL'),
-}
-
+DEFAULT_MODEL = "deepseek-v4-flash"
+DEFAULT_BASE_URL = "https://api.deepseek.com"
 MAX_RETRIES = 3
-_RETRY_WAIT = [3, 5, 10]
-
-_THINK_RE = re.compile(r'<think>.*?</think>\s*', re.DOTALL)
+_RETRY_WAIT = (3, 5, 10)
 
 
-def _is_retryable(e: Exception) -> bool:
-    s = str(e).lower()
-    return any(k in s for k in ['429', 'resource_exhausted', 'rate limit', '499', '500', '502', '503', '504'])
+def _is_retryable(error: Exception) -> bool:
+    status = getattr(error, "status_code", None)
+    if status == 429 or isinstance(status, int) and status >= 500:
+        return True
+    text = str(error).lower()
+    return any(
+        marker in text
+        for marker in (
+            "429", "rate limit", "500", "502", "503", "504",
+            "connection error", "connection reset", "timed out", "timeout",
+        )
+    )
 
 
-def _strip_think_tags(text: str) -> str:
-    """移除 <think>...</think> 标签及其内容"""
-    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+def responses_usage(response: Any, model: str, latency_ms: float = 0.0) -> TokenUsage | None:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    output_tokens = getattr(usage, "output_tokens", 0) or 0
+    output_details = getattr(usage, "output_tokens_details", None)
+    reasoning_tokens = getattr(output_details, "reasoning_tokens", 0) or 0
+    return TokenUsage(
+        prompt_tokens=getattr(usage, "input_tokens", 0) or 0,
+        completion_tokens=max(0, output_tokens - reasoning_tokens),
+        thinking_tokens=reasoning_tokens,
+        total_tokens=getattr(usage, "total_tokens", 0) or 0,
+        model=model,
+        latency_ms=latency_ms,
+    )
 
 
-class LLMClient(abc.ABC):
-    """统一接口：所有 LLM 客户端都实现这个协议"""
+class DeepSeekResponsesClient:
+    """Small transport wrapper around ``AsyncOpenAI.responses``."""
 
-    def __init__(self, model: str, system_prompt: Optional[str] = None):
-        self.model = model
-        self.system_prompt = system_prompt
+    def __init__(self, model: str | None = None, instructions: str | None = None):
+        from openai import AsyncOpenAI
 
-    @abc.abstractmethod
-    async def chat(
-        self,
-        prompt: str,
-        response_mime_type: str = "text/plain",
-        temperature: Optional[float] = None,
-        thinking_budget: Optional[int] = None,
-    ) -> Tuple[str, Optional[TokenUsage]]:
-        ...
-
-    @abc.abstractmethod
-    async def chat_stream(
-        self,
-        prompt: str,
-        response_mime_type: str = "text/plain",
-        temperature: Optional[float] = None,
-        thinking_budget: Optional[int] = None,
-    ) -> "AsyncGenerator[Tuple[str, str], None]":
-        """产出 (kind, text)：kind 为 "reasoning"（思考）或 "content"（答案）。
-
-        思考走模型原生的独立通道（如 DeepSeek 的 reasoning_content），
-        与答案分离，由上层分别展示为过程 thought 和最终回答。
-        无原生 reasoning 的实现只产出 "content"。
-        """
-        ...
-
-
-class _GeminiClient(LLMClient):
-    """Google Gemini，通过 GenAI SDK + 内部代理调用"""
-
-    def __init__(self, model: str, system_prompt: Optional[str] = None,
-                 enable_thinking: bool = True):
-        super().__init__(model, system_prompt)
-        self.enable_thinking = enable_thinking
-
-        from google import genai
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        base_url = os.environ.get("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
         if not api_key:
-            raise ValueError("OPENAI_API_KEY 未设置")
-        self._client = genai.Client(
-            api_key=api_key, vertexai=True,
-            http_options={"base_url": f"{base_url}/gemini/", "timeout": 1200000},
-        )
+            raise ValueError("DEEPSEEK_API_KEY 未设置")
+        parsed_base_url = urlparse(base_url)
+        if parsed_base_url.scheme != "https" or parsed_base_url.hostname != "api.deepseek.com":
+            raise ValueError("DEEPSEEK_BASE_URL 必须使用 HTTPS 并指向 DeepSeek 官网 api.deepseek.com")
+        configured_model = model.strip() if isinstance(model, str) else ""
+        environment_model = os.environ.get("DEEPSEEK_MODEL", "").strip()
+        self.model = configured_model or environment_model or DEFAULT_MODEL
+        self.instructions = instructions
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
-    async def chat(self, prompt: str, response_mime_type: str = "text/plain",
-                   temperature: Optional[float] = None,
-                   thinking_budget: Optional[int] = None) -> Tuple[str, Optional[TokenUsage]]:
-        from google.genai import types
+    async def create(
+        self,
+        *,
+        input: str | list[dict[str, Any]],
+        instructions: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.0,
+        text: dict[str, Any] | None = None,
+        stream: bool = False,
+        max_output_tokens: int = 65_536,
+        on_retry: Callable[[dict[str, Any]], None] | None = None,
+    ):
+        params: dict[str, Any] = {
+            "model": self.model,
+            "input": input,
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+            "stream": stream,
+        }
+        effective_instructions = instructions if instructions is not None else self.instructions
+        if effective_instructions:
+            params["instructions"] = effective_instructions
+        if tools:
+            params.update(
+                tools=tools,
+                tool_choice="auto",
+                parallel_tool_calls=False,
+            )
+        if text is not None:
+            params["text"] = text
 
-        contents = []
-        if self.system_prompt:
-            contents.append(types.Content(role="user", parts=[types.Part(text=self.system_prompt)]))
-            contents.append(types.Content(role="model", parts=[types.Part(text="好的，我明白了。")]))
-        contents.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
-
-        _budget = thinking_budget if thinking_budget is not None else 24576
-        config = types.GenerateContentConfig(
-            response_mime_type=response_mime_type,
-            temperature=temperature if temperature is not None else 1.0,
-            thinking_config=types.ThinkingConfig(
-                thinking_budget=_budget if self.enable_thinking else 0
-            ),
-        )
-
-        start = time.time()
-        response = None
         for retry in range(MAX_RETRIES + 1):
             try:
-                response = await self._client.aio.models.generate_content(
-                    model=self.model, contents=contents, config=config
-                )
-            except Exception as e:
-                if _is_retryable(e) and retry < MAX_RETRIES:
-                    await asyncio.sleep(_RETRY_WAIT[retry])
-                    continue
-                raise
-            if response and response.text:
-                break
-            if retry < MAX_RETRIES:
-                await asyncio.sleep(_RETRY_WAIT[retry])
+                return await self._client.responses.create(**params)
+            except Exception as error:
+                if retry >= MAX_RETRIES or not _is_retryable(error):
+                    raise
+                delay_seconds = _RETRY_WAIT[retry]
+                if on_retry is not None:
+                    on_retry({
+                        "retry_count": retry + 1,
+                        "next_attempt": retry + 2,
+                        "delay_seconds": delay_seconds,
+                        "error_type": type(error).__name__,
+                        "status_code": getattr(error, "status_code", None),
+                    })
+                await asyncio.sleep(delay_seconds)
+        raise AssertionError("unreachable")
 
-        latency = (time.time() - start) * 1000
-        text = response.text if response and response.text else ""
-        usage = extract_token_usage(response, self.model, latency) if response else None
-        return text, usage
-
-    async def chat_stream(
+    async def generate_text(
         self,
         prompt: str,
+        *,
         response_mime_type: str = "text/plain",
-        temperature: Optional[float] = None,
-        thinking_budget: Optional[int] = None,
-    ) -> AsyncGenerator[str, None]:
-        from google.genai import types
-        contents = []
-        if self.system_prompt:
-            contents.append(types.Content(role="user", parts=[types.Part(text=self.system_prompt)]))
-            contents.append(types.Content(role="model", parts=[types.Part(text="好的，我明白了。")]))
-        contents.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
-        _budget = thinking_budget if thinking_budget is not None else 24576
-        config = types.GenerateContentConfig(
-            response_mime_type=response_mime_type,
-            temperature=temperature if temperature is not None else 1.0,
-            thinking_config=types.ThinkingConfig(
-                thinking_budget=_budget if self.enable_thinking else 0
-            ),
-        )
-        stream = await self._client.aio.models.generate_content_stream(
-            model=self.model, contents=contents, config=config
-        )
-        async for chunk in stream:
-            if chunk.text:
-                yield "content", chunk.text
-
-
-class _OpenAICompatClient(LLMClient):
-    """OpenAI 兼容客户端，适用于 Zhipu/DeepSeek/Qwen 等"""
-
-    def __init__(self, model: str, system_prompt: Optional[str] = None):
-        super().__init__(model, system_prompt)
-        import openai
-
-        # 先尝试从 provider 配置获取
-        api_key = None
-        base_url = None
-        for prefix, (key_env, url_env) in _PROVIDER_ENV_OVERRIDES.items():
-            if model.startswith(prefix):
-                api_key, base_url = resolve_env_vars(key_env, url_env)
-                break
-
-        # 兜底：使用默认环境变量
-        if not api_key:
-            api_key = os.environ.get("OPENAI_API_KEY")
-        if not base_url:
-            base_url = os.environ.get("OPENAI_BASE_URL", "")
-        if not api_key:
-            raise ValueError("API_KEY 未设置")
-        self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
-
-    async def chat(self, prompt: str, response_mime_type: str = "text/plain",
-                   temperature: Optional[float] = None,
-                   thinking_budget: Optional[int] = None) -> Tuple[str, Optional[TokenUsage]]:
-        messages = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        params = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": 65536,
-            "temperature": temperature if temperature is not None else 1.0,
-        }
+        temperature: float = 0.0,
+        instructions: str | None = None,
+    ) -> tuple[str, TokenUsage | None]:
+        text_format = None
         if response_mime_type == "application/json":
-            params["response_format"] = {"type": "json_object"}
-
-        response = await self._client.chat.completions.create(**params)
-
-        msg = response.choices[0].message
-
-        # 处理 tool_calls（OpenAI 兼容格式，MiniMax/Claude/DeepSeek 等）
-        tool_calls = getattr(msg, "tool_calls", None) or getattr(msg, "function_call", None)
-        if tool_calls:
-            tc = tool_calls[0] if isinstance(tool_calls, list) else tool_calls
-            func = tc.get("function", tc) if isinstance(tc, dict) else tc
-            # func 可以是 dict（OpenAI 格式）或对象（某些 provider）
-            if isinstance(func, dict):
-                name = func.get("name", str(func))
-                args = func.get("arguments", "{}")
-            else:
-                name = getattr(func, "name", str(func))
-                args = getattr(func, "arguments", "{}")
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except json.JSONDecodeError:
-                    args = {"raw": args}
-            return json.dumps({"action": "tool", "tool": name, "args": args}, ensure_ascii=False), None
-
-        text = ""
-        if msg.content:
-            text = response.choices[0].message.content
-            text = _strip_think_tags(text)
-
-        usage = None
-        if hasattr(response, "usage") and response.usage:
-            u = response.usage
-            usage = TokenUsage(
-                model=self.model,
-                prompt_tokens=getattr(u, "prompt_tokens", 0) or 0,
-                completion_tokens=getattr(u, "completion_tokens", 0) or 0,
-                total_tokens=getattr(u, "total_tokens", 0) or 0,
-            )
-        return text, usage
-
-    async def chat_stream(
-        self,
-        prompt: str,
-        response_mime_type: str = "text/plain",
-        temperature: Optional[float] = None,
-        thinking_budget: Optional[int] = None,
-    ) -> AsyncGenerator[Tuple[str, str], None]:
-        """产出 (kind, text)：
-
-        - ("reasoning", ...)：模型原生独立思考通道（DeepSeek reasoning_content），
-          逐 delta 直接透传，与答案分离。
-        - ("content", ...)：答案文本，沿用 <think> 内联标签剥离作为兜底
-          （部分模型把思考塞进 content 而非 reasoning_content）。
-        """
-        messages = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        params = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": 65536,
-            "temperature": temperature if temperature is not None else 1.0,
-            "stream": True,
-        }
-        if response_mime_type == "application/json":
-            params["response_format"] = {"type": "json_object"}
-        stream = await self._client.chat.completions.create(**params)
-        buf = ""
-        in_think = False
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            reasoning = getattr(delta, "reasoning_content", None)
-            if reasoning:
-                yield "reasoning", reasoning
-            if delta.content:
-                buf += delta.content
-                while True:
-                    if in_think:
-                        end = buf.find("</think>")
-                        if end == -1:
-                            buf = ""
-                            break
-                        buf = buf[end + 8:]
-                        in_think = False
-                    else:
-                        start = buf.find("<think>")
-                        if start == -1:
-                            if "<" in buf and not buf.endswith(">"):
-                                # partial tag — hold back
-                                safe = buf[:buf.rfind("<")]
-                                if safe:
-                                    yield "content", safe
-                                buf = buf[len(safe):]
-                            else:
-                                if buf:
-                                    yield "content", buf
-                                buf = ""
-                            break
-                        if start > 0:
-                            yield "content", buf[:start]
-                        buf = buf[start + 7:]
-                        in_think = True
-        if buf and not in_think:
-            yield "content", buf
+            text_format = {"format": {"type": "json_object"}}
+        started = time.monotonic()
+        response = await self.create(
+            input=prompt,
+            instructions=instructions,
+            temperature=temperature,
+            text=text_format,
+        )
+        latency_ms = (time.monotonic() - started) * 1000
+        return response.output_text or "", responses_usage(response, self.model, latency_ms)
 
 
 def create_client(
-    model: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    enable_thinking: bool = True,
-    provider: Optional[str] = None,
-) -> LLMClient:
-    """
-    工厂函数：根据模型名或 provider 自动选择客户端。
-
-    方式1: 指定 provider（推荐）
-        create_client(provider="minimax")
-
-    方式2: 直接指定模型名（向后兼容）
-        create_client(model="deepseek-v4-flash")
-
-    方式3: 同时指定 provider + model（model 覆盖 provider 默认）
-        create_client(provider="deepseek", model="deepseek-v4-flash")
-
-    路由规则：
-        glm-* / ppio/* / huawei/* / zai/* / MiniMax-* / deepseek-* / qwen-* / claude-*  → OpenAI 兼容
-        其余（gemini-* 等）→ Gemini SDK
-    """
-    if provider:
-        # 从 provider 配置获取模型
-        actual_model = get_provider_model(provider, model)
-    else:
-        actual_model = model or os.environ.get("OPENAI_MODEL", "deepseek-v4-flash")
-
-    if any(actual_model.startswith(p) for p in _OPENAI_COMPAT_PREFIXES):
-        return _OpenAICompatClient(model=actual_model, system_prompt=system_prompt)
-    return _GeminiClient(model=actual_model, system_prompt=system_prompt, enable_thinking=enable_thinking)
+    model: str | None = None,
+    instructions: str | None = None,
+) -> DeepSeekResponsesClient:
+    return DeepSeekResponsesClient(model=model, instructions=instructions)

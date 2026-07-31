@@ -98,7 +98,7 @@ async def review_corpus(corpus_root: Path, sample_size: int, workers: int,
     prompt_text = PROMPT_PATH.read_text(encoding="utf-8")
     if prompt_text.startswith("---\n"):
         prompt_text = prompt_text.split("---", 2)[2].strip()
-    client = create_client(model=os.environ.get("OPENAI_MODEL"))
+    client = create_client(model=os.environ.get("DEEPSEEK_MODEL"))
     semaphore = asyncio.Semaphore(workers)
     selected = select_review_sample(master, sample_size)
     cache_dir = corpus_root / "quality/review-outputs"
@@ -138,7 +138,7 @@ async def review_corpus(corpus_root: Path, sample_size: int, workers: int,
                 result = None
                 usage = None
                 for _ in range(2):
-                    text, usage = await client.chat(
+                    text, usage = await client.generate_text(
                         prompt, response_mime_type="application/json", temperature=0,
                     )
                     candidate = extract_json(text)

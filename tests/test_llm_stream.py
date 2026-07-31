@@ -1,156 +1,323 @@
-"""Tests for LLMClient.chat_stream() streaming support."""
-import pytest
+"""DeepSeek Responses transport and adapter tests."""
+
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
-def test_default_client_uses_deepseek_v4_flash_and_deepseek_env():
-    from utils.llm_client import _OpenAICompatClient, create_client
+from harness.model_adapter import ResponsesModelAdapter, responses_tool
+from harness.models import ModelRequest
+from harness.tools.base import ToolSpec
+from utils.llm_client import DeepSeekResponsesClient, create_client
 
+
+def _tool_spec() -> ToolSpec:
+    return ToolSpec(
+        name="lookup",
+        description="lookup a value",
+        parameters={
+            "type": "object",
+            "properties": {"key": {"type": "string"}},
+            "required": ["key"],
+            "additionalProperties": False,
+        },
+        handler=lambda workspace, args: None,
+    )
+
+
+class _Item(SimpleNamespace):
+    def model_dump(self, **kwargs):
+        return dict(self.dump)
+
+
+def _usage(input_tokens=10, output_tokens=6, reasoning_tokens=2):
+    return SimpleNamespace(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+        output_tokens_details=SimpleNamespace(reasoning_tokens=reasoning_tokens),
+    )
+
+
+def test_create_client_uses_only_deepseek_responses_configuration():
     env = {
         "DEEPSEEK_API_KEY": "deepseek-key",
-        "DEEPSEEK_BASE_URL": "https://deepseek.example/v1",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+        "DEEPSEEK_MODEL": "deepseek-v4-flash",
+    }
+    with patch.dict("os.environ", env, clear=True), patch("openai.AsyncOpenAI") as openai:
+        client = create_client(instructions="system")
+
+    assert isinstance(client, DeepSeekResponsesClient)
+    assert client.model == "deepseek-v4-flash"
+    assert client.instructions == "system"
+    openai.assert_called_once_with(api_key="deepseek-key", base_url="https://api.deepseek.com")
+
+
+@pytest.mark.parametrize("base_url", [
+    "https://proxy.example/v1",
+    "http://api.deepseek.com",
+])
+def test_client_rejects_non_official_endpoint(base_url):
+    env = {
+        "DEEPSEEK_API_KEY": "deepseek-key",
+        "DEEPSEEK_BASE_URL": base_url,
     }
     with patch.dict("os.environ", env, clear=True):
-        with patch("openai.AsyncOpenAI") as mock_openai:
-            client = create_client()
+        with pytest.raises(ValueError, match="DeepSeek 官网"):
+            create_client()
 
-    assert isinstance(client, _OpenAICompatClient)
+
+def test_client_uses_default_model_when_environment_value_is_blank():
+    env = {
+        "DEEPSEEK_API_KEY": "deepseek-key",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+        "DEEPSEEK_MODEL": "   ",
+    }
+    with patch.dict("os.environ", env, clear=True), patch("openai.AsyncOpenAI"):
+        client = create_client()
+
     assert client.model == "deepseek-v4-flash"
-    mock_openai.assert_called_once_with(
-        base_url="https://deepseek.example/v1",
-        api_key="deepseek-key",
+
+
+@pytest.mark.asyncio
+async def test_generate_text_uses_responses_and_normalizes_usage():
+    response = SimpleNamespace(output_text="OK", usage=_usage())
+    env = {
+        "DEEPSEEK_API_KEY": "key",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    }
+    with patch.dict("os.environ", env, clear=True), patch("openai.AsyncOpenAI"):
+        client = create_client(instructions="system")
+        client._client.responses.create = AsyncMock(return_value=response)
+        text, usage = await client.generate_text(
+            "prompt", response_mime_type="application/json", temperature=0.2
+        )
+
+    assert text == "OK"
+    assert usage.prompt_tokens == 10
+    assert usage.completion_tokens == 4
+    assert usage.thinking_tokens == 2
+    client._client.responses.create.assert_awaited_once_with(
+        model="deepseek-v4-flash",
+        input="prompt",
+        max_output_tokens=65536,
+        temperature=0.2,
+        stream=False,
+        instructions="system",
+        text={"format": {"type": "json_object"}},
     )
 
 
 @pytest.mark.asyncio
-async def test_gemini_chat_stream_awaits_sdk_stream():
-    from utils.llm_client import _GeminiClient
+async def test_client_retries_transient_responses_error_without_changing_request():
+    response = SimpleNamespace(output_text="OK", usage=_usage())
+    retries = []
+    env = {
+        "DEEPSEEK_API_KEY": "key",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    }
+    with (
+        patch.dict("os.environ", env, clear=True),
+        patch("openai.AsyncOpenAI"),
+        patch("utils.llm_client.asyncio.sleep", new_callable=AsyncMock) as sleep,
+    ):
+        client = create_client()
+        client._client.responses.create = AsyncMock(
+            side_effect=[RuntimeError("503 service unavailable"), response]
+        )
+        result = await client.create(input="hello", on_retry=retries.append)
 
-    async def chunks():
-        for text in ("你好", "世界"):
-            yield MagicMock(text=text)
-
-    client = object.__new__(_GeminiClient)
-    client.model = "gemini-3.1-pro"
-    client.system_prompt = None
-    client.enable_thinking = False
-    client._client = MagicMock()
-    client._client.aio.models.generate_content_stream = AsyncMock(return_value=chunks())
-
-    result = []
-    async for chunk in client.chat_stream(prompt="hi"):
-        result.append(chunk)
-
-    assert result == [("content", "你好"), ("content", "世界")]
-
-
-@pytest.mark.asyncio
-async def test_openai_chat_stream_yields_chunks():
-    from utils.llm_client import _OpenAICompatClient
-
-    mock_chunk_1 = MagicMock()
-    mock_chunk_1.choices = [MagicMock()]
-    mock_chunk_1.choices[0].delta.content = "你好"
-    mock_chunk_1.choices[0].delta.reasoning_content = None
-
-    mock_chunk_2 = MagicMock()
-    mock_chunk_2.choices = [MagicMock()]
-    mock_chunk_2.choices[0].delta.content = "世界"
-    mock_chunk_2.choices[0].delta.reasoning_content = None
-
-    mock_chunk_end = MagicMock()
-    mock_chunk_end.choices = [MagicMock()]
-    mock_chunk_end.choices[0].delta.content = None
-    mock_chunk_end.choices[0].delta.reasoning_content = None
-
-    async def mock_stream():
-        for chunk in (mock_chunk_1, mock_chunk_2, mock_chunk_end):
-            yield chunk
-
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
-        with patch("openai.AsyncOpenAI") as mock_openai:
-            client = _OpenAICompatClient(model="deepseek-v3.2", system_prompt="test")
-            client._client.chat.completions.create = AsyncMock(return_value=mock_stream())
-
-            chunks = []
-            async for chunk in client.chat_stream(prompt="hi"):
-                chunks.append(chunk)
-
-            assert ("content", "你好") in chunks
-            assert ("content", "世界") in chunks
+    assert result is response
+    assert client._client.responses.create.await_count == 2
+    assert client._client.responses.create.await_args_list[0] == (
+        client._client.responses.create.await_args_list[1]
+    )
+    assert retries == [{
+        "retry_count": 1,
+        "next_attempt": 2,
+        "delay_seconds": 3,
+        "error_type": "RuntimeError",
+        "status_code": None,
+    }]
+    sleep.assert_awaited_once_with(3)
 
 
 @pytest.mark.asyncio
-async def test_openai_chat_stream_strips_think_tags():
-    from utils.llm_client import _OpenAICompatClient
+async def test_client_does_not_retry_non_transient_responses_error():
+    env = {
+        "DEEPSEEK_API_KEY": "key",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    }
+    with (
+        patch.dict("os.environ", env, clear=True),
+        patch("openai.AsyncOpenAI"),
+        patch("utils.llm_client.asyncio.sleep", new_callable=AsyncMock) as sleep,
+    ):
+        client = create_client()
+        client._client.responses.create = AsyncMock(side_effect=ValueError("bad request"))
+        with pytest.raises(ValueError, match="bad request"):
+            await client.create(input="hello")
 
-    mock_chunk = MagicMock()
-    mock_chunk.choices = [MagicMock()]
-    mock_chunk.choices[0].delta.content = "<think>internal reasoning</think>visible text"
-    mock_chunk.choices[0].delta.reasoning_content = None
-
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
-        with patch("openai.AsyncOpenAI"):
-            client = _OpenAICompatClient(model="deepseek-v3.2", system_prompt=None)
-            async def mock_stream():
-                yield mock_chunk
-            client._client.chat.completions.create = AsyncMock(return_value=mock_stream())
-
-            chunks = []
-            async for chunk in client.chat_stream(prompt="hi"):
-                chunks.append(chunk)
-
-            assert chunks == [("content", "visible text")]
+    client._client.responses.create.assert_awaited_once()
+    sleep.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_openai_chat_stream_skips_empty_after_strip():
-    from utils.llm_client import _OpenAICompatClient
+def test_responses_tool_injects_required_summary_without_mutating_business_schema():
+    spec = _tool_spec()
 
-    mock_chunk = MagicMock()
-    mock_chunk.choices = [MagicMock()]
-    mock_chunk.choices[0].delta.content = "<think>only thinking</think>"
-    mock_chunk.choices[0].delta.reasoning_content = None
+    value = responses_tool(spec)
 
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
-        with patch("openai.AsyncOpenAI"):
-            client = _OpenAICompatClient(model="deepseek-v3.2", system_prompt=None)
-            async def mock_stream():
-                yield mock_chunk
-            client._client.chat.completions.create = AsyncMock(return_value=mock_stream())
-
-            chunks = []
-            async for chunk in client.chat_stream(prompt="hi"):
-                chunks.append(chunk)
-
-            assert chunks == []
+    assert value["type"] == "function"
+    assert value["strict"] is True
+    assert set(value["parameters"]["required"]) == {"key", "summary"}
+    assert "summary" in value["parameters"]["properties"]
+    assert "summary" not in spec.parameters["properties"]
 
 
 @pytest.mark.asyncio
-async def test_openai_chat_stream_separates_reasoning_content():
-    """DeepSeek 原生 reasoning_content → ("reasoning", ...)；content → ("content", ...)"""
-    from utils.llm_client import _OpenAICompatClient
+async def test_adapter_normalizes_native_function_call_and_preserves_output_items():
+    reasoning = _Item(
+        type="reasoning",
+        content=[SimpleNamespace(text="先查")],
+        dump={"type": "reasoning", "id": "r1", "content": []},
+    )
+    call = _Item(
+        type="function_call",
+        call_id="call_1",
+        name="lookup",
+        arguments='{"key":"alpha","summary":"先查一下"}',
+        dump={
+            "type": "function_call",
+            "call_id": "call_1",
+            "name": "lookup",
+            "arguments": '{"key":"alpha","summary":"先查一下"}',
+        },
+    )
+    response = SimpleNamespace(
+        id="resp_1",
+        output=[reasoning, call],
+        output_text="",
+        usage=_usage(),
+    )
+    client = MagicMock(model="deepseek-v4-flash")
+    client.create = AsyncMock(return_value=response)
+    adapter = ResponsesModelAdapter(client)
 
-    think_chunk = MagicMock()
-    think_chunk.choices = [MagicMock()]
-    think_chunk.choices[0].delta.content = None
-    think_chunk.choices[0].delta.reasoning_content = "先判断行业。"
+    turn = await adapter.complete(ModelRequest(
+        instructions="system",
+        input_items=[{"role": "user", "content": "lookup"}],
+        tools=[_tool_spec()],
+        temperature=0,
+    ))
 
-    answer_chunk = MagicMock()
-    answer_chunk.choices = [MagicMock()]
-    answer_chunk.choices[0].delta.content = "白酒行业"
-    answer_chunk.choices[0].delta.reasoning_content = None
+    assert turn.response_id == "resp_1"
+    assert turn.reasoning == "先查"
+    assert turn.output_text == ""
+    assert turn.protocol_error == ""
+    assert len(turn.function_calls) == 1
+    assert turn.function_calls[0].call_id == "call_1"
+    assert turn.function_calls[0].arguments == {"key": "alpha"}
+    assert turn.function_calls[0].summary == "先查一下"
+    assert [item["type"] for item in turn.response_items] == ["reasoning", "function_call"]
 
-    with patch.dict("os.environ", {"OPENAI_API_KEY": "test", "OPENAI_BASE_URL": "http://fake"}):
-        with patch("openai.AsyncOpenAI"):
-            client = _OpenAICompatClient(model="deepseek-v4-flash", system_prompt=None)
-            async def mock_stream():
-                for chunk in (think_chunk, answer_chunk):
-                    yield chunk
-            client._client.chat.completions.create = AsyncMock(return_value=mock_stream())
 
-            chunks = []
-            async for chunk in client.chat_stream(prompt="hi"):
-                chunks.append(chunk)
+@pytest.mark.asyncio
+async def test_adapter_separates_commentary_from_final_output_during_tool_call():
+    commentary = _Item(
+        type="message",
+        phase="commentary",
+        content=[SimpleNamespace(text="我先确认现有配置。")],
+        dump={"type": "message", "phase": "commentary", "content": []},
+    )
+    call = _Item(
+        type="function_call",
+        call_id="call_1",
+        name="lookup",
+        arguments='{"key":"alpha","summary":"确认现有配置"}',
+        dump={
+            "type": "function_call",
+            "call_id": "call_1",
+            "name": "lookup",
+            "arguments": '{"key":"alpha","summary":"确认现有配置"}',
+        },
+    )
+    response = SimpleNamespace(
+        id="resp_commentary",
+        output=[commentary, call],
+        output_text="我先确认现有配置。",
+        usage=_usage(),
+    )
+    client = MagicMock(model="deepseek-v4-flash")
+    client.create = AsyncMock(return_value=response)
 
-    assert chunks == [("reasoning", "先判断行业。"), ("content", "白酒行业")]
+    turn = await ResponsesModelAdapter(client).complete(ModelRequest(
+        instructions="system",
+        input_items=[{"role": "user", "content": "lookup"}],
+        tools=[_tool_spec()],
+    ))
+
+    assert turn.output_text == ""
+    assert turn.commentary == "我先确认现有配置。"
+    assert len(turn.function_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_adapter_rejects_incomplete_response_as_protocol_error():
+    message = _Item(
+        type="message",
+        content=[SimpleNamespace(text="未完成的答案")],
+        dump={"type": "message", "content": []},
+    )
+    response = SimpleNamespace(
+        id="resp_incomplete",
+        status="incomplete",
+        output=[message],
+        output_text="未完成的答案",
+        usage=_usage(),
+    )
+    client = MagicMock(model="deepseek-v4-flash")
+    client.create = AsyncMock(return_value=response)
+
+    turn = await ResponsesModelAdapter(client).complete(ModelRequest(
+        instructions="system",
+        input_items=[{"role": "user", "content": "answer"}],
+        tools=[],
+    ))
+
+    assert turn.output_text == "未完成的答案"
+    assert turn.protocol_error == "response status is incomplete"
+
+
+@pytest.mark.asyncio
+async def test_adapter_streams_reasoning_text_and_completed_turn():
+    message = _Item(type="message", dump={"type": "message", "id": "m1"})
+    response = SimpleNamespace(
+        id="resp_2",
+        output=[message],
+        output_text="答案",
+        usage=_usage(),
+    )
+
+    async def events():
+        yield SimpleNamespace(type="response.reasoning_text.delta", delta="思考")
+        yield SimpleNamespace(type="response.output_text.delta", delta="答案")
+        yield SimpleNamespace(type="response.completed", response=response)
+
+    client = MagicMock(model="deepseek-v4-flash")
+    client.create = AsyncMock(return_value=events())
+    adapter = ResponsesModelAdapter(client)
+    request = ModelRequest(
+        instructions="system",
+        input_items=[{"role": "user", "content": "answer"}],
+        tools=[],
+    )
+
+    result = [event async for event in adapter.complete_stream(request)]
+
+    assert [(event.kind, event.text) for event in result[:2]] == [
+        ("reasoning_delta", "思考"),
+        ("output_text_delta", "答案"),
+    ]
+    assert result[-1].kind == "completed"
+    assert result[-1].turn.output_text == "答案"

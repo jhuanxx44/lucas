@@ -5,6 +5,7 @@ import { ChatMessage } from "./ChatMessage";
 import { SynthesisCard } from "./SynthesisCard";
 import { PlanCard } from "./PlanCard";
 import { AnalysisProcess } from "./AnalysisProcess";
+import type { LiveTraceTurn } from "./TracePanel";
 import { fetchWikiIndex } from "@/lib/api";
 import { MessageSquare, RefreshCw, TrendingUp, Building2, Lightbulb, BarChart3, Globe } from "lucide-react";
 import type { ChatMessage as ChatMessageType, WikiItem } from "@/types";
@@ -14,6 +15,7 @@ interface ChatPanelProps {
   onMessagesCommitted: (messages: ChatMessageType[]) => void;
   onResearchTarget?: (target: string) => void;
   onResearchDone?: () => void;
+  onLiveTraceChange?: (turn: LiveTraceTurn | null) => void;
 }
 
 const ICONS = [TrendingUp, Building2, Lightbulb, BarChart3, Globe];
@@ -47,7 +49,13 @@ function generateSuggestions(
   });
 }
 
-export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarget, onResearchDone }: ChatPanelProps) {
+export function ChatPanel({
+  initialMessages,
+  onMessagesCommitted,
+  onResearchTarget,
+  onResearchDone,
+  onLiveTraceChange,
+}: ChatPanelProps) {
   const { state, sendMessage, cancel } = useChat(
     initialMessages,
     onMessagesCommitted,
@@ -89,6 +97,28 @@ export function ChatPanel({ initialMessages, onMessagesCommitted, onResearchTarg
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [state.messages, state.researchers, state.synthesis]);
+
+  useEffect(() => {
+    if (!onLiveTraceChange) return;
+    if (!state.isLoading) {
+      onLiveTraceChange(null);
+      return;
+    }
+    const question = [...state.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    onLiveTraceChange({
+      question,
+      answer: state.synthesis,
+      steps: state.traceSteps,
+      runtimeTrace: state.runtimeTrace,
+    });
+  }, [
+    onLiveTraceChange,
+    state.isLoading,
+    state.messages,
+    state.runtimeTrace,
+    state.synthesis,
+    state.traceSteps,
+  ]);
 
   const isEmpty = state.messages.length === 0 && !state.isLoading;
 

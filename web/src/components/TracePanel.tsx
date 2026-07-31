@@ -92,20 +92,20 @@ function exportTrace(turns: TraceTurn[], messages: ChatMessage[]) {
   }
   const exportedAt = new Date();
   const payload: Record<string, unknown> = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     traceType: "lucas-product-run",
     exportedAt: exportedAt.toISOString(),
     config: runConfig
       ? {
           agent: runConfig.agent,
-          provider: runConfig.provider,
+          protocol: runConfig.protocol,
           model: runConfig.model,
           temperature: runConfig.temperature,
           allowed_tools: runConfig.allowed_tools,
           max_steps: runConfig.max_steps,
           timeout_seconds: runConfig.timeout_seconds,
           system_prompt: runConfig.system_prompt,
-          tools_description: runConfig.tools_description,
+          tools: runConfig.tools,
           prompt_template: runConfig.prompt_template,
         }
       : undefined,

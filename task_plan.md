@@ -1,4 +1,140 @@
-# Current Task Plan: Review Lucas against open-source agent harnesses
+# Current Task Plan: Review, Fix, Commit, and Push Responses Migration
+
+## Goal
+Systematically review the complete Responses-native migration, fix verified issues without expanding scope, rerun risk-proportionate validation, then commit and push the reviewed migration to the current `feature/dev` branch.
+
+## Current Phase
+Phase 5 — stage, commit, push, and verify the reviewed migration
+
+## Phases
+
+### Phase 1: Scope and Baseline
+- [x] Attribute every dirty file to the migration or pre-existing user work
+- [x] Review branch/upstream state, deleted files, configuration, dependencies, and prompt annotations
+- [x] Establish the current deterministic and frontend baseline
+- **Status:** complete
+
+### Phase 2: Systematic Review
+- [x] Review transport, adapter, Runner, tool schemas/runtime, SSE/frontend, eval, scripts, docs, and tests
+- [x] Check security, timeout/retry/cancellation, context fidelity, streaming, trace, and terminal semantics
+- [x] Record only evidence-backed findings with severity and reproduction
+- **Status:** complete
+
+### Phase 3: Targeted Fixes
+- [x] Add or locate a failing test for each verified code issue
+- [x] Apply minimal fixes and remove any migration-created dead code
+- [x] Re-run focused tests after each fix
+- **Status:** complete
+
+### Phase 4: Release Validation
+- [x] Run full backend suite, frontend build/lint, live connectivity smoke, forbidden-reference scan, and diff checks
+- [x] Confirm `raw/` remains untouched and review final staged diff
+- [x] Confirm experiment/learning/planning records match final evidence
+- **Status:** complete
+
+### Phase 5: Commit and Push
+- [x] Stage only reviewed in-scope files
+- [x] Create a Chinese commit message
+- [x] Push `feature/dev` to its configured upstream and verify remote state
+- **Status:** complete
+
+## Success Criteria
+1. Every staged file is attributable to the Responses migration or this review's necessary fixes.
+2. No unresolved P0/P1 correctness, safety, protocol, or data-loss finding remains.
+3. All required tests and product checks pass from the final tree.
+4. `raw/` is unchanged and unrelated user work is not staged.
+5. The commit exists locally and `origin/feature/dev` resolves to the same commit after push.
+
+## Constraints and Decisions
+- Review is authorized to fix migration issues, commit, and push the current branch.
+- Do not install the unavailable Codex MCP globally; use local evidence-backed review as fallback.
+- Preserve unrelated user changes and do not rewrite history.
+- Keep the migration single-provider and Responses-native; do not restore compatibility layers.
+
+## Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|
+| Codex collaboration MCP is unavailable in this environment | 1 | Record the skill limitation and use local diff review, static analysis, focused tests, and independent evidence instead of installing global tooling |
+| Four focused regression tests failed for the reproduced review findings | 1 | Confirmed the failures before implementation; apply the minimal fixes and rerun the same tests |
+
+---
+
+# Archived Task Plan: Migrate Lucas fully to native Responses API
+
+## Goal
+Implement `docs/plans/2026-07-31-responses-native-migration.md` end to end: DeepSeek official Responses API only, native function calling and function_call_output, direct output_text answers, explicit Lucas-owned context, no legacy JSON action protocol or multi-provider compatibility.
+
+## Current Phase
+Complete
+
+## Phases
+
+### Phase 1: Probe, Baseline, and Audit
+- [x] Verify DeepSeek Responses function calling, strict schemas, call_id/output chaining, streaming, reasoning, usage, and failure behavior
+- [x] Freeze baseline on the selected agent eval/product scenarios
+- [x] Inventory production, test, prompt, config, dependency, trace, and documentation changes
+- **Status:** complete
+
+### Phase 2: Native Protocol and Tool Schemas
+- [x] Introduce provider-neutral ModelRequest/ModelTurn/FunctionCall/ModelEvent types
+- [x] Replace ToolSpec string args descriptions with JSON Schema
+- [x] Add required model-facing summary and strict tool-schema conversion
+- **Status:** complete
+
+### Phase 3: Responses Client and Runner Loop
+- [x] Replace multi-provider LLM client with one DeepSeek Responses client
+- [x] Rewrite AgentRunner around native function_call/function_call_output and direct output_text
+- [x] Preserve execution safety, budgets, deadlines, retries, correction bounds, trace, and artifacts
+- **Status:** complete
+
+### Phase 4: Streaming, Prompt, Config, and Services
+- [x] Replace JSON answer streaming with native Responses events
+- [x] Simplify agent-loop prompt and remove tool descriptions from prompt rendering
+- [x] Remove provider routing/config and update product/knowledge/script call sites
+- **Status:** complete
+
+### Phase 5: Legacy Deletion and Test Rewrite
+- [x] Delete legacy JSON action parsing, AnswerStreamParser, Chat Completions, Gemini, providers.yaml, and obsolete dependencies/docs
+- [x] Rewrite fake models, Runner tests, SSE tests, LLM tests, config tests, and knowledge tests for native types
+- [x] Pass focused and full deterministic suites
+- **Status:** complete
+
+### Phase 6: Eval, Real Smoke, and Documentation
+- [x] Run post-change trials with baseline-equivalent task/model/tool/environment/budget settings
+- [x] Compare outcome, stability, steps, latency, token usage, retries/corrections, summary, and trace
+- [x] Write experiment report, experiment-log entry, and learning document
+- [x] Run real DeepSeek product/knowledge smoke and forbidden-reference audit
+- **Status:** complete
+
+## Success Criteria
+1. Production agent calls tools only through native Responses function calls and returns final output_text directly.
+2. Tool results are sent as function_call_output with validated call_id; Lucas explicitly owns submitted context items.
+3. ToolRuntime security, permissions, timeout, budget, repeated-failure, retry/correction, trace, and outcome semantics remain enforced in code.
+4. No production/current prompt/config/current documentation references the legacy protocols or providers listed in the migration plan.
+5. Focused tests, full tests, frontend build where affected, fixed eval trials, and real DeepSeek smoke pass with recorded evidence.
+6. Required experiment and learning documents are present and honest about capability/eval results.
+
+## Constraints and Decisions
+- `raw/` is immutable and must remain untouched.
+- Preserve unrelated dirty-worktree changes.
+- No long-lived compatibility layer; temporary intermediate states are allowed only during implementation.
+- Responses server-side conversation state is not a correctness dependency; do not use previous_response_id in this migration.
+- Execution semantics and reliability remain code-enforced; prompts only guide model behavior.
+
+## Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|
+| None yet | 0 | — |
+| Planning status patch used stale section ordering and failed context verification | 1 | Read the current plan header and applied a smaller exact patch |
+| Frontend build found App passed onLiveTraceChange but ChatPanel lacked the prop | 1 | Added the missing typed prop and synchronized live native runtime trace state |
+| Canonical update_plan patch used stale schema wording and failed context verification | 1 | Read the exact file and replaced the legacy-tolerant tool definition atomically |
+| Agent wait was called with an unsupported 1-second timeout | 1 | Use the documented minimum 10-second timeout for subsequent waits |
+| Trace artifact query assumed each output artifact was an object, but it is a raw response-item array | 1 | Read the artifact shape directly and query response metadata from trace events instead |
+| Frontend Vite build became idle for nearly two minutes after TypeScript completed | 1 | Stop the hung process, inspect the idle Vite process, and rerun the build separately with CI mode before treating it as a regression |
+
+---
+
+# Archived Task Plan: Review Lucas against open-source agent harnesses
 
 ## Goal
 Deeply review Lucas's learning-by-building roadmap against selected open-source agent harness and evaluation projects, then make evidence-backed, minimal updates to the roadmap and Eval MVP without changing product code or `raw/`.

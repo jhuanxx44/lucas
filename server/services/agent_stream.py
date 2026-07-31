@@ -6,8 +6,8 @@ web/src/hooks/useChat.ts 严格对齐：
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
-  summary {step, text}            模型每步生成的一句话用户旁白（action JSON 的
-                                  summary 字段），展示为过程摘要；不进最终答案。
+  summary {step, text}            模型原生 function call 的 summary 参数，
+                                  展示为过程摘要；不传给业务工具。
                                   模型原生 reasoning 草稿仅记入 trace，不再推送前端
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from harness.config import build_single_system_prompt, load_agent_config
-from harness.model_adapter import LLMClientAdapter
+from harness.model_adapter import ResponsesModelAdapter, responses_tools
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
 from harness.tools.base import ToolResult
@@ -197,19 +197,20 @@ async def chat_event_stream(
         # 产品聊天显式装配四个只读研究工具；wiki 根 = 工作区/wiki。
         tools = ToolRuntime(workspace or _PROJECT_ROOT, _CHAT_TOOL_SPECS)
         allowed_tools = _resolve_chat_tool_names(config.allowed_tools)
-        system_prompt: str | None = None
         model = model_override or config.model
-        tools_desc = tools.describe(allowed_tools)
+        system_prompt = build_single_system_prompt(current_date=date.today().isoformat())
         if model_adapter is None:
-            # 工具说明渲染进 system prompt（稳定指令层），user prompt 只留每轮变化内容。
-            system_prompt = build_single_system_prompt(
-                tools_desc, current_date=date.today().isoformat())
             logger.info("━━ 收到问题 | model=%s | %s", model, question[:100])
-            client = create_client(provider=config.provider, model=model,
-                                   system_prompt=system_prompt)
-            model_adapter = LLMClientAdapter(client, temperature=config.temperature)
+            client = create_client(model=model)
+            model_adapter = ResponsesModelAdapter(client)
         prompt_template = load_prompt_template(_PROMPT_PATH)
-        runner = AgentRunner(model_adapter, tools, prompt_template)
+        runner = AgentRunner(
+            model_adapter,
+            tools,
+            prompt_template,
+            instructions=system_prompt,
+            temperature=config.temperature,
+        )
         # 非寒暄问题强制标注：提醒模型必须使用工具查证
         chitchat_patterns = ('hi', 'hello', '你好', '谢谢', '你是谁', '你是什么', '你叫什么')
         is_chitchat = question.strip().lower().startswith(chitchat_patterns) and len(question) < 15
@@ -251,13 +252,17 @@ async def chat_event_stream(
                 yield _sse("trace_event", {
                     "event": "model_input",
                     "step": evt.get("step"),
-                    "data": {"prompt": evt.get("prompt", "")},
+                    "data": {"input": evt.get("input", [])},
                 })
             if kind == "model_output":
                 yield _sse("trace_event", {
                     "event": "model_output",
                     "step": evt.get("step"),
-                    "data": {"output": evt.get("output", "")},
+                    "data": {
+                        "response_id": evt.get("response_id", ""),
+                        "output_text": evt.get("output_text", ""),
+                        "items": evt.get("items", []),
+                    },
                 })
             if kind == "thought":
                 step = evt.get("step", 0)
@@ -314,17 +319,21 @@ async def chat_event_stream(
         })
         yield _sse("researcher_start", {"id": "single", "name": config.name})
         yield _sse("trace_event", {
+            "event": "run_started",
+            "data": {"question": question},
+        })
+        yield _sse("trace_event", {
             "event": "run_config",
             "data": {
                 "agent": config.name,
-                "provider": config.provider,
+                "protocol": "openai_responses",
                 "model": model,
                 "temperature": config.temperature,
                 "allowed_tools": allowed_tools,
                 "max_steps": limits.max_steps,
                 "timeout_seconds": limits.timeout_seconds,
                 "system_prompt": system_prompt,
-                "tools_description": tools_desc,
+                "tools": responses_tools(tools.available(allowed_tools)),
                 "prompt_template": prompt_template,
             },
         })
@@ -360,6 +369,15 @@ async def chat_event_stream(
             answer_len = len(text)
             if streamed_chars < answer_len:
                 yield _sse("synthesis_chunk", {"text": text[streamed_chars:]})
+            yield _sse("trace_event", {
+                "event": "assistant_answer",
+                "step": step_count,
+                "data": {"answer": text},
+            })
+            yield _sse("trace_event", {
+                "event": "run_finished",
+                "data": {"finishReason": result.finish_reason},
+            })
             yield _sse("researcher_done", {"id": "single"})
             total_tokens = result.usage.total_tokens if result.usage else 0
             elapsed = time.monotonic() - t0
@@ -370,6 +388,13 @@ async def chat_event_stream(
             elapsed = time.monotonic() - t0
             logger.warning("  ⚠️ 非正常结束 | finish_reason=%s, %.1fs",
                            result.finish_reason, elapsed)
+            yield _sse("trace_event", {
+                "event": "run_finished",
+                "data": {
+                    "finishReason": result.finish_reason,
+                    "error": result.error,
+                },
+            })
             yield _sse("error", {"message": _error_message(result)})
     except Exception:
         logger.exception("agent stream error for question: %s", question[:80])

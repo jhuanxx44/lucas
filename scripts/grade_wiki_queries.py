@@ -96,7 +96,7 @@ async def grade_queries(corpus_root: Path, workers: int) -> list[dict]:
     prompt_text = PROMPT_PATH.read_text(encoding="utf-8")
     if prompt_text.startswith("---\n"):
         prompt_text = prompt_text.split("---", 2)[2].strip()
-    client = create_client(model=os.environ.get("OPENAI_MODEL"))
+    client = create_client(model=os.environ.get("DEEPSEEK_MODEL"))
     semaphore = asyncio.Semaphore(workers)
     cache_dir = corpus_root / "quality/query-grading"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -132,7 +132,9 @@ async def grade_queries(corpus_root: Path, workers: int) -> list[dict]:
                 usage = None
                 candidate = None
                 for _ in range(2):
-                    text, usage = await client.chat(prompt, response_mime_type="application/json", temperature=0)
+                    text, usage = await client.generate_text(
+                        prompt, response_mime_type="application/json", temperature=0,
+                    )
                     candidate = extract_json(text)
                     normalized = _normalize_result(candidate, candidates)
                     if normalized is not None:
@@ -143,7 +145,7 @@ async def grade_queries(corpus_root: Path, workers: int) -> list[dict]:
                     seen = {row["path"] for row in partial_rows}
                     missing = [path for path in candidates if path not in seen]
                     if 0 < len(missing) <= 3:
-                        text, extra_usage = await client.chat(
+                        text, extra_usage = await client.generate_text(
                             render_prompt(missing), response_mime_type="application/json", temperature=0,
                         )
                         supplement = extract_json(text)

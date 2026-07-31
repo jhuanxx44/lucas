@@ -299,7 +299,7 @@ class KnowledgeService:
             content=content[:2000],
             industries=self._industries_text(),
         )
-        text, _ = await self.client.chat(
+        text, _ = await self.client.generate_text(
             prompt=prompt,
             response_mime_type="application/json",
             temperature=0.1,
@@ -400,7 +400,7 @@ class KnowledgeService:
             existing_pages=self._list_wiki_pages(),
             company_categories=self._list_company_categories(),
         )
-        text, _ = await self.client.chat(
+        text, _ = await self.client.generate_text(
             prompt=prompt,
             response_mime_type="application/json",
             temperature=0.3,
@@ -471,7 +471,7 @@ class KnowledgeService:
             today=date.today().isoformat(),
             source_path=source_path,
         )
-        text, _ = await self.client.chat(prompt=prompt, temperature=0.3)
+        text, _ = await self.client.generate_text(prompt=prompt, temperature=0.3)
         return text
 
     # ── wiki 页面定位 / 校验辅助 ──────────────────────────
@@ -560,5 +560,5 @@ class KnowledgeService:
 def create_knowledge_service(workspace, config_path: str | None = None) -> KnowledgeService:
     """正常 service 构造：lucas.yaml wiki 段 → LLM client → KnowledgeService。"""
     config = load_wiki_config(config_path)
-    client = create_client(provider=config.provider, model=config.model)
+    client = create_client(model=config.model)
     return KnowledgeService(client, workspace, config)

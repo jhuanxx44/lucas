@@ -14,10 +14,9 @@ wiki/         LLM编译的结构化Wiki
 prompts/      编译模板
 harness/      通用 AgentRunner（single 模式 ReAct 循环）与工具集
 lucas.yaml    Agent 与 wiki 领域配置
-providers.yaml 模型提供商配置
 server/       FastAPI 后端（services/agent_stream.py 聊天链路、services/knowledge.py wiki 收录编译）
 web/          React 前端
-utils/        LLM统一调用层
+utils/        DeepSeek Responses API 调用层
 ```
 
 ## 快速启动
@@ -30,17 +29,13 @@ utils/        LLM统一调用层
 
 生产部署：先 `cd web && npm run build`，再 `python -m server.app`——FastAPI 会自动 serve 静态文件。
 
-## 可用模型
+## LLM 配置
 
-配置见 `providers.yaml`，当前支持：
+Lucas 只使用 DeepSeek 官网 Responses API。复制 `.env.example` 并填写
+`DEEPSEEK_API_KEY`；endpoint 默认为 `https://api.deepseek.com`，模型由
+`lucas.yaml` 显式配置，也可用 `DEEPSEEK_MODEL` 作为缺省值。
 
-| Provider | 默认模型 | 路由 |
-|----------|----------|------|
-| MiniMax | `MiniMax-M2.7` | OpenAI 兼容 |
-| Gemini | `gemini-3.1-pro` | OpenAI 兼容 |
-| DeepSeek | `deepseek-v4-flash`（项目默认） | OpenAI 兼容 |
-| Qwen | `qwen-plus` | OpenAI 兼容 |
-| Claude | `claude-3-5-sonnet` | OpenAI 兼容 |
+调用约定和示例见 [`docs/LLM_CALLING_GUIDE.md`](docs/LLM_CALLING_GUIDE.md)。
 
 ## 使用方式
 

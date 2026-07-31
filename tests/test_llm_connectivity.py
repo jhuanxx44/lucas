@@ -9,12 +9,13 @@ from utils.llm_client import create_client
 
 
 async def check_model(model: str):
+    """官网 Responses 最小连通性探针。[llm-weight: light]"""
     print(f"\n{'='*50}")
     print(f"测试模型: {model}")
     print('='*50)
     try:
-        client = create_client(model=model, system_prompt="用一句话回答")
-        text, usage = await client.chat("1+1等于几？")
+        client = create_client(model=model, instructions="用一句话回答")
+        text, usage = await client.generate_text("1+1等于几？")
         print(f"响应: {text[:200]}")
         if usage:
             print(f"Token: 输入={usage.prompt_tokens} 输出={usage.completion_tokens} 总计={usage.total_tokens}")
@@ -24,15 +25,7 @@ async def check_model(model: str):
 
 
 async def main():
-    models = ["deepseek-v4-flash"]
-
-    # 可选：取消注释测试其他模型
-    # models.append("gemini-3.1-pro")
-    # models.append("glm-4.7")
-    # models.append("qwen-max")
-
-    for model in models:
-        await check_model(model)
+    await check_model("deepseek-v4-flash")
 
 
 if __name__ == "__main__":

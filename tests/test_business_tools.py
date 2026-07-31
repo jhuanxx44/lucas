@@ -419,7 +419,7 @@ async def test_adapter_executes_explicitly_allowed_business_tool(tmp_path):
     """任务白名单显式允许业务工具时，adapter 注册并真实执行。"""
     import json
     from evals.harness.adapters.lucas_single import LucasSingleAgent
-    from harness.models import RunLimits
+    from harness.models import FunctionCall, ModelTurn, RunLimits
     from harness.trace import TraceRecorder
 
     _wiki_fixture(tmp_path)
@@ -427,13 +427,24 @@ async def test_adapter_executes_explicitly_allowed_business_tool(tmp_path):
     class FakeModel:
         def __init__(self):
             self.responses = [
-                json.dumps({"action": "tool", "tool": "wiki_recall",
-                            "args": {"query": "600519 分红"}}),
-                json.dumps({"action": "answer", "reply": "done"}),
+                ModelTurn(
+                    function_calls=[FunctionCall(
+                        call_id="call-1", name="wiki_recall",
+                        arguments={"query": "600519 分红"}, summary="查询相关公告",
+                    )],
+                    response_items=[{
+                        "type": "function_call", "call_id": "call-1",
+                        "name": "wiki_recall",
+                        "arguments": json.dumps({
+                            "query": "600519 分红", "summary": "查询相关公告",
+                        }, ensure_ascii=False),
+                    }],
+                ),
+                ModelTurn(output_text="done"),
             ]
 
-        async def complete(self, prompt):
-            return self.responses.pop(0), None
+        async def complete(self, request):
+            return self.responses.pop(0)
 
     adapter = LucasSingleAgent(model_adapter=FakeModel())
     trace = TraceRecorder(tmp_path / "trace.jsonl", "run-test")
@@ -447,7 +458,7 @@ async def test_adapter_does_not_force_business_tools_into_task_whitelist(tmp_pat
     """注册工具不等于授权；task 未允许的业务工具必须被 ToolRuntime 拒绝。"""
     import json
     from evals.harness.adapters.lucas_single import LucasSingleAgent
-    from harness.models import RunLimits
+    from harness.models import FunctionCall, ModelTurn, RunLimits
     from harness.trace import TraceRecorder, read_trace
 
     _wiki_fixture(tmp_path)
@@ -455,13 +466,24 @@ async def test_adapter_does_not_force_business_tools_into_task_whitelist(tmp_pat
     class FakeModel:
         def __init__(self):
             self.responses = [
-                json.dumps({"action": "tool", "tool": "wiki_recall",
-                            "args": {"query": "600519 分红"}}),
-                json.dumps({"action": "answer", "reply": "工具不可用"}),
+                ModelTurn(
+                    function_calls=[FunctionCall(
+                        call_id="call-1", name="wiki_recall",
+                        arguments={"query": "600519 分红"}, summary="查询相关公告",
+                    )],
+                    response_items=[{
+                        "type": "function_call", "call_id": "call-1",
+                        "name": "wiki_recall",
+                        "arguments": json.dumps({
+                            "query": "600519 分红", "summary": "查询相关公告",
+                        }, ensure_ascii=False),
+                    }],
+                ),
+                ModelTurn(output_text="工具不可用"),
             ]
 
-        async def complete(self, prompt):
-            return self.responses.pop(0), None
+        async def complete(self, request):
+            return self.responses.pop(0)
 
     adapter = LucasSingleAgent(model_adapter=FakeModel())
     trace_path = tmp_path / "trace.jsonl"

@@ -4,7 +4,7 @@
 处理多种格式：
 - 纯 JSON: {"action": "direct"}
 - Markdown 代码块: ```json\n{"action": "direct"}\n```
-- 混有思考过程（MiniMax thinking 模型）:
+- 混有前后文本：
   <think>\n...(thinking)...</think>\n...(final JSON)...
 """
 import json
