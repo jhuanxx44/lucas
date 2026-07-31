@@ -46,7 +46,7 @@ llm-weight: medium
 
 写（落盘）：用 write_file 往 wiki 写内容时，必须放进对应的分类子目录，不要写到 wiki 根目录（根目录只有 index.md 和 glossary.md），否则文件在侧栏归入"未归类"、也难以被后续召回。
 
-**每篇 wiki 页面的 frontmatter 中必须包含 `summary` 字段**，写一段 2-4 句话的 TL;DR，概括本页的核心信息、关键数据和时间范围。wiki_recall 召回时会优先返回此摘要而非原始正文，因此摘要必须自包含、能独立支撑阅读和判断。
+**每篇 wiki 页面的 frontmatter 中必须包含 `summary` 字段**，写一段 2-4 句话的 TL;DR，概括本页的核心信息、关键数据和时间范围。`summary` 的值必须用英文单引号包裹（`summary: '…'`），因为摘要常含英文冒号+空格、引号等字符，不加引号会导致 frontmatter YAML 解析失败。wiki_recall 召回时会优先返回此摘要而非原始正文，因此摘要必须自包含、能独立支撑阅读和判断。
 
 落点规则：
 - 公司档案 → `wiki/companies/<行业>/<公司名>.md`

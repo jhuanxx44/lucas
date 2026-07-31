@@ -94,28 +94,42 @@ def apply_patch(workspace: Path, args: dict) -> ToolResult:
     return ToolResult(status="ok", observation=f"patched {args.get('path')}")
 
 
-_WIKI_SUMMARY_ERROR = (
-    "wiki 页面必须在 frontmatter 中包含 summary 字段（2-4 句中文 TL;DR）。\n"
+_WIKI_FRONTMATTER_ERROR = (
+    "wiki 页面必须包含 YAML frontmatter，且其中 summary 字段非空（2-4 句中文 TL;DR）。\n"
     "示例 frontmatter：\n"
     "---\n"
     "title: 页面标题\n"
     "type: company\n"
     "summary: '2-4 句中文摘要，概括核心信息、关键数据和时间范围'\n"
-    "---"
+    "---\n"
+    "注意：summary 的值必须用英文单引号包裹；摘要中的英文冒号+空格、引号等字符"
+    "若不加引号，会导致 frontmatter YAML 解析失败。"
 )
 
 
-def _has_summary_frontmatter(content: str) -> bool:
+def _check_wiki_frontmatter(content: str) -> tuple[bool, str, str]:
+    """校验 wiki 页面 frontmatter，返回 (是否通过, error_code, 补充信息)。
+
+    error_code 取值：missing_frontmatter / invalid_yaml / missing_summary；
+    通过时为空字符串。
+    """
     if not content.startswith("---"):
-        return False
+        return False, "missing_frontmatter", ""
     parts = content.split("---", 2)
     if len(parts) < 3:
-        return False
+        return False, "invalid_yaml", "frontmatter 未闭合（缺少结尾 ---）"
     try:
         fm = yaml.safe_load(parts[1]) or {}
-    except yaml.YAMLError:
-        return False
-    return bool(fm.get("summary", "").strip())
+    except yaml.YAMLError as e:
+        detail = str(e).strip()
+        mark = getattr(e, "problem_mark", None)
+        if mark is not None:
+            detail = f"{detail}（位置：第 {mark.line + 1} 行，第 {mark.column + 1} 列）"
+        return False, "invalid_yaml", detail
+    summary = fm.get("summary")
+    if not isinstance(summary, str) or not summary.strip():
+        return False, "missing_summary", ""
+    return True, "", ""
 
 
 def write_file(workspace: Path, args: dict) -> ToolResult:
@@ -133,10 +147,27 @@ def write_file(workspace: Path, args: dict) -> ToolResult:
     rel_to_ws = str(path.resolve().relative_to(ws_root))
     if (rel_to_ws.startswith("wiki/") and path.suffix == ".md"
             and path.name not in ("index.md", "glossary.md")):
-        if not _has_summary_frontmatter(content):
+        ok, error_code, detail = _check_wiki_frontmatter(content)
+        if not ok:
+            if error_code == "invalid_yaml":
+                return ToolResult(
+                    status="invalid_input", error_code="invalid_yaml",
+                    observation=(
+                        "wiki 页面 frontmatter YAML 解析失败：\n"
+                        f"{detail}\n"
+                        "常见原因：summary 的值未用英文单引号包裹，且摘要含英文冒号+空格、"
+                        "引号等 YAML 特殊字符。\n"
+                        f"{_WIKI_FRONTMATTER_ERROR}"
+                    ),
+                )
+            if error_code == "missing_frontmatter":
+                return ToolResult(
+                    status="invalid_input", error_code="missing_frontmatter",
+                    observation=f"wiki 页面缺少 frontmatter（必须以 --- 开头）。\n{_WIKI_FRONTMATTER_ERROR}",
+                )
             return ToolResult(
                 status="invalid_input", error_code="missing_summary",
-                observation=_WIKI_SUMMARY_ERROR,
+                observation=_WIKI_FRONTMATTER_ERROR,
             )
 
     if path.exists():
@@ -376,8 +407,11 @@ LIST_FILES_SPEC = ToolSpec(
 WRITE_FILE_SPEC = ToolSpec(
     name="write_file",
     description="在工作区内新建文件并整体写入内容；文件已存在时默认拒绝，需 overwrite: true 才覆盖。"
-                "写入 wiki/*.md 时，内容必须包含 frontmatter 且其中 summary 字段非空（2-4 句中文 TL;DR），"
-                "否则返回 missing_summary 错误。index.md / glossary.md 除外。",
+                "写入 wiki/*.md 时，内容必须包含 YAML frontmatter 且其中 summary 字段非空"
+                "（2-4 句中文 TL;DR）。summary 的值必须用英文单引号包裹（summary: '…'），"
+                "否则摘要中的英文冒号+空格、引号等字符会导致 YAML 解析失败。"
+                "缺少 frontmatter 返回 missing_frontmatter，YAML 语法错误返回 invalid_yaml，"
+                "缺少 summary 返回 missing_summary。index.md / glossary.md 除外。",
     parameters={
         "type": "object",
         "properties": {
