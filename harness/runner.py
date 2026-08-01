@@ -150,13 +150,15 @@ class AgentRunner:
             trace.record("response_started", {"step_id": context.step_id})
 
             use_stream = stream_answer and on_event is not None and hasattr(self.model, "complete_stream")
-            streamed_chunks: list[str] = []
+            # 已实时推送的 answer 字符数；流式中途失败回退 complete() 时仍保留，
+            # 供下游按最终答案补尾防缺字。
+            stream_state = {"streamed": 0}
             started = time.monotonic()
             try:
                 if use_stream:
                     try:
-                        turn, streamed_chunks = await await_before_deadline(
-                            self._complete_streaming(request, step, on_event)
+                        turn = await await_before_deadline(
+                            self._complete_streaming(request, step, on_event, stream_state)
                         )
                     except _RunDeadlineExceeded:
                         return timeout_result("model_call")
@@ -166,11 +168,15 @@ class AgentRunner:
                             "error": str(error)[:200],
                         })
                         turn = await await_before_deadline(self.model.complete(request))
-                        streamed_chunks = []
                 else:
                     turn = await await_before_deadline(self.model.complete(request))
             except _RunDeadlineExceeded:
                 return timeout_result("model_call")
+
+            if turn.function_calls and stream_state["streamed"] > 0 and on_event is not None:
+                # 工具轮（含被拒绝的混合轮）流出的 output_text 只是中间叙述，
+                # 不是最终答案，通知下游清掉已展示的临时文本
+                on_event({"kind": "answer_discard"})
 
             duration_ms = (time.monotonic() - started) * 1000
             if turn.usage is not None:
@@ -263,23 +269,17 @@ class AgentRunner:
             correction_count = 0
             if not turn.function_calls:
                 answer_text = turn.output_text
-                if streamed_chunks and "".join(streamed_chunks) != answer_text:
-                    streamed_chunks = [answer_text] if answer_text else []
                 trace.record("assistant_answer", {
                     "step_id": context.step_id,
                     "answer_preview": answer_text[:500],
                 })
                 trace.record("step_finished", {"step_id": context.step_id})
-                streamed_chars = 0
                 if on_event is not None:
-                    for chunk in streamed_chunks:
-                        streamed_chars += len(chunk)
-                        on_event({"kind": "answer_chunk", "step": step, "text": chunk})
                     on_event({
                         "kind": "answer",
                         "step": step,
                         "answer": answer_text,
-                        "streamed_chars": streamed_chars,
+                        "streamed_chars": stream_state["streamed"],
                     })
                 return AgentResult(
                     answer=answer_text,
@@ -414,21 +414,27 @@ class AgentRunner:
         request: ModelRequest,
         step: int,
         on_event: Callable[[dict], None],
-    ) -> tuple[ModelTurn, list[str]]:
-        """Buffer answer deltas until the completed turn proves it is not a tool call."""
-        chunks: list[str] = []
+        stream_state: dict,
+    ) -> ModelTurn:
+        """实时转发答案 delta；completed turn 提供最终答案与 usage。
+
+        DeepSeek 工具轮也可能产出 output_text.delta（中间叙述，item 顺序
+        不可靠），因此文本一律实时转发，由本 runner 在 turn 完成且确认
+        是工具轮后发出 answer_discard 丢弃。
+        """
         completed_turn: ModelTurn | None = None
         async for event in self.model.complete_stream(request):
             if event.kind == "reasoning_delta":
                 if event.text:
                     on_event({"kind": "thought", "step": step, "text": event.text})
             elif event.kind == "output_text_delta":
-                chunks.append(event.text)
+                stream_state["streamed"] += len(event.text)
+                on_event({"kind": "answer_chunk", "step": step, "text": event.text})
             elif event.kind == "completed":
                 completed_turn = event.turn
         if completed_turn is None:
             raise RuntimeError("model stream did not produce a completed turn")
-        return completed_turn, chunks
+        return completed_turn
 
 
 def _decision_error(turn: ModelTurn) -> str:

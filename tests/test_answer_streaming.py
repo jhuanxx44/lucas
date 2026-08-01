@@ -71,7 +71,7 @@ def _runner(tmp_path, model):
 
 
 @pytest.mark.asyncio
-async def test_final_output_text_deltas_are_forwarded_after_completed_turn(tmp_path):
+async def test_final_output_text_deltas_are_streamed_in_real_time(tmp_path):
     turn = _answer("你好世界")
     turn.usage = TokenUsage(prompt_tokens=2, completion_tokens=2, total_tokens=4, model="m")
     model = FakeStreamModel([[
@@ -102,7 +102,7 @@ async def test_final_output_text_deltas_are_forwarded_after_completed_turn(tmp_p
 
 
 @pytest.mark.asyncio
-async def test_tool_turn_does_not_leak_buffered_output_text(tmp_path):
+async def test_tool_turn_streamed_text_is_discarded(tmp_path):
     (tmp_path / "a.txt").write_text("content", encoding="utf-8")
     tool_turn = _tool()
     answer_turn = _answer("完成")
@@ -128,18 +128,21 @@ async def test_tool_turn_does_not_leak_buffered_output_text(tmp_path):
 
     chunks = [event["text"] for event in events if event["kind"] == "answer_chunk"]
     assert result.answer == "完成"
-    assert chunks == ["完成"]
-    assert "不应展示" not in "".join(chunks)
+    assert any(event["kind"] == "answer_discard" for event in events)
+    discard_at = next(i for i, event in enumerate(events) if event["kind"] == "answer_discard")
+    effective = [event["text"] for event in events[discard_at + 1:] if event["kind"] == "answer_chunk"]
+    assert effective == ["完成"]
+    assert "不应展示" in "".join(chunks)  # 临时文本确实流式经过，由 discard 事件清除
     assert any(event["kind"] == "summary" for event in events)
     assert any(event["kind"] == "tool_step" for event in events)
 
 
 @pytest.mark.asyncio
-async def test_final_stream_discards_commentary_deltas_not_in_normalized_answer(tmp_path):
+async def test_answer_chunks_precede_completed_turn_in_event_order(tmp_path):
     model = FakeStreamModel([[
-        ModelEvent(kind="output_text_delta", text="先总结一下。"),
-        ModelEvent(kind="output_text_delta", text="最终答案"),
-        ModelEvent(kind="completed", turn=_answer("最终答案")),
+        ModelEvent(kind="output_text_delta", text="你好"),
+        ModelEvent(kind="output_text_delta", text="世界"),
+        ModelEvent(kind="completed", turn=_answer("你好世界")),
     ]])
     events = []
 
@@ -151,14 +154,16 @@ async def test_final_stream_discards_commentary_deltas_not_in_normalized_answer(
         stream_answer=True,
     )
 
+    kinds = [event["kind"] for event in events]
     chunks = [event["text"] for event in events if event["kind"] == "answer_chunk"]
-    assert result.answer == "最终答案"
-    assert "".join(chunks) == "最终答案"
-    assert events[-1]["streamed_chars"] == len("最终答案")
+    assert result.answer == "你好世界"
+    assert chunks == ["你好", "世界"]
+    assert kinds == ["answer_chunk", "answer_chunk", "answer"]
+    assert events[-1]["streamed_chars"] == len("你好世界")
 
 
 @pytest.mark.asyncio
-async def test_mixed_tool_and_final_text_is_corrected_without_stream_leak(tmp_path):
+async def test_mixed_tool_and_final_text_is_corrected_with_discard(tmp_path):
     mixed = _tool()
     mixed.output_text = "错误正文"
     model = FakeStreamModel([
@@ -182,8 +187,11 @@ async def test_mixed_tool_and_final_text_is_corrected_without_stream_leak(tmp_pa
     )
 
     assert result.answer == "已修正"
-    chunks = "".join(event["text"] for event in events if event["kind"] == "answer_chunk")
-    assert chunks == "已修正"
+    assert any(event["kind"] == "answer_discard" for event in events)
+    # 丢弃事件之后剩余的 answer_chunk 才是有效答案
+    discard_at = next(i for i, event in enumerate(events) if event["kind"] == "answer_discard")
+    effective = "".join(event["text"] for event in events[discard_at + 1:] if event["kind"] == "answer_chunk")
+    assert effective == "已修正"
 
 
 @pytest.mark.asyncio

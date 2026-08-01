@@ -171,6 +171,9 @@ async def test_provider_reasoning_is_hidden_trace_not_visible_event(tmp_path):
 
     events = await _collect("资料够吗", model=ReasoningModel(), workspace=tmp_path)
 
+    thinking = [data for event, data in events if event == "thinking_chunk"]
+    assert "".join(data["text"] for data in thinking) == "先判断资料是否足够。"
+    assert {data["step"] for data in thinking} == {1}
     reasoning = [
         data for event, data in events
         if event == "trace_event" and data["event"] == "model_reasoning"
@@ -181,6 +184,38 @@ async def test_provider_reasoning_is_hidden_trace_not_visible_event(tmp_path):
         "data": {"text": "先判断资料是否足够。"},
     }]
     assert "thought" not in [event for event, _ in events]
+
+
+@pytest.mark.asyncio
+async def test_tool_turn_intermediate_text_is_cleared_via_sse(tmp_path):
+    class ToolTextModel:
+        def __init__(self):
+            # 每次 complete_stream 对应 provider 的一次响应（一个 turn）
+            self.streams = [
+                [
+                    ModelEvent(kind="output_text_delta", text="我先查一下资料"),
+                    ModelEvent(kind="completed", turn=_tool()),
+                ],
+                [
+                    ModelEvent(kind="output_text_delta", text="最终答案"),
+                    ModelEvent(kind="completed", turn=_answer("最终答案")),
+                ],
+            ]
+
+        async def complete_stream(self, request):
+            for event in self.streams.pop(0):
+                yield event
+
+    events = await _collect("查一下", model=ToolTextModel(), workspace=tmp_path)
+
+    visible = [item for item in events if item[0] != "trace_event"]
+    names = [name for name, _ in visible]
+    assert "synthesis_clear" in names
+    clear_at = names.index("synthesis_clear")
+    chunks_after = [
+        data["text"] for name, data in visible[clear_at + 1:] if name == "synthesis_chunk"
+    ]
+    assert "".join(chunks_after) == "最终答案"
 
 
 @pytest.mark.asyncio

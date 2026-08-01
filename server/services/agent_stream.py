@@ -8,12 +8,16 @@ web/src/hooks/useChat.ts 严格对齐：
   researcher_start {id, name}     run 开始（固定 id="single"）
   summary {step, text}            模型原生 function call 的 summary 参数，
                                   展示为过程摘要；不传给业务工具。
-                                  模型原生 reasoning 草稿仅记入 trace，不再推送前端
+                                  模型原生 reasoning 草稿实时推送为 thinking_chunk，
+                                  完整文本仍记入 trace
+  thinking_chunk {step, text}     每轮模型原生思考的实时增量，前端按 step
+                                  以单行展示；该轮 summary/tool_start 到达时隐藏
   tool_start {step, tool, args,   工具开始执行，前端立即展示运行中状态
               message}
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
   synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
+  synthesis_clear {}              工具轮流出的临时文本不是最终答案，前端清空已展示内容
   researcher_done {id}            答案推送完成后
   done {total_tokens}             正常结束（AgentResult.usage 累计）
   error {message}                 异常 / 解析失败 / budget_exceeded / max_steps / timeout
@@ -250,6 +254,10 @@ async def chat_event_stream(
         def _forward(evt: dict):
             nonlocal streamed_chars, step_count
             kind = evt.get("kind")
+            if kind == "answer_discard":
+                streamed_chars = 0
+                yield _sse("synthesis_clear", {})
+                return
             if kind == "model_input":
                 yield _sse("trace_event", {
                     "event": "model_input",
@@ -268,7 +276,10 @@ async def chat_event_stream(
                 })
             if kind == "thought":
                 step = evt.get("step", 0)
-                _pending_reasoning[step] = _pending_reasoning.get(step, "") + evt.get("text", "")
+                text = evt.get("text", "")
+                _pending_reasoning[step] = _pending_reasoning.get(step, "") + text
+                if text:
+                    yield _sse("thinking_chunk", {"step": step, "text": text})
                 return
             if kind == "tool_start":
                 yield _sse("tool_start", {
