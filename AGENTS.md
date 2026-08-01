@@ -104,7 +104,13 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 
 持续执行到成功标准满足；不要把“代码已经写完”当成任务完成。
 
+### 已知教训（渐进式加载）
+
+改动涉及对应领域前先读教训文档，避免重复踩坑。代码踩坑记录统一放 `docs/lessons/`，按 `YYYY-MM-DD-简述.md` 命名，并在本节加一行指针：
+
+- 前端输入框/文本域的回车提交必须抑制输入法组合回车（含组合结束短窗口），教训见 `docs/lessons/2026-08-01-前端输入法回车陷阱.md`。
 - LLM 用 write_file 写 wiki 页面时，frontmatter 的 summary 值必须用英文单引号包裹；校验层要把 YAML 语法错误与字段缺失分开报错，教训见 `docs/lessons/2026-08-01-write_file-frontmatter-yaml-引号.md`。
+- DeepSeek Responses 工具轮也会流式输出中间文本，须按 turn 完成时是否含 function_call 决定丢弃，教训见 `docs/lessons/2026-08-01-responses工具轮流式中间文本.md`。
 
 ## 5. 两类 Harness 的边界
 
