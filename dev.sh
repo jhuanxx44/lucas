@@ -33,7 +33,21 @@ echo "🚀 启动前端 (localhost:5173) ..."
 (cd "$DIR/web" && exec npm run dev) > /dev/null 2>&1 &
 PIDS+=($!)
 
-sleep 1
+echo "⏳ 等待前端就绪..."
+for _ in {1..30}; do
+    if curl -s -o /dev/null http://localhost:5173; then
+        break
+    fi
+    sleep 0.5
+done
+
+if command -v open > /dev/null 2>&1; then
+    open http://localhost:5173
+elif command -v xdg-open > /dev/null 2>&1; then
+    xdg-open http://localhost:5173
+else
+    echo "🔗 前端地址: http://localhost:5173"
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
