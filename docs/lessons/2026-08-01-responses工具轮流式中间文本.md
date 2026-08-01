@@ -14,10 +14,10 @@ Responses API 迁移后恢复"逐 token 流式"时，工具调用轮的中间叙
 
 - 适配器（`harness/model_adapter.py`）无条件实时转发 `output_text.delta`；
 - runner（`harness/runner.py`）在 turn 完成且确认是工具轮（含被协议纠错拒绝的混合轮）时发出 `answer_discard`；
-- SSE 桥转发为 `synthesis_clear`，前端清空已展示的临时文本；
+- SSE 桥（`server/services/agent_stream.py`）按 turn 缓冲 `answer_chunk`：`answer_discard` 到达即静默丢弃；只有最终答案在 run 结束后按节奏冲洗推送（fake streaming）。中间文本永不上屏，前端无需再清空（`synthesis_clear` 已废弃，前端保留兼容处理）；
 - 不要试图用 item_added 顺序或 message 项判型来"预测"工具轮——真实事件顺序会打脸。
 
 ## 验证
 
-- 单测：工具轮流式文本后必有 `answer_discard`；混合轮（function_call + output_text）同样丢弃；
-- 真实 API 端到端：多次工具轮后出现 `synthesis_clear`，最终答案无中间叙述，且文本仍逐 token 实时到达。
+- 单测：工具轮流式文本后必有 `answer_discard`；混合轮（function_call + output_text）同样丢弃；SSE 层断言中间文本不出现在任何 `synthesis_chunk` 中；
+- 真实 API 端到端：多次工具轮后前端无中间叙述频闪，最终答案以打字机节奏平滑上屏。

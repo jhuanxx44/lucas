@@ -16,8 +16,11 @@ web/src/hooks/useChat.ts 严格对齐：
               message}
   tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
              ok, output, message} 结构化输入输出
-  synthesis_chunk {text}          最终答案（逐 token 增量推送，前端增量拼接）
-  synthesis_clear {}              工具轮流出的临时文本不是最终答案，前端清空已展示内容
+  synthesis_chunk {text}          最终答案（按 turn 缓冲、turn 结束确认无
+                                  function_call 后按节奏冲洗推送，前端增量拼接
+                                  直播上屏；工具轮中间文本静默丢弃，永不上屏）
+  synthesis_clear {}              已废弃不再发送（中间文本不上屏，无需清空）；
+                                  前端保留兼容处理
   researcher_done {id}            答案推送完成后
   done {total_tokens}             正常结束（AgentResult.usage 累计）
   error {message}                 异常 / 解析失败 / budget_exceeded / max_steps / timeout
@@ -95,6 +98,13 @@ _WIKI_APPLY_PATCH_SPEC = replace(
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 0.0  # 0 = 不限时
+# 答案冲洗节奏：把已生成完毕的最终答案切成小片按固定间隔推送，
+# 前端呈现为平滑打字机而非一次性砸入。片数随长度自适应：
+# 短答案快（百字约 0.2s），长答案封顶约 1.6s，不会让用户干等。
+_FLUSH_INTERVAL_S = 0.016
+_FLUSH_CHARS_PER_TICK = 18
+_FLUSH_MIN_TICKS = 6
+_FLUSH_MAX_TICKS = 100
 _CHAT_TOOL_SPECS = [
     UPDATE_PLAN_SPEC,
     WEB_SEARCH_SPEC,
@@ -235,9 +245,11 @@ async def chat_event_stream(
         )
 
         t0 = time.monotonic()
-        # answer_chunk 已推送的字符数；run 结束时若少于最终答案长度则补尾防缺字
-        streamed_chars = 0
         step_count = 0
+        # 当前 turn 的文本缓冲：工具轮中间文本与最终答案在流式时无法区分，
+        # 按 turn 缓冲；turn 结束含 function_call（answer_discard）则静默丢弃，
+        # 只有最终答案会被冲洗上屏——前端永远不会看到待丢弃的文本
+        answer_buffer: list[str] = []
 
         _pending_reasoning: dict[int, str] = {}
 
@@ -252,11 +264,10 @@ async def chat_event_stream(
             return None
 
         def _forward(evt: dict):
-            nonlocal streamed_chars, step_count
+            nonlocal step_count
             kind = evt.get("kind")
             if kind == "answer_discard":
-                streamed_chars = 0
-                yield _sse("synthesis_clear", {})
+                answer_buffer.clear()
                 return
             if kind == "model_input":
                 yield _sse("trace_event", {
@@ -324,12 +335,9 @@ async def chat_event_stream(
                     "text": text,
                 })
             if kind == "answer_chunk":
-                text = evt.get("text", "")
-                streamed_chars += len(text)
-                yield _sse("synthesis_chunk", {"text": text})
+                answer_buffer.append(evt.get("text", ""))
+                return
             if kind == "answer":
-                # Runner 权威计数（含流式回退前的部分推送）
-                streamed_chars = evt.get("streamed_chars", streamed_chars)
                 step_count = evt.get("step", step_count)
             return
 
@@ -387,8 +395,14 @@ async def chat_event_stream(
             text = result.answer if isinstance(result.answer, str) else json.dumps(
                 result.answer, ensure_ascii=False)
             answer_len = len(text)
-            if streamed_chars < answer_len:
-                yield _sse("synthesis_chunk", {"text": text[streamed_chars:]})
+            if answer_len:
+                ticks = min(_FLUSH_MAX_TICKS,
+                            max(_FLUSH_MIN_TICKS, answer_len // _FLUSH_CHARS_PER_TICK))
+                slice_size = -(-answer_len // ticks)
+                for i in range(0, answer_len, slice_size):
+                    yield _sse("synthesis_chunk", {"text": text[i:i + slice_size]})
+                    if i + slice_size < answer_len:
+                        await asyncio.sleep(_FLUSH_INTERVAL_S)
             yield _sse("trace_event", {
                 "event": "assistant_answer",
                 "step": step_count,

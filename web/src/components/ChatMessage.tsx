@@ -3,6 +3,10 @@ import type { ChatMessage as ChatMessageType, ChatTraceStep } from "@/types";
 import { AnalysisProcess } from "./AnalysisProcess";
 import { REMARK_PLUGINS } from "@/lib/markdown";
 
+// 正文的排版类与直播上屏块（ChatPanel streaming-answer）共用，
+// 保证 DONE 提交消息时样式无缝衔接
+export const PROSE_CLASSES = "prose prose-zinc max-w-none text-[15px] leading-7 tabular-nums dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-4 prose-p:leading-7 prose-p:text-zinc-700 prose-a:text-indigo-600 prose-strong:text-zinc-900 prose-li:my-1 prose-li:text-zinc-700 prose-pre:rounded-xl prose-pre:border prose-pre:border-zinc-800 prose-pre:bg-zinc-950 dark:prose-p:text-zinc-300 dark:prose-a:text-indigo-400 dark:prose-strong:text-zinc-100 dark:prose-li:text-zinc-300";
+
 interface Props {
   message: ChatMessageType;
   onAction?: (value: string) => void;
@@ -34,7 +38,7 @@ export function ChatMessage({ message, onAction, defaultOpen = false }: Props) {
   return (
     <div className="animate-message-in mb-10">
       <AnalysisProcess steps={message.traceSteps?.length ? message.traceSteps : legacySteps(message)} defaultOpen={defaultOpen} />
-      <div className="prose prose-zinc max-w-none text-[15px] leading-7 tabular-nums dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-4 prose-p:leading-7 prose-p:text-zinc-700 prose-a:text-indigo-600 prose-strong:text-zinc-900 prose-li:my-1 prose-li:text-zinc-700 prose-pre:rounded-xl prose-pre:border prose-pre:border-zinc-800 prose-pre:bg-zinc-950 dark:prose-p:text-zinc-300 dark:prose-a:text-indigo-400 dark:prose-strong:text-zinc-100 dark:prose-li:text-zinc-300">
+      <div className={PROSE_CLASSES}>
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
           {message.content}
         </ReactMarkdown>

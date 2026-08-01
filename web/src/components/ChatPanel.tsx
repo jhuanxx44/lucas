@@ -1,7 +1,9 @@
 import { useRef, useEffect, useState, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { useChat } from "@/hooks/useChat";
 import { ChatInput } from "./ChatInput";
-import { ChatMessage } from "./ChatMessage";
+import { ChatMessage, PROSE_CLASSES } from "./ChatMessage";
+import { REMARK_PLUGINS } from "@/lib/markdown";
 import { PlanCard } from "./PlanCard";
 import { AnalysisProcess } from "./AnalysisProcess";
 import type { LiveTraceTurn } from "./TracePanel";
@@ -189,6 +191,14 @@ export function ChatPanel({
             ))}
 
             {state.isLoading && <AnalysisProcess steps={state.traceSteps} live thinkingByStep={state.thinkingByStep} />}
+
+            {/* 最终答案直播上屏：后端按 turn 缓冲确认非工具轮后才冲洗，
+                此处渲染的只会是最终答案；位置与 DONE 后提交的消息正文一致 */}
+            {state.isLoading && state.synthesis && (
+              <div className={`streaming-answer mb-10 ${PROSE_CLASSES}`}>
+                <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{state.synthesis}</ReactMarkdown>
+              </div>
+            )}
 
             {/* DONE 后保持挂载，避免完成瞬间卡片卸载造成布局跳动；下一轮 USER_MESSAGE 时重置 */}
             {state.plan && <PlanCard plan={state.plan} />}

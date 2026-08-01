@@ -68,6 +68,26 @@ html {
     animation: none;
   }
 }
+
+/* 直播上屏块的打字光标：跟在最后一个块元素的行尾 */
+.streaming-answer > :last-child::after {
+  content: "▍";
+  margin-left: 1px;
+  color: rgb(99 102 241 / 0.75);
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streaming-answer > :last-child::after {
+    animation: none;
+  }
+}
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:where(.dark, .dark *));

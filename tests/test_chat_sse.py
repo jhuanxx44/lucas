@@ -122,17 +122,19 @@ async def test_agent_stream_full_native_event_sequence(tmp_path):
 
     events = await _collect("查一下茅台", model=model, workspace=tmp_path)
     visible = [item for item in events if item[0] != "trace_event"]
+    names = [name for name, _ in visible]
 
-    assert [name for name, _ in visible] == [
-        "dispatch", "researcher_start", "summary", "tool_start", "tool_step",
-        "synthesis_chunk", "researcher_done", "done",
-    ]
+    # 答案按节奏冲洗成多个 synthesis_chunk 小片，位于 tool_step 与 researcher_done 之间
+    assert names[:5] == ["dispatch", "researcher_start", "summary", "tool_start", "tool_step"]
+    assert names[-2:] == ["researcher_done", "done"]
+    assert set(names[5:-2]) == {"synthesis_chunk"}
     assert visible[2][1] == {"step": 1, "text": "先查一下资料"}
     assert visible[3][1]["tool"] == "wiki_recall"
     assert visible[3][1]["args"] == {"query": "贵州茅台"}
     assert visible[3][1]["message"] == "Lucas 调用 wiki_recall: 贵州茅台"
     assert visible[4][1]["ok"] is True
-    assert visible[5][1] == {"text": "最终答案"}
+    chunks = [data["text"] for name, data in visible if name == "synthesis_chunk"]
+    assert "".join(chunks) == "最终答案"
     assert visible[-1][1] == {"total_tokens": 430}
 
 
@@ -187,7 +189,7 @@ async def test_provider_reasoning_is_hidden_trace_not_visible_event(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_tool_turn_intermediate_text_is_cleared_via_sse(tmp_path):
+async def test_tool_turn_intermediate_text_never_reaches_sse(tmp_path):
     class ToolTextModel:
         def __init__(self):
             # 每次 complete_stream 对应 provider 的一次响应（一个 turn）
@@ -210,12 +212,10 @@ async def test_tool_turn_intermediate_text_is_cleared_via_sse(tmp_path):
 
     visible = [item for item in events if item[0] != "trace_event"]
     names = [name for name, _ in visible]
-    assert "synthesis_clear" in names
-    clear_at = names.index("synthesis_clear")
-    chunks_after = [
-        data["text"] for name, data in visible[clear_at + 1:] if name == "synthesis_chunk"
-    ]
-    assert "".join(chunks_after) == "最终答案"
+    # 按 turn 缓冲：工具轮中间文本静默丢弃，不上屏也无需 clear
+    assert "synthesis_clear" not in names
+    chunks = [data["text"] for name, data in visible if name == "synthesis_chunk"]
+    assert "".join(chunks) == "最终答案"
 
 
 @pytest.mark.asyncio
