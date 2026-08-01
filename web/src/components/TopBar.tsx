@@ -13,7 +13,7 @@ export function TopBar({ linked, onToggleLink, onToggleNavigation, traceOpen, on
   const { theme, toggle } = useTheme();
 
   return (
-    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex items-center px-4 gap-4 shrink-0">
+    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/70 flex items-center px-4 gap-4 shrink-0">
       <button
         onClick={onToggleNavigation}
         className="-ml-1 rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 md:hidden"
@@ -22,7 +22,6 @@ export function TopBar({ linked, onToggleLink, onToggleNavigation, traceOpen, on
         <Menu size={17} />
       </button>
       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">Lucas</span>
-      <span className="hidden text-sm text-zinc-400 dark:text-zinc-500 sm:inline">投研认知的复利引擎</span>
       <div className="ml-auto flex items-center gap-1">
         <button
           onClick={toggle}
@@ -41,6 +40,7 @@ export function TopBar({ linked, onToggleLink, onToggleNavigation, traceOpen, on
         >
           {linked ? <Link2 size={16} /> : <Link2Off size={16} />}
         </button>
+        <span className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
         <button
           aria-pressed={traceOpen}
           aria-label={traceOpen ? "折叠右侧 Trace" : "展开右侧 Trace"}

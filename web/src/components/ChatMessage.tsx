@@ -6,6 +6,8 @@ import { REMARK_PLUGINS } from "@/lib/markdown";
 interface Props {
   message: ChatMessageType;
   onAction?: (value: string) => void;
+  // 刚流式完成的消息：分析过程默认展开，与直播态的视觉位置连续
+  defaultOpen?: boolean;
 }
 
 // 历史消息只有 processSteps（无 traceSteps）时，退化成 action 步展示
@@ -18,10 +20,10 @@ function legacySteps(message: ChatMessageType): ChatTraceStep[] {
   }));
 }
 
-export function ChatMessage({ message, onAction }: Props) {
+export function ChatMessage({ message, onAction, defaultOpen = false }: Props) {
   if (message.role === "user") {
     return (
-      <div className="mb-8 flex justify-end">
+      <div className="animate-message-in mb-8 flex justify-end">
         <div className="max-w-[88%] rounded-2xl rounded-br-md bg-zinc-100 px-4 py-2.5 text-[15px] leading-6 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 sm:max-w-[80%]">
           <span className="whitespace-pre-wrap">{message.content}</span>
         </div>
@@ -30,9 +32,9 @@ export function ChatMessage({ message, onAction }: Props) {
   }
 
   return (
-    <div className="mb-10">
-      <AnalysisProcess steps={message.traceSteps?.length ? message.traceSteps : legacySteps(message)} />
-      <div className="prose prose-zinc max-w-none text-[15px] leading-7 dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-4 prose-p:leading-7 prose-p:text-zinc-700 prose-a:text-indigo-600 prose-strong:text-zinc-900 prose-li:my-1 prose-li:text-zinc-700 prose-pre:rounded-xl prose-pre:border prose-pre:border-zinc-800 prose-pre:bg-zinc-950 dark:prose-p:text-zinc-300 dark:prose-a:text-indigo-400 dark:prose-strong:text-zinc-100 dark:prose-li:text-zinc-300">
+    <div className="animate-message-in mb-10">
+      <AnalysisProcess steps={message.traceSteps?.length ? message.traceSteps : legacySteps(message)} defaultOpen={defaultOpen} />
+      <div className="prose prose-zinc max-w-none text-[15px] leading-7 tabular-nums dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-4 prose-p:leading-7 prose-p:text-zinc-700 prose-a:text-indigo-600 prose-strong:text-zinc-900 prose-li:my-1 prose-li:text-zinc-700 prose-pre:rounded-xl prose-pre:border prose-pre:border-zinc-800 prose-pre:bg-zinc-950 dark:prose-p:text-zinc-300 dark:prose-a:text-indigo-400 dark:prose-strong:text-zinc-100 dark:prose-li:text-zinc-300">
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
           {message.content}
         </ReactMarkdown>

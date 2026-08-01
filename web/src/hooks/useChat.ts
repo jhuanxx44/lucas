@@ -11,6 +11,7 @@ interface ChatState {
   messages: ChatMessage[];
   researchers: Map<string, ResearcherState>;
   synthesis: string;
+  thinkingByStep: Record<number, string>;
   actions: ChatAction[];
   processSteps: string[];
   traceSteps: ChatTraceStep[];
@@ -28,6 +29,9 @@ type Action =
   | { type: "RESEARCHER_CHUNK"; id: string; text: string }
   | { type: "RESEARCHER_DONE"; id: string }
   | { type: "SYNTHESIS_CHUNK"; text: string }
+  | { type: "SYNTHESIS_CLEAR" }
+  | { type: "THINKING_CHUNK"; step: number; text: string }
+  | { type: "THINKING_CLEAR"; step: number }
   | { type: "ACTIONS"; actions: ChatAction[] }
   | { type: "PROCESS_STEP"; step: string }
   | { type: "TOOL_STEP"; step: ChatTraceStep }
@@ -52,11 +56,13 @@ function reducer(state: ChatState, action: Action): ChatState {
         messages: [...state.messages, action.message],
         researchers: new Map(),
         synthesis: "",
+        thinkingByStep: {},
         actions: [],
         processSteps: ["已收到问题"],
         traceSteps: [{ id: "init", kind: "action", label: "已收到问题", status: "done" }],
         runConfig: null,
         runtimeTrace: [],
+        plan: null,
         isLoading: true,
         phase: "dispatching",
       };
@@ -81,6 +87,18 @@ function reducer(state: ChatState, action: Action): ChatState {
     }
     case "SYNTHESIS_CHUNK":
       return { ...state, synthesis: state.synthesis + action.text, phase: "synthesizing" };
+    case "SYNTHESIS_CLEAR":
+      return { ...state, synthesis: "" };
+    case "THINKING_CHUNK": {
+      const current = state.thinkingByStep[action.step] ?? "";
+      return { ...state, thinkingByStep: { ...state.thinkingByStep, [action.step]: current + action.text } };
+    }
+    case "THINKING_CLEAR": {
+      if (!(action.step in state.thinkingByStep)) return state;
+      const thinkingByStep = { ...state.thinkingByStep };
+      delete thinkingByStep[action.step];
+      return { ...state, thinkingByStep };
+    }
     case "ACTIONS":
       return { ...state, actions: action.actions };
     case "TOOL_STEP":
@@ -100,6 +118,7 @@ function reducer(state: ChatState, action: Action): ChatState {
       return {
         ...state,
         messages: [...state.messages, action.message],
+        thinkingByStep: {},
         actions: [],
         runConfig: null,
         runtimeTrace: [],
@@ -111,6 +130,7 @@ function reducer(state: ChatState, action: Action): ChatState {
       return {
         ...state,
         messages: [...state.messages, action.message],
+        thinkingByStep: {},
         isLoading: false,
         phase: "idle",
         actions: [],
@@ -126,6 +146,7 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     messages,
     researchers: new Map(),
     synthesis: "",
+    thinkingByStep: {},
     actions: [],
     processSteps: [],
     traceSteps: [],
@@ -242,12 +263,22 @@ export function useChat(
                 streamedSynthesis += d.text;
                 dispatch({ type: "SYNTHESIS_CHUNK", text: d.text });
                 break;
+              case "synthesis_clear":
+                streamedSynthesis = "";
+                dispatch({ type: "SYNTHESIS_CLEAR" });
+                break;
+              case "thinking_chunk": {
+                const thinkingData = data as { step: number; text: string };
+                dispatch({ type: "THINKING_CHUNK", step: thinkingData.step, text: thinkingData.text });
+                break;
+              }
               case "actions":
                 streamedActions = (data as { actions: ChatAction[] }).actions;
                 dispatch({ type: "ACTIONS", actions: streamedActions });
                 break;
               case "tool_start": {
                 const toolData = data as { step: number; tool: string; args: Record<string, unknown>; message: string };
+                dispatch({ type: "THINKING_CLEAR", step: toolData.step });
                 const step: ChatTraceStep = {
                   id: `tool-${toolData.step}-${toolData.tool}`,
                   kind: "tool",
@@ -279,6 +310,7 @@ export function useChat(
               }
               case "summary": {
                 const summaryData = data as { step: number; text: string };
+                dispatch({ type: "THINKING_CLEAR", step: summaryData.step });
                 const step: ChatTraceStep = {
                   id: `summary-${summaryData.step}`,
                   kind: "summary",

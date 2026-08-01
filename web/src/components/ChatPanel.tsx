@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@/hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
-import { SynthesisCard } from "./SynthesisCard";
 import { PlanCard } from "./PlanCard";
 import { AnalysisProcess } from "./AnalysisProcess";
 import type { LiveTraceTurn } from "./TracePanel";
@@ -64,6 +63,9 @@ export function ChatPanel({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+  // 挂载时已有的消息视为历史；之后追加的才是本次会话新产生的
+  const historyIds = useRef(new Set(initialMessages.map((m) => m.id)));
+  const wasLoading = useRef(false);
 
   const [allItems, setAllItems] = useState<{ item: WikiItem; section: string }[]>([]);
   const [suggestions, setSuggestions] = useState<{ icon: typeof TrendingUp; text: string }[]>([]);
@@ -98,6 +100,17 @@ export function ChatPanel({
     }
   }, [state.messages, state.researchers, state.synthesis]);
 
+  // 发送新一轮时强制跟滚到底部：用户上翻超过阈值也不影响新轮次的观看位置
+  useEffect(() => {
+    if (state.isLoading && !wasLoading.current) {
+      isNearBottom.current = true;
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }
+    wasLoading.current = state.isLoading;
+  }, [state.isLoading]);
+
   useEffect(() => {
     if (!onLiveTraceChange) return;
     if (!state.isLoading) {
@@ -124,7 +137,7 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4 mx-auto max-w-md">
             <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center mb-4">
@@ -160,15 +173,27 @@ export function ChatPanel({
           </div>
         )}
 
-        {state.messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} onAction={sendMessage} />
-        ))}
+        {!isEmpty && (
+          <div className="mx-auto w-full max-w-[46rem] px-4 py-4 sm:px-6">
+            {state.messages.map((msg, index) => (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                onAction={sendMessage}
+                defaultOpen={
+                  msg.role === "assistant"
+                  && index === state.messages.length - 1
+                  && !historyIds.current.has(msg.id)
+                }
+              />
+            ))}
 
-        {state.isLoading && <AnalysisProcess steps={state.traceSteps} live />}
+            {state.isLoading && <AnalysisProcess steps={state.traceSteps} live thinkingByStep={state.thinkingByStep} />}
 
-        {state.isLoading && state.plan && <PlanCard plan={state.plan} />}
-
-        {state.isLoading && <SynthesisCard text={state.synthesis} loading={state.isLoading} />}
+            {/* DONE 后保持挂载，避免完成瞬间卡片卸载造成布局跳动；下一轮 USER_MESSAGE 时重置 */}
+            {state.plan && <PlanCard plan={state.plan} />}
+          </div>
+        )}
       </div>
       <ChatInput onSend={sendMessage} onCancel={cancel} phase={state.phase} />
     </div>

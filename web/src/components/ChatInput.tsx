@@ -51,7 +51,7 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
 
   return (
     <div className="border-t border-zinc-200 dark:border-zinc-800 p-3">
-      <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg focus-within:border-indigo-500 transition-colors">
+      <div className="mx-auto w-full max-w-[46rem] rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow focus-within:border-indigo-300 focus-within:shadow-md focus-within:ring-2 focus-within:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:focus-within:border-indigo-500/50 dark:focus-within:ring-indigo-400/15">
         <textarea
           ref={textareaRef}
           rows={1}
@@ -112,7 +112,7 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
           {loading ? (
             <button
               onClick={onCancel}
-              className="bg-red-500/90 hover:bg-red-500 text-white rounded-md p-1.5 transition-colors"
+              className="bg-red-500/90 hover:bg-red-500 text-white rounded-full p-2 transition-colors"
               title="取消"
             >
               <Square size={14} />
@@ -121,7 +121,7 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
             <button
               onClick={handleSend}
               disabled={!text.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white rounded-md p-1.5 transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-700 text-white disabled:text-zinc-400 dark:disabled:text-zinc-500 rounded-full p-2 transition-colors"
             >
               <Send size={14} />
             </button>

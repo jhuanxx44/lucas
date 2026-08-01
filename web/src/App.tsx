@@ -218,7 +218,7 @@ export default function App() {
           <div className="flex flex-1 overflow-hidden">
             <div
               style={{ "--sidebar-width": `${leftWidth}px` } as CSSProperties}
-              className={`${mobileNavigationOpen ? "flex" : "hidden"} fixed bottom-0 left-0 top-12 z-30 w-[min(85vw,280px)] flex-col overflow-y-auto border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 md:static md:flex md:w-[var(--sidebar-width)] md:shrink-0`}
+              className={`${mobileNavigationOpen ? "flex" : "hidden"} fixed bottom-0 left-0 top-12 z-30 w-[min(85vw,280px)] flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/70 md:static md:flex md:w-[var(--sidebar-width)] md:shrink-0`}
             >
               <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
                 <button
