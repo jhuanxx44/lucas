@@ -7,6 +7,12 @@ const MODELS = [
   { label: "Pro", value: "deepseek-v4-pro" },
 ] as const;
 
+// 输入法组合结束后的一小段时间内仍可能到达“提交组合”的回车 keydown
+// （部分浏览器跨任务派发，compositionend 先于 keydown 到达）。
+// 该窗口内不发送消息；不要改回 onCompositionEnd + setTimeout(0) 复位，
+// 否则会回归中文输入法按回车误发送 bug。
+const COMPOSITION_END_GUARD_MS = 300;
+
 interface ChatInputProps {
   onSend: (message: string, model?: string) => void;
   onCancel: () => void;
@@ -19,6 +25,7 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
   const [modelOpen, setModelOpen] = useState(false);
   const loading = phase !== "idle";
   const isComposingRef = useRef(false);
+  const compositionEndRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = useCallback(() => {
@@ -55,23 +62,31 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
           }}
           onCompositionStart={() => { isComposingRef.current = true; }}
           onCompositionEnd={() => {
-            setTimeout(() => { isComposingRef.current = false; }, 0);
+            isComposingRef.current = false;
+            compositionEndRef.current = Date.now();
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !isComposingRef.current) {
+            if (e.key === "Enter" && !e.shiftKey) {
+              const composing =
+                isComposingRef.current ||
+                e.nativeEvent.isComposing ||
+                e.nativeEvent.keyCode === 229;
+              const compositionJustEnded =
+                Date.now() - compositionEndRef.current < COMPOSITION_END_GUARD_MS;
+              if (composing || compositionJustEnded) return;
               e.preventDefault();
               handleSend();
             }
           }}
           placeholder={loading ? "等待完成后可继续提问…" : "输入你的问题"}
           disabled={loading}
-          className="w-full bg-transparent px-3 pt-2.5 pb-1 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none disabled:opacity-50 overflow-x-hidden break-words resize-none"
+          className="w-full bg-transparent px-4 pt-3 pb-1.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none disabled:opacity-50 overflow-x-hidden break-words resize-none"
         />
-        <div className="flex items-center justify-between px-2 pb-2">
+        <div className="flex items-center justify-between px-2.5 pb-2.5">
           <div className="relative">
             <button
               onClick={() => setModelOpen((o) => !o)}
-              className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-md px-2 py-1 transition-colors"
+              className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md px-2 py-1 transition-colors"
               title="切换模型"
             >
               <span className="font-medium">{currentLabel}</span>
