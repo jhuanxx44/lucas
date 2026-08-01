@@ -1,9 +1,15 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ChatRunConfig, ChatContextUsage, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep, PlanStep, PlanState } from "@/types";
+import type { ChatMessage, ChatRunConfig, ChatContextUsage, ChatContextCompression, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep, PlanStep, PlanState, PendingTask } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
+
+export function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(tokens >= 100_000 ? 0 : 1)}K`;
+  return `${Math.round(tokens)}`;
+}
 
 export type ChatPhase = "idle" | "dispatching" | "researching" | "synthesizing";
 
@@ -18,7 +24,9 @@ interface ChatState {
   runConfig: ChatRunConfig | null;
   runtimeTrace: ChatRuntimeTraceEvent[];
   contextUsage: ChatContextUsage | null;
+  lastCompression: ChatContextCompression | null;
   plan: PlanState | null;
+  pendingQueue: PendingTask[];
   isLoading: boolean;
   phase: ChatPhase;
 }
@@ -40,9 +48,13 @@ type Action =
   | { type: "RUN_CONFIG"; config: ChatRunConfig }
   | { type: "TRACE_EVENT"; event: ChatRuntimeTraceEvent }
   | { type: "CONTEXT_USAGE"; usage: ChatContextUsage }
+  | { type: "CONTEXT_COMPRESSION"; compression: ChatContextCompression }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage }
-  | { type: "PLAN_UPDATE"; steps: PlanStep[] };
+  | { type: "PLAN_UPDATE"; steps: PlanStep[] }
+  | { type: "QUEUE_TASK"; task: PendingTask }
+  | { type: "REMOVE_TASK"; id: string }
+  | { type: "CLEAR_QUEUE" };
 
 function upsertTraceStep(steps: ChatTraceStep[], next: ChatTraceStep): ChatTraceStep[] {
   const index = steps.findIndex((step) => step.id === next.id);
@@ -64,7 +76,6 @@ function reducer(state: ChatState, action: Action): ChatState {
         traceSteps: [{ id: "init", kind: "action", label: "已收到问题", status: "done" }],
         runConfig: null,
         runtimeTrace: [],
-        contextUsage: null,
         plan: null,
         isLoading: true,
         phase: "dispatching",
@@ -113,12 +124,20 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, processSteps: [...state.processSteps, action.step] };
     case "PLAN_UPDATE":
       return { ...state, plan: { steps: action.steps, updatedAt: Date.now() } };
+    case "QUEUE_TASK":
+      return { ...state, pendingQueue: [...state.pendingQueue, action.task] };
+    case "REMOVE_TASK":
+      return { ...state, pendingQueue: state.pendingQueue.filter((task) => task.id !== action.id) };
+    case "CLEAR_QUEUE":
+      return { ...state, pendingQueue: [] };
     case "RUN_CONFIG":
       return { ...state, runConfig: action.config };
     case "TRACE_EVENT":
       return { ...state, runtimeTrace: [...state.runtimeTrace, action.event] };
     case "CONTEXT_USAGE":
       return { ...state, contextUsage: action.usage };
+    case "CONTEXT_COMPRESSION":
+      return { ...state, lastCompression: action.compression };
     case "DONE": {
       return {
         ...state,
@@ -127,7 +146,6 @@ function reducer(state: ChatState, action: Action): ChatState {
         actions: [],
         runConfig: null,
         runtimeTrace: [],
-        contextUsage: null,
         isLoading: false,
         phase: "idle",
       };
@@ -137,7 +155,6 @@ function reducer(state: ChatState, action: Action): ChatState {
         ...state,
         messages: [...state.messages, action.message],
         thinkingByStep: {},
-        contextUsage: null,
         isLoading: false,
         phase: "idle",
         actions: [],
@@ -169,7 +186,9 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     runConfig: null,
     runtimeTrace: [],
     contextUsage: null,
+    lastCompression: null,
     plan: null,
+    pendingQueue: [],
     isLoading: false,
     phase: "idle",
   };
@@ -184,6 +203,8 @@ export function useChat(
   const [state, dispatch] = useReducer(reducer, initialMessages, createInitialState);
   const { send } = useSSE();
   const abortRef = useRef<AbortController | null>(null);
+  const queueRef = useRef<PendingTask[]>([]);
+  const runRef = useRef<(base: ChatMessage[], question: string, model?: string) => Promise<void>>(async () => {});
 
   const stateRef = useRef(state);
   useEffect(() => {
@@ -192,9 +213,25 @@ export function useChat(
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  const enqueue = useCallback((task: PendingTask) => {
+    queueRef.current = [...queueRef.current, task];
+    dispatch({ type: "QUEUE_TASK", task });
+  }, []);
+
+  const removeQueued = useCallback((id: string) => {
+    queueRef.current = queueRef.current.filter((task) => task.id !== id);
+    dispatch({ type: "REMOVE_TASK", id });
+  }, []);
+
+  const clearQueue = useCallback(() => {
+    queueRef.current = [];
+    dispatch({ type: "CLEAR_QUEUE" });
+  }, []);
+
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    clearQueue();
     const errorMessage: ChatMessage = {
       id: nextId(),
       role: "assistant",
@@ -204,15 +241,15 @@ export function useChat(
     const messages = [...stateRef.current.messages, errorMessage];
     dispatch({ type: "ERROR", message: errorMessage });
     onMessagesCommitted(messages);
-  }, [onMessagesCommitted]);
+  }, [clearQueue, onMessagesCommitted]);
 
-  const sendMessage = useCallback(
-    async (question: string, model?: string) => {
+  const run = useCallback(
+    async (baseMessages: ChatMessage[], question: string, model?: string) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const previousMessages = stateRef.current.messages;
+      const previousMessages = baseMessages;
       const userMessage: ChatMessage = { id: nextId(), role: "user", content: question };
       const streamedResearchers = new Map<string, ResearcherState>();
       let streamedSynthesis = "";
@@ -229,6 +266,14 @@ export function useChat(
         if (!step || streamedProcessSteps.at(-1) === step) return;
         streamedProcessSteps = [...streamedProcessSteps, step];
         dispatch({ type: "PROCESS_STEP", step });
+      };
+
+      const pumpQueue = (messages: ChatMessage[]) => {
+        const next = queueRef.current[0];
+        if (!next) return;
+        queueRef.current = queueRef.current.slice(1);
+        dispatch({ type: "REMOVE_TASK", id: next.id });
+        void runRef.current(messages, next.question, next.model);
       };
 
       dispatch({ type: "USER_MESSAGE", message: userMessage });
@@ -375,6 +420,42 @@ export function useChat(
                 });
                 break;
               }
+              case "context_compressed": {
+                const compressionData = data as {
+                  step: number;
+                  before_estimated_tokens: number;
+                  after_estimated_tokens: number;
+                  freed_tokens: number;
+                  dropped_steps: number[];
+                };
+                const compression: ChatContextCompression = {
+                  step: compressionData.step,
+                  beforeTokens: compressionData.before_estimated_tokens,
+                  afterTokens: compressionData.after_estimated_tokens,
+                  freedTokens: compressionData.freed_tokens,
+                  droppedSteps: compressionData.dropped_steps ?? [],
+                };
+                dispatch({ type: "CONTEXT_COMPRESSION", compression });
+                const compressionStep: ChatTraceStep = {
+                  id: `compression-${compressionData.step}`,
+                  kind: "compression",
+                  label: `上下文压缩：丢弃 ${compression.droppedSteps.length} 步内容，释放约 ${formatTokens(compression.freedTokens)} tokens`,
+                  status: "done",
+                  step: compressionData.step,
+                };
+                streamedTraceSteps = [...streamedTraceSteps, compressionStep];
+                dispatch({ type: "SUMMARY_STEP", step: compressionStep });
+                const compressionTraceEvent: ChatRuntimeTraceEvent = {
+                  sequence: streamedRuntimeTrace.length + 1,
+                  timestamp: new Date().toISOString(),
+                  event: "context_compressed",
+                  step: compressionData.step,
+                  data: compressionData as unknown as Record<string, unknown>,
+                };
+                streamedRuntimeTrace = [...streamedRuntimeTrace, compressionTraceEvent];
+                dispatch({ type: "TRACE_EVENT", event: compressionTraceEvent });
+                break;
+              }
               case "trace_id": {
                 const traceData = data as { id: string; file: string | null };
                 streamedTraceId = traceData.id;
@@ -401,6 +482,7 @@ export function useChat(
                 dispatch({ type: "DONE", message: assistantMessage });
                 onMessagesCommitted(messages);
                 onDone?.();
+                pumpQueue(messages);
                 break;
               }
               case "error": {
@@ -419,6 +501,7 @@ export function useChat(
                 const messages = [...previousMessages, userMessage, errorMessage];
                 dispatch({ type: "ERROR", message: errorMessage });
                 onMessagesCommitted(messages);
+                pumpQueue(messages);
                 break;
               }
             }
@@ -438,6 +521,7 @@ export function useChat(
           const messages = [...previousMessages, userMessage, errorMessage];
           dispatch({ type: "ERROR", message: errorMessage });
           onMessagesCommitted(messages);
+          pumpQueue(messages);
         }
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
@@ -446,5 +530,17 @@ export function useChat(
     [send, onMessagesCommitted, onResearchTarget, onDone]
   );
 
-  return { state, sendMessage, cancel };
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+
+  const sendMessage = useCallback((question: string, model?: string) => {
+    if (stateRef.current.isLoading) {
+      enqueue({ id: nextId(), question, model });
+      return;
+    }
+    void run(stateRef.current.messages, question, model);
+  }, [enqueue, run]);
+
+  return { state, sendMessage, cancel, removeQueued };
 }

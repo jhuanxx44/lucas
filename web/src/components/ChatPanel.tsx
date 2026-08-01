@@ -57,7 +57,7 @@ export function ChatPanel({
   onResearchDone,
   onLiveTraceChange,
 }: ChatPanelProps) {
-  const { state, sendMessage, cancel } = useChat(
+  const { state, sendMessage, cancel, removeQueued } = useChat(
     initialMessages,
     onMessagesCommitted,
     onResearchTarget,
@@ -200,7 +200,7 @@ export function ChatPanel({
               </div>
             )}
 
-            {/* DONE 后保持挂载，避免完成瞬间卡片卸载造成布局跳动；下一轮 USER_MESSAGE 时重置 */}
+            {/* PlanCard 内部在全部步骤完成后自动折叠消失，避免卡片残留；state.plan 在下一轮 USER_MESSAGE 时重置 */}
             {state.plan && <PlanCard plan={state.plan} />}
           </div>
         )}
@@ -208,8 +208,11 @@ export function ChatPanel({
       <ChatInput
         onSend={sendMessage}
         onCancel={cancel}
+        onRemovePending={removeQueued}
         phase={state.phase}
         contextUsage={state.contextUsage}
+        lastCompression={state.lastCompression}
+        pendingQueue={state.pendingQueue}
       />
     </div>
   );

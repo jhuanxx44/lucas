@@ -108,7 +108,6 @@ _WIKI_APPLY_PATCH_SPEC = replace(
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 0.0  # 0 = 不限时
-_CONTEXT_LIMIT_TOKENS = 1_000_000  # flash/pro 默认 1M context 窗口
 # 答案冲洗节奏：把已生成完毕的最终答案切成小片按固定间隔推送，
 # 前端呈现为平滑打字机而非一次性砸入。片数随长度自适应：
 # 短答案快（百字约 0.2s），长答案封顶约 1.6s，不会让用户干等。
@@ -205,6 +204,8 @@ def _error_message(result: AgentResult) -> str:
         return "分析步骤达到上限仍未能得出结论。请把问题拆小后重试。"
     if result.finish_reason == "timeout":
         return "分析超时，已中止。请缩小问题范围后重试。"
+    if result.finish_reason == "context_limit_exceeded":
+        return "初始上下文超出模型窗口上限，无法开始分析。请缩短问题或清理历史后重试。"
     logger.warning("agent run 内部中断: finish_reason=%s error=%s",
                    result.finish_reason, result.error)
     return "分析过程中断，请稍后重试。"
@@ -281,6 +282,9 @@ async def chat_event_stream(
             prompt_template,
             instructions=system_prompt,
             temperature=config.temperature,
+            context_window=config.model_context_window,
+            keep_recent_steps=config.context_keep_recent_steps,
+            compression_level=config.context_compression_level,
         )
         # 非寒暄问题强制标注：提醒模型必须使用工具查证
         chitchat_patterns = ('hi', 'hello', '你好', '谢谢', '你是谁', '你是什么', '你叫什么')
@@ -330,7 +334,20 @@ async def chat_event_stream(
                     "step": evt.get("step"),
                     "prompt_tokens": evt.get("prompt_tokens", 0),
                     "total_tokens": evt.get("total_tokens", 0),
-                    "context_limit": _CONTEXT_LIMIT_TOKENS,
+                    "context_limit": config.model_context_window,
+                })
+                return
+            if kind == "context_compressed":
+                yield _sse("context_compressed", {
+                    "step": evt.get("step"),
+                    "before_estimated_tokens": evt.get("before_estimated_tokens"),
+                    "after_estimated_tokens": evt.get("after_estimated_tokens"),
+                    "freed_tokens": evt.get("freed_tokens"),
+                    "dropped_steps": evt.get("dropped_steps", []),
+                    "level": evt.get("level", 2),
+                    "chain": evt.get("chain", []),
+                    "degraded": evt.get("degraded", False),
+                    "mode": evt.get("mode", "soft"),
                 })
                 return
             if kind == "model_input":

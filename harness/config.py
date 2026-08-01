@@ -46,6 +46,11 @@ class AgentConfig:
     model: str = DEFAULT_MODEL
     temperature: float = 0.0
     max_steps: int = 10
+    # 阶段 1 Context 管理：模型上下文窗口（token），0 = 关闭压缩；压缩时保留最近 N 步
+    model_context_window: int = 1_000_000
+    context_keep_recent_steps: int = 1
+    # 压缩等级：1 = 纯机械（实验 baseline），2 = 链式（低损丢弃→LLM 摘要→FIFO 兜底，默认最高）
+    context_compression_level: int = 2
     allowed_tools: list[str] = field(default_factory=lambda: list(DEFAULT_ALLOWED_TOOLS))
     name: str = "Lucas"
     agent_mode: str = "single"
@@ -63,6 +68,9 @@ def load_agent_config(config_path: str | Path | None = None) -> AgentConfig:
         model=_resolve_model(agent.get("model")),
         temperature=float(agent.get("temperature", 0.0)),
         max_steps=int(agent.get("max_steps", 10)),
+        model_context_window=int(agent.get("model_context_window", 1_000_000)),
+        context_keep_recent_steps=int(agent.get("context_keep_recent_steps", 1)),
+        context_compression_level=int(agent.get("context_compression_level", 2)),
         allowed_tools=list(agent.get("allowed_tools") or DEFAULT_ALLOWED_TOOLS),
         name=agent.get("name", "Lucas"),
         agent_mode=runtime.get("agent_mode", "single"),

@@ -39,18 +39,49 @@ def _is_retryable(error: Exception) -> bool:
     )
 
 
+def _usage_field(usage: Any, *names: str) -> int:
+    """从 usage 对象/字典中取第一个非空候选字段（兼容两种 API 命名）。"""
+    for name in names:
+        value = usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+        if value:
+            return int(value)
+    return 0
+
+
+def _has_field(usage: Any, name: str) -> bool:
+    return name in usage if isinstance(usage, dict) else getattr(usage, name, None) is not None
+
+
 def responses_usage(response: Any, model: str, latency_ms: float = 0.0) -> TokenUsage | None:
     usage = getattr(response, "usage", None)
     if usage is None:
         return None
-    output_tokens = getattr(usage, "output_tokens", 0) or 0
-    output_details = getattr(usage, "output_tokens_details", None)
-    reasoning_tokens = getattr(output_details, "reasoning_tokens", 0) or 0
+    # DeepSeek Responses 端点同时兼容 OpenAI Responses 命名
+    # （input_tokens/output_tokens）与 Chat Completions 命名
+    # （prompt_tokens/completion_tokens），两者都要能解析。
+    prompt_tokens = _usage_field(usage, "input_tokens", "prompt_tokens")
+    # OpenAI 风格 output_tokens 包含 reasoning，需减去；
+    # DeepSeek 风格 completion_tokens 已剔除 reasoning，不能再减。
+    openai_style = _has_field(usage, "output_tokens")
+    output_tokens = _usage_field(usage, "output_tokens", "completion_tokens")
+    output_details = (
+        usage.get("output_tokens_details")
+        if isinstance(usage, dict) else getattr(usage, "output_tokens_details", None)
+    )
+    reasoning_tokens = _usage_field(output_details, "reasoning_tokens")
+    if reasoning_tokens == 0:
+        completion_details = (
+            usage.get("completion_tokens_details")
+            if isinstance(usage, dict) else getattr(usage, "completion_tokens_details", None)
+        )
+        reasoning_tokens = _usage_field(completion_details, "reasoning_tokens")
+    if reasoning_tokens == 0:
+        reasoning_tokens = _usage_field(usage, "reasoning_tokens")
     return TokenUsage(
-        prompt_tokens=getattr(usage, "input_tokens", 0) or 0,
-        completion_tokens=max(0, output_tokens - reasoning_tokens),
+        prompt_tokens=prompt_tokens,
+        completion_tokens=max(0, output_tokens - reasoning_tokens) if openai_style else output_tokens,
         thinking_tokens=reasoning_tokens,
-        total_tokens=getattr(usage, "total_tokens", 0) or 0,
+        total_tokens=_usage_field(usage, "total_tokens"),
         model=model,
         latency_ms=latency_ms,
     )

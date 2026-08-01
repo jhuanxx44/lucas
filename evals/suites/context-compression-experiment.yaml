@@ -1,0 +1,14 @@
+# 阶段 1 Context 压缩对照实验：冻结 baseline 上对比
+#   baseline：LUCAS_CONTEXT_WINDOW=0（机制关闭，与旧行为逐字节一致）
+#   prod    ：LUCAS_CONTEXT_WINDOW=1000000（生产窗口；预期不触发压缩）
+#   trigger ：LUCAS_CONTEXT_WINDOW=20000（缩小窗口使压缩真实触发，验证省 token 与成功率）
+# 运行：scripts/run_context_experiment.py（或手动三臂各跑 run-suite）
+id: context-compression-experiment-v1
+version: 1
+tasks:
+  - PLAN-01
+  - PLAN-02
+  - PLAN-04
+  - WIKI-04
+  - READ-02
+  - LOOP-01

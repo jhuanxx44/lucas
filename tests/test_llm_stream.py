@@ -39,6 +39,45 @@ def _usage(input_tokens=10, output_tokens=6, reasoning_tokens=2):
     )
 
 
+def _deepseek_style_usage(prompt_tokens=1200, completion_tokens=300, reasoning_tokens=80):
+    # DeepSeek Chat Completions 风格：prompt_tokens/completion_tokens 命名，
+    # reasoning 挂在 completion_tokens_details 下
+    return SimpleNamespace(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+        completion_tokens_details=SimpleNamespace(reasoning_tokens=reasoning_tokens),
+    )
+
+
+def test_responses_usage_parses_both_naming_conventions():
+    from utils.llm_client import responses_usage
+
+    openai_style = responses_usage(SimpleNamespace(usage=_usage()), model="m")
+    assert openai_style.prompt_tokens == 10
+    assert openai_style.completion_tokens == 4
+    assert openai_style.thinking_tokens == 2
+    assert openai_style.total_tokens == 16
+
+    deepseek_style = responses_usage(
+        SimpleNamespace(usage=_deepseek_style_usage()), model="m"
+    )
+    assert deepseek_style.prompt_tokens == 1200
+    assert deepseek_style.completion_tokens == 300
+    assert deepseek_style.thinking_tokens == 80
+    assert deepseek_style.total_tokens == 1500
+
+    dict_style = responses_usage(SimpleNamespace(usage={
+        "input_tokens": 7,
+        "output_tokens": 5,
+        "output_tokens_details": {"reasoning_tokens": 2},
+        "total_tokens": 12,
+    }), model="m")
+    assert dict_style.prompt_tokens == 7
+    assert dict_style.completion_tokens == 3
+    assert dict_style.total_tokens == 12
+
+
 def test_create_client_uses_only_deepseek_responses_configuration():
     env = {
         "DEEPSEEK_API_KEY": "deepseek-key",

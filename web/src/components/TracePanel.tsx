@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Wrench, X } from "lucide-react";
+import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Minimize2, Wrench, X } from "lucide-react";
 import type { ChatMessage, ChatRuntimeTraceEvent, ChatTraceStep } from "@/types";
 
 export interface LiveTraceTurn {
@@ -148,6 +148,7 @@ function StepIcon({ step }: { step: ChatTraceStep }) {
   if (step.status === "error") return <X size={13} className="text-rose-500" />;
   if (step.kind === "tool") return <Wrench size={13} className="text-amber-500" />;
   if (step.kind === "thought") return <Brain size={13} className="text-zinc-400" />;
+  if (step.kind === "compression") return <Minimize2 size={13} className="text-amber-500" />;
   return <Check size={13} className="text-emerald-500" />;
 }
 
@@ -158,6 +159,15 @@ function TraceStep({ step }: { step: ChatTraceStep }) {
       <div className="flex gap-2 py-1 text-xs italic leading-relaxed text-zinc-400 dark:text-zinc-500">
         <Brain size={13} className="mt-0.5 shrink-0" />
         <span className="whitespace-pre-wrap break-words">{step.label}</span>
+      </div>
+    );
+  }
+
+  if (step.kind === "compression") {
+    return (
+      <div className="flex items-center gap-2 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+        <StepIcon step={step} />
+        <span>{step.label}</span>
       </div>
     );
   }

@@ -212,13 +212,13 @@ export default function App() {
             <button
               aria-label="关闭导航"
               onClick={() => setMobileNavigationOpen(false)}
-              className="fixed inset-x-0 bottom-0 top-12 z-20 bg-black/30 md:hidden"
+              className="fixed inset-x-0 bottom-0 top-9 z-20 bg-black/30 md:hidden"
             />
           )}
           <div className="flex flex-1 overflow-hidden">
             <div
               style={{ "--sidebar-width": `${leftWidth}px` } as CSSProperties}
-              className={`${mobileNavigationOpen ? "flex" : "hidden"} fixed bottom-0 left-0 top-12 z-30 w-[min(85vw,280px)] flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/70 md:static md:flex md:w-[var(--sidebar-width)] md:shrink-0`}
+              className={`${mobileNavigationOpen ? "flex" : "hidden"} fixed bottom-0 left-0 top-9 z-30 w-[min(85vw,280px)] flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/70 md:static md:flex md:w-[var(--sidebar-width)] md:shrink-0`}
             >
               <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
                 <button
@@ -291,11 +291,11 @@ export default function App() {
                 <button
                   aria-label="关闭 Trace 面板"
                   onClick={() => setTraceOpen(false)}
-                  className="fixed inset-0 top-12 z-30 bg-black/30 xl:hidden"
+                  className="fixed inset-0 top-9 z-30 bg-black/30 xl:hidden"
                 />
                 <div
                   style={{ "--trace-width": `${traceWidth}px` } as CSSProperties}
-                  className="fixed bottom-0 right-0 top-12 z-40 w-[min(92vw,380px)] border-l border-zinc-200 shadow-2xl dark:border-zinc-800 xl:static xl:z-auto xl:w-[var(--trace-width)] xl:shrink-0 xl:shadow-none"
+                  className="fixed bottom-0 right-0 top-9 z-40 w-[min(92vw,380px)] border-l border-zinc-200 shadow-2xl dark:border-zinc-800 xl:static xl:z-auto xl:w-[var(--trace-width)] xl:shrink-0 xl:shadow-none"
                 >
                   <TracePanel
                     messages={activeSession?.messages ?? []}

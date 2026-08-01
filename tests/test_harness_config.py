@@ -56,6 +56,23 @@ def test_load_agent_config_defaults_when_file_missing(monkeypatch, tmp_path):
     assert config.agent_mode == "single"
 
 
+def test_agent_config_context_compression_level_defaults_to_max(tmp_path):
+    config_file = tmp_path / "lucas.yaml"
+    config_file.write_text("single_agent: {}\n", encoding="utf-8")
+
+    assert load_agent_config(config_file).context_compression_level == 2
+
+
+def test_agent_config_context_compression_level_override(tmp_path):
+    config_file = tmp_path / "lucas.yaml"
+    config_file.write_text(
+        "single_agent:\n  context_compression_level: 1\n",
+        encoding="utf-8",
+    )
+
+    assert load_agent_config(config_file).context_compression_level == 1
+
+
 def test_load_wiki_config_reads_domain_and_model(tmp_path):
     config_file = tmp_path / "lucas.yaml"
     config_file.write_text(

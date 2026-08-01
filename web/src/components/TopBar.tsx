@@ -13,7 +13,7 @@ export function TopBar({ linked, onToggleLink, onToggleNavigation, traceOpen, on
   const { theme, toggle } = useTheme();
 
   return (
-    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/70 flex items-center px-4 gap-4 shrink-0">
+    <div className="h-9 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/70 flex items-center px-4 gap-4 shrink-0">
       <button
         onClick={onToggleNavigation}
         className="-ml-1 rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 md:hidden"

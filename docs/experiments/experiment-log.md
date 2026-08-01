@@ -916,3 +916,16 @@ LLM 关键词模式：
   provider retry 独立 trace、ToolResult 返回边界和空白模型 fallback；新增回归均通过
 - **决策**：保留断代迁移，不恢复 legacy 兼容层；把 DeepSeek 多 call 和上下文成本作为已知限制记录
 - **真实产物**：`/tmp/lucas-responses-native-final-trials/`
+
+---
+
+## 2026-08-01：阶段 1 Context 压缩真实模型初步验证
+
+- 10 个真实 run（deepseek-v4-flash 直连）；压缩机制真实触发（PLAN-01@12K 9 次压缩），
+  简单任务零压缩且输入逐字节一致；但 12K 窗口高频压缩导致模型重读，累计 prompt_tokens
+  反升 +23%（155K vs 125K）。
+- 结论：机制保留（可归因、零行为差异），trigger 参数不可用，需提高窗口/保留更多步骤或
+  补 CTX 长任务；prod 1M 窗口下现有任务不触发（单轮输入最大 ~14K）。
+- 顺带修复：`answer_json`/`answer_facts` grader 不认 ```json 代码块包裹的答案
+  （DeepSeek 常见输出），新增 `extract_json` + 单测，避免"答案对、格式错"误判。
+- 报告：`docs/experiments/2026-08-01-context-compression-v1.md`

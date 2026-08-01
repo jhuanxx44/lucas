@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from evals.harness.models import AgentResult, RunLimits
@@ -25,10 +26,15 @@ PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "harness" / "age
 class LucasSingleAgent:
     variant = "lucas-single"
 
-    def __init__(self, model_adapter=None, wiki_recall_spec=None, variant=None):
+    def __init__(self, model_adapter=None, wiki_recall_spec=None, variant=None,
+                 context_window=None, keep_recent_steps=None, compression_level=None):
         # client 延迟到 run() 建立；注入 model_adapter（测试）时不读取真实凭据。
         self.model_adapter = model_adapter
         self.wiki_recall_spec = wiki_recall_spec or WIKI_RECALL_SPEC
+        # None = 走配置/环境；实验可用 LUCAS_CONTEXT_WINDOW=0 关闭压缩做 baseline
+        self.context_window = context_window
+        self.keep_recent_steps = keep_recent_steps
+        self.compression_level = compression_level
         if variant is not None:
             self.variant = variant
 
@@ -59,8 +65,20 @@ class LucasSingleAgent:
         model_adapter = self.model_adapter
         system_prompt = ""
         temperature = 0.0
+        config = load_agent_config()
+        context_window = self.context_window
+        if context_window is None:
+            env_window = os.environ.get("LUCAS_CONTEXT_WINDOW", "").strip()
+            context_window = int(env_window) if env_window else config.model_context_window
+        keep_recent_steps = self.keep_recent_steps
+        if keep_recent_steps is None:
+            env_keep = os.environ.get("LUCAS_KEEP_RECENT_STEPS", "").strip()
+            keep_recent_steps = int(env_keep) if env_keep else config.context_keep_recent_steps
+        compression_level = self.compression_level
+        if compression_level is None:
+            env_level = os.environ.get("LUCAS_COMPRESSION_LEVEL", "").strip()
+            compression_level = int(env_level) if env_level else config.context_compression_level
         if model_adapter is None:
-            config = load_agent_config()
             system_prompt = build_single_system_prompt()
             temperature = config.temperature
             client = create_client(model=config.model, instructions=system_prompt)
@@ -71,5 +89,8 @@ class LucasSingleAgent:
             load_prompt_template(PROMPT_PATH),
             instructions=system_prompt,
             temperature=temperature,
+            context_window=context_window,
+            keep_recent_steps=keep_recent_steps,
+            compression_level=compression_level,
         )
         return await runner.run(instruction, allowed_tools, limits, trace)

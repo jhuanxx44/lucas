@@ -1,6 +1,7 @@
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,6 +9,35 @@ from pathlib import Path
 from evals.harness.models import AgentResult, GradeResult, TaskSpec
 from evals.harness.trace import read_trace
 
+
+_JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL)
+
+
+def extract_json(text: str):
+    """解析模型答案中的 JSON：容忍 ```json 代码块与前后解释文字。
+
+    DeepSeek 常把最终 JSON 用 markdown 代码块包裹并附带说明，直接 json.loads
+    会误判失败（"答案对、格式错"属于 harness 宽容度问题，不应计入模型失败）。
+    """
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except (TypeError, ValueError):
+        pass
+    for match in _JSON_BLOCK_RE.finditer(stripped):
+        try:
+            return json.loads(match.group(1))
+        except (TypeError, ValueError):
+            continue
+    for open_char, close_char in (("{", "}"), ("[", "]")):
+        start = stripped.find(open_char)
+        end = stripped.rfind(close_char)
+        if start != -1 and end > start:
+            try:
+                return json.loads(stripped[start:end + 1])
+            except (TypeError, ValueError):
+                continue
+    raise ValueError(f"answer contains no parseable JSON: {text[:120]!r}")
 
 def grade_trial(
     task: TaskSpec,
@@ -96,7 +126,7 @@ def _outcome_check(
         if kind == "answer_json":
             answer = agent_result.answer
             if isinstance(answer, str):
-                answer = json.loads(answer)
+                answer = extract_json(answer)
             expected = config.get("expected", {})
             passed = isinstance(answer, dict) and all(
                 answer.get(key) == value for key, value in expected.items()
@@ -107,7 +137,7 @@ def _outcome_check(
         elif kind == "answer_facts":
             answer = agent_result.answer
             if isinstance(answer, str):
-                answer = json.loads(answer)
+                answer = extract_json(answer)
             fact_groups = config.get("fact_groups", [])
             actual_facts = answer.get("facts", []) if isinstance(answer, dict) else []
             facts_text = "\n".join(str(value) for value in actual_facts).casefold()

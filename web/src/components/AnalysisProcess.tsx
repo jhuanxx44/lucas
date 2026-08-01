@@ -69,6 +69,15 @@ function StepList({ steps, live, thinkingByStep = {} }: AnalysisProcessProps) {
             </li>
           );
         }
+        if (step.kind === "compression") {
+          // 上下文压缩：琥珀色提示，说明哪些步骤的工具结果被丢弃以节省 token
+          return (
+            <li key={step.id} className="animate-step-in relative text-[11px] leading-5 text-amber-600 dark:text-amber-400">
+              <span className={`absolute -left-[19px] top-1.5 h-1.5 w-1.5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${active ? "animate-pulse bg-amber-500" : "bg-amber-300 dark:bg-amber-600"}`} />
+              <span>{step.label}</span>
+            </li>
+          );
+        }
         if (step.kind === "tool") {
           // 工具调用：淡灰底 pill + 扳手图标，一眼可辨；失败态用琥珀色扳手
           const failed = step.status === "error";
@@ -106,7 +115,7 @@ export function AnalysisProcess({ steps, live = false, thinkingByStep, defaultOp
   if (steps.length === 0) return null;
   const items = dedupe(steps);
   // “N 步”只计动作/工具，摘要/思考作为过程旁白不计入步数
-  const stepCount = items.filter((s) => s.kind !== "thought" && s.kind !== "summary").length;
+  const stepCount = items.filter((s) => s.kind !== "thought" && s.kind !== "summary" && s.kind !== "compression").length;
 
   if (!live) {
     return (

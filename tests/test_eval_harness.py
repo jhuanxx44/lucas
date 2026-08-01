@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness.grader import check_trace_integrity, grade_trial
+from evals.harness.grader import check_trace_integrity, extract_json, grade_trial
 from evals.harness.models import AgentResult, RunLimits, TaskSpec, load_suite, load_task
 from evals.harness.runner import run_trial
 from evals.harness.suite import run_suite
@@ -313,6 +313,45 @@ def test_answer_json_exact_rejects_extra_fields(tmp_path):
 
     assert grade.outcome_passed is False
     assert grade.success is False
+
+
+def test_extract_json_tolerates_markdown_code_block_and_commentary():
+    expected = {"y2022": 2606, "y2023": 2891}
+    # 纯 JSON
+    assert extract_json('{"y2022": 2606, "y2023": 2891}') == expected
+    # ```json 代码块 + 前后说明文字（DeepSeek 常见输出）
+    assert extract_json(
+        '找到了表格。\n\n```json\n{"y2022": 2606, "y2023": 2891}\n```\n未修改任何文件。'
+    ) == expected
+    # 无围栏但有前后文字
+    assert extract_json('结果如下：{"y2022": 2606, "y2023": 2891}，完毕。') == expected
+    # 数组
+    assert extract_json('```json\n[1, 2]\n```') == [1, 2]
+
+
+def test_answer_json_accepts_code_block_wrapped_answer(tmp_path):
+    task = replace(
+        _task(tmp_path),
+        outcome_graders=[{
+            "type": "answer_json",
+            "expected": {"y2022": 2606},
+            "exact": True,
+            "required": True,
+        }],
+    )
+    trace = _valid_trace(tmp_path / "trace.jsonl", "run-1")
+
+    grade = grade_trial(
+        task,
+        task.fixture_dir,
+        {},
+        AgentResult(answer='```json\n{"y2022": 2606}\n```'),
+        trace.path,
+        "run-1",
+    )
+
+    assert grade.outcome_passed is True
+    assert grade.success is True
 
 
 @pytest.mark.asyncio

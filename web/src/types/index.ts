@@ -41,7 +41,7 @@ export interface ChatAction {
 
 export interface ChatTraceStep {
   id: string;
-  kind: "action" | "tool" | "thought" | "summary";
+  kind: "action" | "tool" | "thought" | "summary" | "compression";
   label: string;
   status: "running" | "done" | "error";
   step?: number;
@@ -62,6 +62,14 @@ export interface ChatContextUsage {
   promptTokens: number;
   totalTokens: number;
   contextLimit: number;
+}
+
+export interface ChatContextCompression {
+  step: number;
+  beforeTokens: number;
+  afterTokens: number;
+  freedTokens: number;
+  droppedSteps: number[];
 }
 
 export interface ChatRunConfig {
@@ -140,4 +148,10 @@ export interface PlanStep {
 export interface PlanState {
   steps: PlanStep[];
   updatedAt: number;
+}
+
+export interface PendingTask {
+  id: string;
+  question: string;
+  model?: string;
 }

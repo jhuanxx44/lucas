@@ -41,12 +41,23 @@ def _tool(name, args, *, call_id="call_1", summary="先执行这一步", usage=N
 
 
 class FakeModel:
-    def __init__(self, turns):
+    def __init__(self, turns, summary_text=None, summary_error=None):
         self.turns = list(turns)
+        self.summary_text = summary_text
+        self.summary_error = summary_error
         self.requests: list[ModelRequest] = []
+        self.summary_requests: list[ModelRequest] = []
 
     async def complete(self, request: ModelRequest):
         self.requests.append(request)
+        if not request.tools and request.instructions == "":
+            # 链式压缩的 LLM 摘要调用：独立记录，不走主循环 turns
+            self.summary_requests.append(request)
+            if self.summary_error is not None:
+                if isinstance(self.summary_error, Exception):
+                    raise self.summary_error
+                return _answer("")
+            return _answer(self.summary_text or "已完成这些步骤的工具调用，关键事实已记录于本摘要。")
         value = self.turns.pop(0)
         if isinstance(value, Exception):
             raise value
@@ -414,3 +425,451 @@ async def test_unknown_tool_is_returned_as_native_function_output(tmp_path):
 
     assert result.answer == "handled"
     assert "unknown tool" in model.requests[1].input_items[-1]["output"]
+
+
+# ---------- 阶段 1：token 预估与上下文压缩 ----------
+
+from harness.runner import estimate_prompt_tokens
+from harness.tools.generic.planning import UPDATE_PLAN_SPEC
+
+
+def test_estimate_prompt_tokens_default_and_calibrated():
+    # 无校准：默认系数 0.35 token/字符
+    assert estimate_prompt_tokens(1000, 100, []) == 1035
+    assert estimate_prompt_tokens(None, 100, []) is None
+    # 有校准：按最近几轮真实 (chars, tokens) 比值
+    assert estimate_prompt_tokens(1000, 100, [(100, 40)]) == 1040
+    assert estimate_prompt_tokens(1000, 100, [(100, 40), (200, 80)]) == 1040
+
+
+def _echo_spec(observations: dict[str, str], name: str = "echo"):
+    from harness.tools.base import ToolSpec, ToolResult
+
+    return ToolSpec(
+        name=name,
+        description=name,
+        parameters={
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
+        handler=lambda workspace, args: ToolResult(
+            status="ok", observation=observations.get(str(args.get("value", "")), "small-result")
+        ),
+    )
+
+
+def _big_tool_turn(observation: str, call_id: str = "call_1", usage=None, tool_name: str = "echo"):
+    turn = _tool(tool_name, {"value": "x"}, call_id=call_id, usage=usage)
+    turn.response_items = [
+        {"type": "reasoning", "id": f"r-{call_id}",
+         "content": [{"type": "reasoning_text", "text": f"先思考 {call_id} 的步骤"}]},
+        {"type": "function_call", "call_id": call_id, "name": tool_name,
+         "arguments": '{"value": "x", "summary": "执行"}'},
+    ]
+    return turn
+
+
+@pytest.mark.asyncio
+async def test_context_compression_replaces_old_tool_outputs_and_reasoning(tmp_path):
+    big = "BIG-OUTPUT-" + "x" * 100_000
+    t1 = _big_tool_turn(big, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", summary="继续", usage=TokenUsage(prompt_tokens=90_000, total_tokens=90_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    trace = TraceRecorder(tmp_path / "trace.jsonl", "compress-run")
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": big, "y": "small-result"})],
+                  context_window=100_000, keep_recent_steps=1, compression_level=1).run(
+        "task", ["echo"], _limits(), trace=trace, on_event=events.append
+    )
+
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert len(compressed) == 1
+    assert compressed[0]["dropped_steps"] == [1]
+    assert compressed[0]["freed_tokens"] > 0
+
+    third_items = model.requests[2].input_items
+    assert third_items[-1]["type"] == "function_call_output"  # 最近一步（step 2）完整保留
+    assert third_items[-1]["call_id"] == "call_2"
+    outputs = [i.get("output", "") for i in third_items if i.get("type") == "function_call_output"]
+    # 更早（step 1）的工具结果被占位说明替换
+    assert all(big not in out for out in outputs)
+    assert any("压缩" in out for out in outputs)
+    # step 1 的 reasoning 被丢弃
+    assert not any("先思考 call_1" in str(i) for i in third_items)
+    # trace 记录压缩事件
+    assert any(e["event"] == "context_compressed" for e in _events(trace))
+
+
+@pytest.mark.asyncio
+async def test_update_plan_output_is_never_compressed(tmp_path):
+    big1 = "ECHO-OLD-" + "x" * 100_000
+    big3 = "ECHO-RECENT-" + "z" * 50_000
+    t1 = _tool("echo", {"value": "x"}, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("update_plan", {"steps": [{"step": "先调研", "status": "in_progress"}]},
+               call_id="call_plan", usage=TokenUsage(prompt_tokens=60_000, total_tokens=60_000))
+    t3 = _tool("echo", {"value": "z"}, call_id="call_3", summary="继续",
+               usage=TokenUsage(prompt_tokens=95_000, total_tokens=95_000))
+    model = FakeModel([t1, t2, t3, _answer("done")])
+    tools = ToolRuntime(tmp_path, [UPDATE_PLAN_SPEC, _echo_spec({"x": big1, "z": big3})])
+
+    await AgentRunner(
+        model, tools, PROMPT, instructions="system", context_window=100_000, keep_recent_steps=1
+    ).run("task", ["update_plan", "echo"], _limits())
+
+    fourth_items = model.requests[-1].input_items
+    serialized = json.dumps(fourth_items, ensure_ascii=False)
+    # 更早步骤的 update_plan call + output 保留（plan 是任务级状态，永不压缩）
+    assert "update_plan" in serialized
+    assert "## 当前计划" in serialized
+    # 更早步骤的 echo 工具结果被压缩掉；最近一步（step 3）完整保留
+    assert big1 not in serialized
+    assert big3 in serialized
+
+
+@pytest.mark.asyncio
+async def test_context_compression_keeps_two_recent_steps(tmp_path):
+    big1 = "ECHO-STEP1-" + "x" * 100_000
+    t1 = _tool("echo", {"value": "x"}, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", summary="继续", usage=TokenUsage(prompt_tokens=50_000, total_tokens=50_000))
+    t3 = _tool("echo", {"value": "z"}, call_id="call_3", summary="继续", usage=TokenUsage(prompt_tokens=90_000, total_tokens=90_000))
+    model = FakeModel([t1, t2, t3, _answer("done")])
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": big1, "y": "m2", "z": "m3"})],
+                  context_window=100_000, keep_recent_steps=2).run(
+        "task", ["echo"], _limits(), on_event=events.append
+    )
+
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert len(compressed) == 1
+    assert compressed[0]["dropped_steps"] == [1]
+    fourth_items = model.requests[-1].input_items
+    serialized = json.dumps(fourth_items, ensure_ascii=False)
+    # 最近两步（step 2/3）完整保留，仅 step 1 被压缩
+    assert big1 not in serialized
+    assert "m2" in serialized and "m3" in serialized
+
+
+@pytest.mark.asyncio
+async def test_context_compression_disabled_by_default(tmp_path):
+    big = "BIG-OUTPUT-" + "x" * 100_000
+    t1 = _tool("echo", {"value": "x"}, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", usage=TokenUsage(prompt_tokens=100_000, total_tokens=100_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": big, "y": big})]).run(
+        "task", ["echo"], _limits(), on_event=events.append
+    )
+
+    assert not [e for e in events if e["kind"] == "context_compressed"]
+    serialized = json.dumps(model.requests[2].input_items, ensure_ascii=False)
+    assert big in serialized  # 未开启压缩：内容与 baseline 一致
+
+
+@pytest.mark.asyncio
+async def test_context_compression_zero_behavior_below_threshold(tmp_path):
+    t1 = _tool("echo", {"value": "x"}, call_id="call_1", usage=TokenUsage(prompt_tokens=2_000, total_tokens=2_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", usage=TokenUsage(prompt_tokens=4_000, total_tokens=4_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    trace = TraceRecorder(tmp_path / "trace.jsonl", "no-compress-run")
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": "small"})], context_window=100_000).run(
+        "task", ["echo"], _limits(), trace=trace, on_event=events.append
+    )
+
+    assert not [e for e in events if e["kind"] == "context_compressed"]
+    assert not any(e["event"] == "context_compressed" for e in _events(trace))
+
+
+@pytest.mark.asyncio
+async def test_context_compression_fallback_drops_old_assistant_messages(tmp_path):
+    big = "TOOL-" + "x" * 10_000
+    msg = "MESSAGE-" + "y" * 50_000
+    t1 = _tool("echo", {"value": "x"}, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t1.response_items = [
+        {"type": "message", "role": "assistant", "id": "m1",
+         "content": [{"type": "output_text", "text": msg}]},
+        {"type": "function_call", "call_id": "call_1", "name": "echo",
+         "arguments": '{"value": "x", "summary": "执行"}'},
+    ]
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", usage=TokenUsage(prompt_tokens=100_000, total_tokens=100_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": big, "y": "small"})],
+                  context_window=100_000, compression_level=1).run(
+        "task", ["echo"], _limits(), on_event=events.append
+    )
+
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert len(compressed) == 1
+    assert compressed[0]["dropped_steps"] == [1]
+    third_items = model.requests[-1].input_items
+    serialized = json.dumps(third_items, ensure_ascii=False)
+    # 兜底：更早的 assistant 消息与 tool output 都被丢弃
+    assert msg not in serialized
+    assert big not in serialized
+    # 协议结构完整：call 与 output 仍成对（call_id 保留）
+    call_ids = [i.get("call_id") for i in third_items
+                if i.get("type") in ("function_call", "function_call_output")]
+    assert call_ids.count("call_1") == 2 and call_ids.count("call_2") == 2
+    # 最近一步完整保留
+    assert "small" in serialized
+
+
+@pytest.mark.asyncio
+async def test_context_compression_multi_round_does_not_recount_placeholders(tmp_path):
+    """连续多轮压缩：已占位的 tool output 不被再次替换/重复计入 dropped_steps。"""
+    bigs = {f"k{i}": f"BIG-{i}-" + "x" * 80_000 for i in range(1, 6)}
+    turns = []
+    for i, pt in enumerate([25_000, 40_000, 55_000, 55_000, 55_000], start=1):
+        raw = json.dumps({"value": f"k{i}", "summary": "执行"}, ensure_ascii=False)
+        turns.append(ModelTurn(
+            function_calls=[FunctionCall(f"call_{i}", "echo", {"value": f"k{i}"}, "执行", raw)],
+            usage=TokenUsage(prompt_tokens=pt, total_tokens=pt),
+            response_id=f"resp_call_{i}",
+            response_items=[
+                {"type": "reasoning", "id": f"r-{i}",
+                 "content": [{"type": "reasoning_text", "text": f"先思考 {i}"}]},
+                {"type": "function_call", "call_id": f"call_{i}", "name": "echo", "arguments": raw},
+            ],
+        ))
+    turns.append(_answer("done"))
+    model = FakeModel(turns)
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec(bigs)],
+                  context_window=60_000, keep_recent_steps=1, compression_level=1).run(
+        "task", ["echo"], _limits(max_steps=10), on_event=events.append
+    )
+
+    comps = [e for e in events if e["kind"] == "context_compressed"]
+    assert len(comps) >= 3  # 连续多轮真实触发
+
+    # 每个 step 最多出现两次：一次丢 reasoning、一次替换 tool output；不得随轮次膨胀
+    counts: dict[int, int] = {}
+    for c in comps:
+        for st in c["dropped_steps"]:
+            counts[st] = counts.get(st, 0) + 1
+    assert max(counts.values()) <= 2, counts
+
+    # 已占位的 output 不被再次替换：每个 step 的占位文本唯一，token 估算不反复重算
+    seen: dict[str, set[str]] = {}
+    for req in model.requests:
+        for item in req.input_items:
+            if item.get("type") == "function_call_output" and "上下文压缩" in item.get("output", ""):
+                step_no = item["output"].split("第")[1].split(" 步")[0]
+                seen.setdefault(step_no, set()).add(item["output"])
+    assert all(len(texts) == 1 for texts in seen.values()), {k: len(v) for k, v in seen.items()}
+
+
+@pytest.mark.asyncio
+async def test_context_compression_level2_summarizes_old_steps(tmp_path):
+    """level=2（默认）：第 1 级丢低价值内容后仍超软线 → LLM 摘要最早可压缩步骤，
+    整步替换为摘要消息（协议结构完整、无悬空 call_id），并记录 context_summarized。"""
+    big = "BIG-OUTPUT-" + "x" * 100_000
+    t1 = _big_tool_turn(big, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", summary="继续",
+               usage=TokenUsage(prompt_tokens=90_000, total_tokens=90_000))
+    model = FakeModel([t1, t2, _answer("done")], summary_text="旧步骤摘要：已读取文件 A，得到关键数据 123。")
+    trace = TraceRecorder(tmp_path / "trace.jsonl", "level2-summary")
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec({"x": big, "y": "small-result"})],
+                  context_window=100_000, keep_recent_steps=1).run(
+        "task", ["echo"], _limits(), trace=trace, on_event=events.append
+    )
+
+    # 发生一次独立的摘要调用（无工具、无 instructions），且看到了原始 tool output
+    assert len(model.summary_requests) == 1
+    summary_input = model.summary_requests[0].input_items[0]["content"]
+    assert "上下文压缩" in summary_input
+    assert big in summary_input
+
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert len(compressed) == 1
+    assert compressed[0]["dropped_steps"] == [1]
+    assert compressed[0]["level"] == 2
+    assert "summarize" in compressed[0]["chain"]
+    assert compressed[0]["mode"] == "drop+summarize"  # 第 1 级丢了 reasoning，第 2 级摘要
+
+    final = model.requests[-1].input_items
+    serialized = json.dumps(final, ensure_ascii=False)
+    assert "旧步骤摘要" in serialized          # 摘要消息进入后续上下文
+    assert big not in serialized               # 覆盖步骤整步移除
+    assert "先思考 call_1" not in serialized   # reasoning 第 1 级已丢
+    call_ids = [i.get("call_id") for i in final
+                if i.get("type") in ("function_call", "function_call_output")]
+    assert "call_1" not in call_ids            # 无悬空 call_id
+    assert call_ids.count("call_2") == 2       # 最近一步完整保留
+    assert "small-result" in serialized
+    assert any(e["event"] == "context_summarized" for e in _events(trace))
+    ctx = [e for e in _events(trace) if e["event"] == "context_compressed"][0]
+    assert ctx["data"]["compression_level"] == 2
+    assert ctx["data"]["summary_covered"] == [1]
+
+
+@pytest.mark.asyncio
+async def test_context_compression_level2_summary_failure_degrades_to_placeholder(tmp_path):
+    """level=2：摘要调用失败 → 降级为占位挖空（degraded），仍释放 token、协议结构完整，
+    run 正常完成。"""
+    big = "BIG-OUTPUT-" + "x" * 100_000
+    t1 = _big_tool_turn(big, call_id="call_1", usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", summary="继续",
+               usage=TokenUsage(prompt_tokens=90_000, total_tokens=90_000))
+    model = FakeModel([t1, t2, _answer("done")], summary_error=RuntimeError("summary provider down"))
+    events = []
+
+    result = await _runner(tmp_path, model, [_echo_spec({"x": big, "y": "small"})],
+                           context_window=100_000, keep_recent_steps=1).run(
+        "task", ["echo"], _limits(), on_event=events.append
+    )
+
+    assert result.finish_reason == "completed"
+    assert len(model.summary_requests) == 1  # 摘要确实被尝试
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert compressed and "degraded" in compressed[0]["chain"]
+    assert compressed[0]["degraded"] is True
+    serialized = json.dumps(model.requests[-1].input_items, ensure_ascii=False)
+    assert big not in serialized
+    assert "上下文压缩" in serialized  # 降级占位
+    call_ids = [i.get("call_id") for i in model.requests[-1].input_items
+                if i.get("type") in ("function_call", "function_call_output")]
+    assert call_ids.count("call_1") == 2 and call_ids.count("call_2") == 2
+
+
+@pytest.mark.asyncio
+async def test_context_compression_level2_skips_summary_when_drop_suffices(tmp_path):
+    """level=2：第 1 级低价值丢弃（超大 reasoning）已达标 → 不触发摘要调用，零成本解决。"""
+    raw = json.dumps({"value": "x", "summary": "执行"}, ensure_ascii=False)
+    t1 = ModelTurn(
+        function_calls=[FunctionCall("call_1", "echo", {"value": "x"}, "执行", raw)],
+        usage=TokenUsage(prompt_tokens=20_000, total_tokens=20_000),
+        response_id="resp_call_1",
+        response_items=[
+            {"type": "reasoning", "id": "r-1",
+             "content": [{"type": "reasoning_text", "text": "先思考" + "y" * 100_000}]},
+            {"type": "function_call", "call_id": "call_1", "name": "echo", "arguments": raw},
+        ],
+    )
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2", summary="继续",
+               usage=TokenUsage(prompt_tokens=90_000, total_tokens=90_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    events = []
+
+    result = await _runner(tmp_path, model, [_echo_spec({"x": "ok", "y": "small"})],
+                           context_window=100_000, keep_recent_steps=1).run(
+        "task", ["echo"], _limits(), on_event=events.append
+    )
+
+    assert result.finish_reason == "completed"
+    assert model.summary_requests == []  # 第 1 级已达标，未付 LLM 成本
+    compressed = [e for e in events if e["kind"] == "context_compressed"]
+    assert compressed and compressed[0]["chain"] == ["drop"]
+    serialized = json.dumps(model.requests[-1].input_items, ensure_ascii=False)
+    assert "先思考" not in serialized  # 超大 reasoning 被丢弃
+    assert "ok" in serialized          # 工具结果保留（低价值丢弃不碰高价值内容）
+
+
+@pytest.mark.asyncio
+async def test_context_compression_level2_existing_summary_is_not_resummarized(tmp_path):
+    """level=2 连续多轮压缩：已生成的摘要消息不被再次覆盖/摘要，原摘要文本保持原样。"""
+    bigs = {f"k{i}": f"BIG-{i}-" + "x" * 20_000 for i in range(1, 6)}
+    turns = []
+    for i, pt in enumerate([15_000, 25_000, 35_000, 42_000, 45_000], start=1):
+        raw = json.dumps({"value": f"k{i}", "summary": "执行"}, ensure_ascii=False)
+        turns.append(ModelTurn(
+            function_calls=[FunctionCall(f"call_{i}", "echo", {"value": f"k{i}"}, "执行", raw)],
+            usage=TokenUsage(prompt_tokens=pt, total_tokens=pt),
+            response_id=f"resp_call_{i}",
+            response_items=[
+                {"type": "reasoning", "id": f"r-{i}",
+                 "content": [{"type": "reasoning_text", "text": f"先思考 {i}"}]},
+                {"type": "function_call", "call_id": f"call_{i}", "name": "echo", "arguments": raw},
+            ],
+        ))
+    turns.append(_answer("done"))
+    summary_text = "第一次摘要：关键事实 123 已记录。"
+    model = FakeModel(turns, summary_text=summary_text)
+    events = []
+
+    await _runner(tmp_path, model, [_echo_spec(bigs)],
+                  context_window=50_000, keep_recent_steps=1).run(
+        "task", ["echo"], _limits(max_steps=10), on_event=events.append
+    )
+
+    assert len(model.summary_requests) >= 1
+    serialized = json.dumps(model.requests[-1].input_items, ensure_ascii=False)
+    # 第一次的摘要文本原样存活：后续压缩没有把它再覆盖
+    assert summary_text in serialized
+    assert serialized.count("⚠️ [上下文摘要] ") >= 1
+
+
+@pytest.mark.asyncio
+async def test_context_initial_estimate_blocks_over_hard_line(tmp_path):
+    """开始时超硬线（0.95）：初始预估即超限 → 拦截，不发必败请求。"""
+    model = FakeModel([_answer("done")])
+    events = []
+    trace = TraceRecorder(tmp_path / "trace.jsonl", "initial-over-hard")
+
+    result = await _runner(tmp_path, model, context_window=300).run(
+        "内容" + "x" * 1000, ["echo"], _limits(), trace=trace, on_event=events.append
+    )
+
+    assert result.finish_reason == "context_limit_exceeded"
+    assert model.requests == []  # 初始拦截：零请求发出
+    assert any(e["kind"] == "context_compressed" for e in events)
+    assert any(e["event"] == "context_limit_exceeded" for e in _events(trace))
+
+
+@pytest.mark.asyncio
+async def test_context_initial_estimate_soft_only_no_block(tmp_path):
+    """开始时超软线（0.9）但未超硬线（0.95）：记录触发、不拦截，正常提交。"""
+    model = FakeModel([_answer("done")])
+    trace = TraceRecorder(tmp_path / "trace.jsonl", "initial-soft")
+
+    result = await _runner(tmp_path, model, context_window=150).run(
+        "内容" + "x" * 300, ["echo"], _limits(), trace=trace
+    )
+
+    assert result.finish_reason == "completed"
+    assert len(model.requests) == 1  # 软线区间（0.9~0.95）：无可压缩，直接提交
+    compressed = [e for e in _events(trace) if e["event"] == "context_compressed"]
+    assert compressed and compressed[0]["data"]["mode"] == "soft"
+    assert compressed[0]["data"]["freed_tokens"] == 0
+
+
+@pytest.mark.asyncio
+async def test_context_hard_line_fifo_drops_oldest_turns(tmp_path):
+    """硬线（0.95）：软线压缩后仍超 → 从最早 step 整轮 FIFO。update_plan 软线豁免，
+    硬线可删整轮；step 0（当前用户轮次）与最近一步保留，协议结构完整。"""
+    plan_steps = [{"step": "计划步骤" + "x" * 400, "status": "in_progress"} for _ in range(40)]
+    t1 = _tool("update_plan", {"steps": plan_steps}, call_id="call_plan",
+               usage=TokenUsage(prompt_tokens=96_000, total_tokens=96_000))
+    t2 = _tool("echo", {"value": "y"}, call_id="call_2",
+               usage=TokenUsage(prompt_tokens=96_000, total_tokens=96_000))
+    model = FakeModel([t1, t2, _answer("done")])
+    events = []
+
+    await _runner(tmp_path, model, [UPDATE_PLAN_SPEC, _echo_spec({"y": "small"})],
+                  context_window=100_000).run(
+        "task", ["update_plan", "echo"], _limits(), on_event=events.append
+    )
+
+    comps = [e for e in events if e["kind"] == "context_compressed"]
+    assert comps and comps[-1]["mode"] == "fifo"  # 软线挖不动（plan 豁免）→ 纯 FIFO
+    assert comps[-1]["dropped_steps"] == [1]      # 整轮 FIFO：最早 step 全部删除
+    third_items = model.requests[2].input_items
+    serialized = json.dumps(third_items, ensure_ascii=False)
+    # 整轮删除：update_plan 的 call 与 output 成对消失，无悬空 call_id
+    assert "call_plan" not in serialized and "## 当前计划" not in serialized
+    assert not any(i.get("type") in ("function_call", "function_call_output")
+                   and i.get("call_id") == "call_plan" for i in third_items)
+    # step 0（初始 user 消息）与最近一步（step 2）保留
+    assert third_items[0]["role"] == "user"
+    assert "call_2" in serialized and "small" in serialized
