@@ -91,11 +91,13 @@ async def test_final_output_text_deltas_are_streamed_in_real_time(tmp_path):
     )
 
     assert result.answer == "你好世界"
-    assert [(event["kind"], event.get("text")) for event in events[:-1]] == [
+    assert [(event["kind"], event.get("text")) for event in events[:-2]] == [
         ("thought", "先想"),
         ("answer_chunk", "你好"),
         ("answer_chunk", "世界"),
     ]
+    assert events[-2]["kind"] == "usage"
+    assert events[-2]["total_tokens"] == 4
     assert events[-1]["kind"] == "answer"
     assert events[-1]["streamed_chars"] == 4
     assert result.usage.total_tokens == 4

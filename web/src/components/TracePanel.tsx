@@ -17,6 +17,8 @@ interface TraceTurn {
   answer: string;
   steps: ChatTraceStep[];
   runtimeTrace: ChatRuntimeTraceEvent[];
+  traceId?: string;
+  traceFile?: string | null;
   requestAt?: string;
   responseAt?: string;
   live?: boolean;
@@ -58,6 +60,8 @@ function buildTurns(messages: ChatMessage[], liveTurn: LiveTraceTurn | null): Tr
         answer: message.content,
         steps,
         runtimeTrace: message.runtimeTrace ?? [],
+        traceId: message.traceId,
+        traceFile: message.traceFile,
       });
     }
   }
@@ -114,6 +118,8 @@ function exportTrace(turns: TraceTurn[], messages: ChatMessage[]) {
       status: live ? "running" : "finished",
       requestAt: requestAt ?? null,
       responseAt: responseAt ?? null,
+      traceId: turn.traceId ?? null,
+      traceFile: turn.traceFile ?? null,
       completeness: traceCompleteness(runtimeTrace, live),
       events: runtimeTrace,
     })),
@@ -193,6 +199,7 @@ function TraceStep({ step }: { step: ChatTraceStep }) {
 
 export function TracePanel({ messages, liveTurn }: TracePanelProps) {
   const turns = buildTurns(messages, liveTurn);
+  const latestTrace = [...turns].reverse().find((turn) => turn.traceId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // 是否处于「贴底跟随」状态；用户手动上滚离开底部时置 false，滚回底部再恢复。
@@ -223,6 +230,14 @@ export function TracePanel({ messages, liveTurn }: TracePanelProps) {
         <span className="ml-2 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
           {turns.length} 轮
         </span>
+        {latestTrace?.traceId && (
+          <span
+            title={latestTrace.traceFile ?? latestTrace.traceId}
+            className="ml-1 max-w-[10rem] truncate rounded bg-zinc-200 px-1.5 py-0.5 font-mono text-[9px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+          >
+            {latestTrace.traceId}
+          </span>
+        )}
         <button
           aria-label="导出 Trace JSON"
           title="导出 Trace JSON"

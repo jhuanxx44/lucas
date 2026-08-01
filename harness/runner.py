@@ -181,6 +181,13 @@ class AgentRunner:
             duration_ms = (time.monotonic() - started) * 1000
             if turn.usage is not None:
                 total_usage = turn.usage if total_usage is None else total_usage.merge(turn.usage)
+                if on_event is not None:
+                    on_event({
+                        "kind": "usage",
+                        "step": step,
+                        "prompt_tokens": turn.usage.prompt_tokens,
+                        "total_tokens": turn.usage.total_tokens,
+                    })
             cost_usd = total_usage.total_cost if total_usage is not None else 0.0
             output_json = json.dumps(turn.response_items, ensure_ascii=False, indent=2)
             output_ref = (

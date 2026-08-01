@@ -58,6 +58,12 @@ export interface ChatRuntimeTraceEvent {
   data: Record<string, unknown>;
 }
 
+export interface ChatContextUsage {
+  promptTokens: number;
+  totalTokens: number;
+  contextLimit: number;
+}
+
 export interface ChatRunConfig {
   agent: string;
   protocol: "openai_responses";
@@ -82,6 +88,8 @@ export interface ChatMessage {
   traceSteps?: ChatTraceStep[];
   runtimeTrace?: ChatRuntimeTraceEvent[];
   runConfig?: ChatRunConfig;
+  traceId?: string;
+  traceFile?: string | null;
 }
 
 export interface ChatSessionSummary {

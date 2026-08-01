@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Send, Square, ChevronDown } from "lucide-react";
 import type { ChatPhase } from "@/hooks/useChat";
+import type { ChatContextUsage } from "@/types";
 
 const MODELS = [
   { label: "Flash", value: "deepseek-v4-flash" },
@@ -12,14 +13,62 @@ const MODELS = [
 // 该窗口内不发送消息；不要改回 onCompositionEnd + setTimeout(0) 复位，
 // 否则会回归中文输入法按回车误发送 bug。
 const COMPOSITION_END_GUARD_MS = 300;
+const CONTEXT_LIMIT_DEFAULT = 1_000_000;
+
+function ContextRing({ usage }: { usage: ChatContextUsage | null }) {
+  const limit = usage?.contextLimit ?? CONTEXT_LIMIT_DEFAULT;
+  const used = Math.min(usage?.promptTokens ?? 0, limit);
+  const ratio = limit > 0 ? used / limit : 0;
+  const radius = 8;
+  const circumference = 2 * Math.PI * radius;
+  const active = usage !== null;
+  const strokeClass = !active
+    ? "stroke-zinc-300 dark:stroke-zinc-600"
+    : ratio >= 0.9
+      ? "stroke-red-500"
+      : ratio >= 0.7
+        ? "stroke-amber-500"
+        : "stroke-indigo-500";
+  const label = active
+    ? `Context 使用：${used.toLocaleString()} / ${limit.toLocaleString()} tokens（${(ratio * 100).toFixed(1)}%）`
+    : `Context 使用：0 / ${limit.toLocaleString()} tokens`;
+
+  return (
+    <div className="flex items-center" title={label}>
+      <svg width="22" height="22" viewBox="0 0 22 22" className="shrink-0">
+        <circle
+          cx="11"
+          cy="11"
+          r={radius}
+          fill="none"
+          strokeWidth="2.5"
+          className="stroke-zinc-200 dark:stroke-zinc-700"
+        />
+        <circle
+          cx="11"
+          cy="11"
+          r={radius}
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - ratio)}
+          transform="rotate(-90 11 11)"
+          className={`transition-all duration-300 ${strokeClass}`}
+        />
+      </svg>
+    </div>
+  );
+}
 
 interface ChatInputProps {
   onSend: (message: string, model?: string) => void;
   onCancel: () => void;
   phase: ChatPhase;
+  contextUsage: ChatContextUsage | null;
 }
 
-export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
+export function ChatInput({ onSend, onCancel, phase, contextUsage }: ChatInputProps) {
   const [text, setText] = useState("");
   const [model, setModel] = useState<string>("deepseek-v4-flash");
   const [modelOpen, setModelOpen] = useState(false);
@@ -109,23 +158,26 @@ export function ChatInput({ onSend, onCancel, phase }: ChatInputProps) {
               </>
             )}
           </div>
-          {loading ? (
-            <button
-              onClick={onCancel}
-              className="bg-red-500/90 hover:bg-red-500 text-white rounded-full p-2 transition-colors"
-              title="取消"
-            >
-              <Square size={14} />
-            </button>
-          ) : (
-            <button
-              onClick={handleSend}
-              disabled={!text.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-700 text-white disabled:text-zinc-400 dark:disabled:text-zinc-500 rounded-full p-2 transition-colors"
-            >
-              <Send size={14} />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <ContextRing usage={contextUsage} />
+            {loading ? (
+              <button
+                onClick={onCancel}
+                className="bg-red-500/90 hover:bg-red-500 text-white rounded-full p-2 transition-colors"
+                title="取消"
+              >
+                <Square size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!text.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-700 text-white disabled:text-zinc-400 dark:disabled:text-zinc-500 rounded-full p-2 transition-colors"
+              >
+                <Send size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

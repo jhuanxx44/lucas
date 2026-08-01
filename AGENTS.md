@@ -118,3 +118,7 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - **Evaluation Harness**：准备任务和隔离环境、运行 trial、记录 trace、自动判卷并汇总指标的系统。
 
 两者可以共享数据协议，但不要把评估逻辑硬编码进业务 Agent，也不要让业务概念进入通用 Harness 核心。
+
+## 6. 读懂 Trace（两类 trace 的关联）
+
+Lucas 有两类 trace：前端 Trace 面板导出的 `lucas-trace-*.json` 是回合级决策轨迹（问题→答案、过程步骤、`model_input`/`model_output`/`assistant_answer`/`run_finished` 等 run 生命周期事件）；后端 `logs/chat-traces/<trace_id>-<slug>/` 的 `trace.jsonl` + `artifacts/input|output-step-N.json` 是每步发给模型的完整原始 context 与 usage（需 `LUCAS_CHAT_TRACE=1` 开启）。两者通过同一个 `traceId` 关联：前端导出 JSON 每轮带 `traceId`/`traceFile`，后端目录以 `<trace_id>-<slug>` 命名且 `chat_started` 记录同一 `trace_id` 与 `trace_path`，任一端都能定位到另一端——读前端 trace 看 Agent 做了什么决策，读后端 trace 看每一步模型实际看到和消耗了什么。

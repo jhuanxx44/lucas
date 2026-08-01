@@ -293,6 +293,30 @@ async def test_usage_is_accumulated_across_responses(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_usage_event_is_emitted_per_model_turn(tmp_path):
+    first = TokenUsage(prompt_tokens=10, completion_tokens=2, thinking_tokens=3,
+                       total_tokens=15, model="m")
+    second = TokenUsage(prompt_tokens=20, completion_tokens=4, thinking_tokens=5,
+                        total_tokens=29, model="m")
+    (tmp_path / "a.txt").write_text("x", encoding="utf-8")
+    model = FakeModel([
+        _tool("read_file", {"path": "a.txt"}, usage=first),
+        _answer("done", usage=second),
+    ])
+    events = []
+
+    result = await _runner(tmp_path, model).run(
+        "read", ["read_file"], _limits(), on_event=events.append
+    )
+
+    assert [e for e in events if e["kind"] == "usage"] == [
+        {"kind": "usage", "step": 1, "prompt_tokens": 10, "total_tokens": 15},
+        {"kind": "usage", "step": 2, "prompt_tokens": 20, "total_tokens": 29},
+    ]
+    assert result.usage.total_tokens == 44
+
+
+@pytest.mark.asyncio
 async def test_cost_budget_is_checked_before_tool_execution(tmp_path):
     calls = []
     spec = ToolSpec(

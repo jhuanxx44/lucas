@@ -205,7 +205,12 @@ export function ChatPanel({
           </div>
         )}
       </div>
-      <ChatInput onSend={sendMessage} onCancel={cancel} phase={state.phase} />
+      <ChatInput
+        onSend={sendMessage}
+        onCancel={cancel}
+        phase={state.phase}
+        contextUsage={state.contextUsage}
+      />
     </div>
   );
 }

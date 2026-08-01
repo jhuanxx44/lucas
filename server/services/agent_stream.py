@@ -3,6 +3,9 @@
 替代旧 stream.py（agents.Manager 链路，已删除）。事件协议与前端
 web/src/hooks/useChat.ts 严格对齐：
 
+  trace_id {id, file}            本次对话唯一 trace id（与 logs/chat-traces/
+                                  落盘目录同名）；file 为后端 trace 文件绝对
+                                  路径，未开启落盘时为 null
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
@@ -22,6 +25,10 @@ web/src/hooks/useChat.ts 严格对齐：
   synthesis_clear {}              已废弃不再发送（中间文本不上屏，无需清空）；
                                   前端保留兼容处理
   researcher_done {id}            答案推送完成后
+  context_usage {step,            每轮模型调用完成后推送当前 context 窗口占用
+               prompt_tokens,     （prompt_tokens = 该轮输入上下文长度，
+               total_tokens,      随步骤累积增长）与窗口上限 context_limit
+               context_limit}
   done {total_tokens}             正常结束（AgentResult.usage 累计）
   error {message}                 异常 / 解析失败 / budget_exceeded / max_steps / timeout
 
@@ -30,6 +37,8 @@ actions 不再发送（前端缺省行为正常）。
 import asyncio
 import json
 import logging
+import os
+import uuid
 from dataclasses import replace
 from datetime import date, datetime
 import time
@@ -40,6 +49,7 @@ from harness.config import build_single_system_prompt, load_agent_config
 from harness.model_adapter import ResponsesModelAdapter, responses_tools
 from harness.models import AgentResult, RunLimits
 from harness.runner import AgentRunner, load_prompt_template
+from harness.trace import TraceRecorder
 from harness.tools.base import ToolResult
 from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
 from harness.tools.business.wiki import WIKI_RECALL_SPEC
@@ -98,6 +108,7 @@ _WIKI_APPLY_PATCH_SPEC = replace(
 
 _HISTORY_TURNS = 10  # 注入 instruction 的最近对话轮数
 _TIMEOUT_SECONDS = 0.0  # 0 = 不限时
+_CONTEXT_LIMIT_TOKENS = 1_000_000  # flash/pro 默认 1M context 窗口
 # 答案冲洗节奏：把已生成完毕的最终答案切成小片按固定间隔推送，
 # 前端呈现为平滑打字机而非一次性砸入。片数随长度自适应：
 # 短答案快（百字约 0.2s），长答案封顶约 1.6s，不会让用户干等。
@@ -199,6 +210,48 @@ def _error_message(result: AgentResult) -> str:
     return "分析过程中断，请稍后重试。"
 
 
+_CHAT_TRACE_ENV = "LUCAS_CHAT_TRACE"
+_CHAT_TRACE_DIR_ENV = "LUCAS_CHAT_TRACE_DIR"
+_DEFAULT_CHAT_TRACE_ROOT = _PROJECT_ROOT / "logs" / "chat-traces"
+
+
+def _chat_trace_root() -> Path | None:
+    """调试开关：设置 LUCAS_CHAT_TRACE=1 后每次对话落盘 trace。
+
+    输出根目录默认 logs/chat-traces，可用 LUCAS_CHAT_TRACE_DIR 覆盖。
+    """
+    if not os.environ.get(_CHAT_TRACE_ENV, "").strip():
+        return None
+    override = os.environ.get(_CHAT_TRACE_DIR_ENV, "").strip()
+    return Path(override) if override else _DEFAULT_CHAT_TRACE_ROOT
+
+
+def _chat_trace_recorder(
+    question: str,
+    history: list[dict] | None,
+    user_id: str,
+    model: str,
+    system_prompt: str,
+    trace_id: str,
+) -> TraceRecorder | None:
+    root = _chat_trace_root()
+    if root is None:
+        return None
+    slug = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in question[:40])
+    slug = slug.strip("-").strip("_")[:24] or "chat"
+    recorder = TraceRecorder(root / f"{trace_id}-{slug}" / "trace.jsonl", trace_id)
+    recorder.record("chat_started", {
+        "trace_id": trace_id,
+        "trace_path": str(recorder.path),
+        "question": question,
+        "history_turns": len(history or []),
+        "user_id": user_id,
+        "model": model,
+        "system_prompt": system_prompt,
+    })
+    return recorder
+
+
 async def chat_event_stream(
     question: str,
     history: list[dict] | None = None,
@@ -220,6 +273,8 @@ async def chat_event_stream(
             client = create_client(model=model)
             model_adapter = ResponsesModelAdapter(client)
         prompt_template = load_prompt_template(_PROMPT_PATH)
+        trace_id = f"chat-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+        trace = _chat_trace_recorder(question, history, user_id, model, system_prompt, trace_id)
         runner = AgentRunner(
             model_adapter,
             tools,
@@ -239,6 +294,7 @@ async def chat_event_stream(
         queue: asyncio.Queue = asyncio.Queue()
         run_task = asyncio.create_task(
             runner.run(instruction, allowed_tools, limits,
+                       trace=trace,
                        on_event=queue.put_nowait,
                        on_trace_event=queue.put_nowait,
                        stream_answer=True)
@@ -268,6 +324,14 @@ async def chat_event_stream(
             kind = evt.get("kind")
             if kind == "answer_discard":
                 answer_buffer.clear()
+                return
+            if kind == "usage":
+                yield _sse("context_usage", {
+                    "step": evt.get("step"),
+                    "prompt_tokens": evt.get("prompt_tokens", 0),
+                    "total_tokens": evt.get("total_tokens", 0),
+                    "context_limit": _CONTEXT_LIMIT_TOKENS,
+                })
                 return
             if kind == "model_input":
                 yield _sse("trace_event", {
@@ -341,6 +405,10 @@ async def chat_event_stream(
                 step_count = evt.get("step", step_count)
             return
 
+        yield _sse("trace_id", {
+            "id": trace_id,
+            "file": str(trace.path) if trace is not None else None,
+        })
         yield _sse("dispatch", {
             "researchers": [{"id": "single", "name": config.name}],
             "mode": "single",
@@ -381,6 +449,16 @@ async def chat_event_stream(
         if flush:
             yield flush
         result = run_task.result()
+        if trace is not None:
+            trace.record("chat_completed", {
+                "finish_reason": result.finish_reason,
+                "error": result.error,
+                "steps": step_count,
+                "total_tokens": result.usage.total_tokens if result.usage else 0,
+                "elapsed_seconds": round(time.monotonic() - t0, 3),
+                "answer_preview": (result.answer if isinstance(result.answer, str) else "")[:500],
+            })
+            logger.info("📝 chat trace written: %s", trace.path)
         while not queue.empty():
             for out in _forward(queue.get_nowait()):
                 if out is not None:

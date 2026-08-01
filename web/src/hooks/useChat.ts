@@ -1,6 +1,6 @@
 import { useReducer, useCallback, useEffect, useRef } from "react";
 import { useSSE } from "./useSSE";
-import type { ChatMessage, ChatRunConfig, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep, PlanStep, PlanState } from "@/types";
+import type { ChatMessage, ChatRunConfig, ChatContextUsage, ChatRuntimeTraceEvent, ResearcherState, ChatAction, ChatTraceStep, PlanStep, PlanState } from "@/types";
 
 let _msgId = 0;
 function nextId() { return `msg-${++_msgId}`; }
@@ -17,6 +17,7 @@ interface ChatState {
   traceSteps: ChatTraceStep[];
   runConfig: ChatRunConfig | null;
   runtimeTrace: ChatRuntimeTraceEvent[];
+  contextUsage: ChatContextUsage | null;
   plan: PlanState | null;
   isLoading: boolean;
   phase: ChatPhase;
@@ -38,6 +39,7 @@ type Action =
   | { type: "SUMMARY_STEP"; step: ChatTraceStep }
   | { type: "RUN_CONFIG"; config: ChatRunConfig }
   | { type: "TRACE_EVENT"; event: ChatRuntimeTraceEvent }
+  | { type: "CONTEXT_USAGE"; usage: ChatContextUsage }
   | { type: "DONE"; message: ChatMessage }
   | { type: "ERROR"; message: ChatMessage }
   | { type: "PLAN_UPDATE"; steps: PlanStep[] };
@@ -62,6 +64,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         traceSteps: [{ id: "init", kind: "action", label: "已收到问题", status: "done" }],
         runConfig: null,
         runtimeTrace: [],
+        contextUsage: null,
         plan: null,
         isLoading: true,
         phase: "dispatching",
@@ -114,6 +117,8 @@ function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, runConfig: action.config };
     case "TRACE_EVENT":
       return { ...state, runtimeTrace: [...state.runtimeTrace, action.event] };
+    case "CONTEXT_USAGE":
+      return { ...state, contextUsage: action.usage };
     case "DONE": {
       return {
         ...state,
@@ -122,6 +127,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         actions: [],
         runConfig: null,
         runtimeTrace: [],
+        contextUsage: null,
         isLoading: false,
         phase: "idle",
       };
@@ -131,6 +137,7 @@ function reducer(state: ChatState, action: Action): ChatState {
         ...state,
         messages: [...state.messages, action.message],
         thinkingByStep: {},
+        contextUsage: null,
         isLoading: false,
         phase: "idle",
         actions: [],
@@ -161,6 +168,7 @@ function createInitialState(messages: ChatMessage[]): ChatState {
     traceSteps: [],
     runConfig: null,
     runtimeTrace: [],
+    contextUsage: null,
     plan: null,
     isLoading: false,
     phase: "idle",
@@ -213,6 +221,8 @@ export function useChat(
       let streamedTraceSteps: ChatTraceStep[] = [{ id: "init", kind: "action", label: "已收到问题", status: "done" }];
       let streamedRuntimeTrace: ChatRuntimeTraceEvent[] = [];
       let streamedRunConfig: ChatRunConfig | null = null;
+      let streamedTraceId: string | undefined;
+      let streamedTraceFile: string | null | undefined;
       let completed = false;
 
       const appendProcessStep = (step: string) => {
@@ -348,6 +358,29 @@ export function useChat(
                 dispatch({ type: "TRACE_EVENT", event: traceEvent });
                 break;
               }
+              case "context_usage": {
+                const usageData = data as {
+                  step: number;
+                  prompt_tokens: number;
+                  total_tokens: number;
+                  context_limit: number;
+                };
+                dispatch({
+                  type: "CONTEXT_USAGE",
+                  usage: {
+                    promptTokens: usageData.prompt_tokens,
+                    totalTokens: usageData.total_tokens,
+                    contextLimit: usageData.context_limit,
+                  },
+                });
+                break;
+              }
+              case "trace_id": {
+                const traceData = data as { id: string; file: string | null };
+                streamedTraceId = traceData.id;
+                streamedTraceFile = traceData.file;
+                break;
+              }
               case "done": {
                 completed = true;
                 const assistantMessage: ChatMessage = {
@@ -361,6 +394,8 @@ export function useChat(
                   traceSteps: streamedTraceSteps,
                   runtimeTrace: streamedRuntimeTrace.length > 0 ? streamedRuntimeTrace : undefined,
                   runConfig: streamedRunConfig ?? undefined,
+                  traceId: streamedTraceId,
+                  traceFile: streamedTraceFile,
                 };
                 const messages = [...previousMessages, userMessage, assistantMessage];
                 dispatch({ type: "DONE", message: assistantMessage });
@@ -378,6 +413,8 @@ export function useChat(
                   processSteps: streamedProcessSteps,
                   runtimeTrace: streamedRuntimeTrace.length > 0 ? streamedRuntimeTrace : undefined,
                   runConfig: streamedRunConfig ?? undefined,
+                  traceId: streamedTraceId,
+                  traceFile: streamedTraceFile,
                 };
                 const messages = [...previousMessages, userMessage, errorMessage];
                 dispatch({ type: "ERROR", message: errorMessage });

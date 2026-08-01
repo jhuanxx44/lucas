@@ -124,17 +124,27 @@ async def test_agent_stream_full_native_event_sequence(tmp_path):
     visible = [item for item in events if item[0] != "trace_event"]
     names = [name for name, _ in visible]
 
+    # trace_id 最先推送（关联后端落盘目录）；每轮模型调用后推送 context_usage；
     # 答案按节奏冲洗成多个 synthesis_chunk 小片，位于 tool_step 与 researcher_done 之间
-    assert names[:5] == ["dispatch", "researcher_start", "summary", "tool_start", "tool_step"]
+    assert names[:7] == ["trace_id", "dispatch", "researcher_start", "context_usage", "summary", "tool_start", "tool_step"]
     assert names[-2:] == ["researcher_done", "done"]
-    assert set(names[5:-2]) == {"synthesis_chunk"}
-    assert visible[2][1] == {"step": 1, "text": "先查一下资料"}
-    assert visible[3][1]["tool"] == "wiki_recall"
-    assert visible[3][1]["args"] == {"query": "贵州茅台"}
-    assert visible[3][1]["message"] == "Lucas 调用 wiki_recall: 贵州茅台"
-    assert visible[4][1]["ok"] is True
+    assert set(names[7:-2]) == {"synthesis_chunk", "context_usage"}
+    trace_id_events = [data for name, data in visible if name == "trace_id"]
+    assert len(trace_id_events) == 1
+    assert trace_id_events[0]["id"].startswith("chat-")
+    assert trace_id_events[0]["file"] is None  # 默认未开启落盘
+    assert visible[4][1] == {"step": 1, "text": "先查一下资料"}
+    assert visible[5][1]["tool"] == "wiki_recall"
+    assert visible[5][1]["args"] == {"query": "贵州茅台"}
+    assert visible[5][1]["message"] == "Lucas 调用 wiki_recall: 贵州茅台"
+    assert visible[6][1]["ok"] is True
     chunks = [data["text"] for name, data in visible if name == "synthesis_chunk"]
     assert "".join(chunks) == "最终答案"
+    usage_events = [data for name, data in events if name == "context_usage"]
+    assert usage_events == [
+        {"step": 1, "prompt_tokens": 100, "total_tokens": 150, "context_limit": 1_000_000},
+        {"step": 2, "prompt_tokens": 200, "total_tokens": 280, "context_limit": 1_000_000},
+    ]
     assert visible[-1][1] == {"total_tokens": 430}
 
 
@@ -241,7 +251,7 @@ async def test_model_exception_yields_friendly_error(tmp_path):
                             workspace=tmp_path)
     visible = [item for item in events if item[0] != "trace_event"]
 
-    assert [name for name, _ in visible] == ["dispatch", "researcher_start", "error"]
+    assert [name for name, _ in visible] == ["trace_id", "dispatch", "researcher_start", "error"]
     assert visible[-1][1]["message"] == "分析过程出错，请稍后重试。"
     assert "secret" not in visible[-1][1]["message"]
 
@@ -277,7 +287,7 @@ async def test_client_disconnect_cancels_native_model_call(tmp_path):
     from server.services.agent_stream import chat_event_stream
     generator = chat_event_stream("问题", workspace=tmp_path, model_adapter=HangingModel())
     first = await generator.__anext__()
-    assert "event: dispatch" in first
+    assert "event: trace_id" in first
     await asyncio.sleep(0.05)
     await generator.aclose()
     await asyncio.sleep(0.01)
@@ -292,3 +302,63 @@ def test_error_messages_hide_internal_details():
     message = _error_message(AgentResult(finish_reason="protocol_error", error="secret"))
     assert "secret" not in message
     assert "中断" in message
+
+
+@pytest.mark.asyncio
+async def test_chat_trace_dump_writes_per_step_context(tmp_path, monkeypatch):
+    u1 = TokenUsage(prompt_tokens=100, completion_tokens=40, thinking_tokens=10,
+                    total_tokens=150, model="m")
+    u2 = TokenUsage(prompt_tokens=200, completion_tokens=60, thinking_tokens=20,
+                    total_tokens=280, model="m")
+    model = FakeModel([_tool(usage=u1), _answer(usage=u2)])
+    monkeypatch.setenv("LUCAS_CHAT_TRACE", "1")
+    monkeypatch.setenv("LUCAS_CHAT_TRACE_DIR", str(tmp_path))
+
+    events = await _collect("查一下茅台", model=model, workspace=tmp_path)
+    assert any(name == "done" for name, _ in events)
+    trace_id_events = [data for name, data in events if name == "trace_id"]
+    assert len(trace_id_events) == 1
+    trace_id = trace_id_events[0]["id"]
+    assert trace_id.startswith("chat-")
+
+    trace_files = sorted(tmp_path.glob("*/trace.jsonl"))
+    assert len(trace_files) == 1
+    assert trace_files[0].parent.name.startswith(trace_id)
+    assert str(trace_files[0]) == trace_id_events[0]["file"]
+    lines = [json.loads(line) for line in trace_files[0].read_text(encoding="utf-8").splitlines()]
+    names = [event["event"] for event in lines]
+    assert names[0] == "chat_started"
+    assert names[-1] == "chat_completed"
+    assert "model_input_prepared" in names
+    assert "model_call_finished" in names
+    assert names.count("model_input_prepared") == 2
+
+    started = lines[0]["data"]
+    assert started["trace_id"] == trace_id
+    assert started["question"] == "查一下茅台"
+    assert "Lucas" in started["system_prompt"]
+    completed = lines[-1]["data"]
+    assert completed["finish_reason"] == "completed"
+    assert completed["total_tokens"] == 430
+
+    artifacts = sorted(trace_files[0].parent.glob("artifacts/input-*.json"))
+    assert len(artifacts) == 2
+    first_input = json.loads(artifacts[0].read_text(encoding="utf-8"))
+    assert isinstance(first_input, list)
+    assert "用户问题：查一下茅台" in first_input[0]["content"]
+
+
+def test_chat_trace_switch_off_by_default(monkeypatch):
+    from server.services.agent_stream import _chat_trace_root
+
+    monkeypatch.delenv("LUCAS_CHAT_TRACE", raising=False)
+    monkeypatch.delenv("LUCAS_CHAT_TRACE_DIR", raising=False)
+    assert _chat_trace_root() is None
+
+    monkeypatch.setenv("LUCAS_CHAT_TRACE", "1")
+    root = _chat_trace_root()
+    assert root is not None
+    assert root.name == "chat-traces"
+
+    monkeypatch.setenv("LUCAS_CHAT_TRACE_DIR", "/tmp/custom-trace")
+    assert str(_chat_trace_root()) == "/tmp/custom-trace"
