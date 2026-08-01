@@ -15,12 +15,16 @@ function dedupe(steps: ChatTraceStep[]): ChatTraceStep[] {
   return steps.filter((step, index) => index === 0 || steps[index - 1].label !== step.label);
 }
 
-// 当前句子：按中英文句号分句，只保留正在生成的最后一句。
-// 句号刚打完、下一句还没开始时，最后一段为空，暂时保留上一句，避免空白闪烁
+// 当前句子：按中英文句号分句，只保留正在生成的最后一句，句号保留在句尾。
+// 句号刚打完、下一句还没开始时，返回完整上一句（含句号），避免空白闪烁
 function currentSentence(text: string): string {
-  const parts = text.split(/[。.]/);
-  const last = parts.at(-1) ?? "";
-  return last || (parts.at(-2) ?? "");
+  const last = Math.max(text.lastIndexOf("。"), text.lastIndexOf("."));
+  if (last === -1) return text;
+  const rest = text.slice(last + 1);
+  if (rest) return rest;
+  // 句号刚打完：截取最后一个句号之前的部分，即上一句完整内容（含句号）
+  const prev = Math.max(text.lastIndexOf("。", last - 1), text.lastIndexOf(".", last - 1));
+  return text.slice(prev + 1);
 }
 
 // 单行思考：固定宽度单行只展示当前句子，超出裁掉；
