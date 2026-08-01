@@ -142,6 +142,15 @@ function reducer(state: ChatState, action: Action): ChatState {
 }
 
 function createInitialState(messages: ChatMessage[]): ChatState {
+  // 页面刷新后模块级 _msgId 归零，会与历史消息里的 msg-N 撞 key；
+  // 用历史消息的最大序号预热计数器，保证新消息 id 从已有消息之后继续递增
+  for (const message of messages) {
+    const match = /^msg-(\d+)$/.exec(message.id);
+    if (match) {
+      const n = Number(match[1]);
+      if (n > _msgId) _msgId = n;
+    }
+  }
   return {
     messages,
     researchers: new Map(),
