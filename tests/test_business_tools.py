@@ -10,12 +10,16 @@ import pytest
 from harness.tools.base import ToolResult
 from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
 from harness.tools.business.wiki import WIKI_RECALL_SPEC
+from harness.tools.generic.doubao_search import DOUBAO_SEARCH_SPEC
+from harness.tools.generic.doubao_search import doubao_search as _doubao_handler
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.registry import ToolRuntime
+from utils.doubao_search import DoubaoSearchError
 from utils.stock_data import KlineBar, QuoteData
 
 EXTERNAL_TOOL_SPECS = [
     WEB_SEARCH_SPEC,
+    DOUBAO_SEARCH_SPEC,
     STOCK_QUOTE_SPEC,
     STOCK_KLINE_SPEC,
     WIKI_RECALL_SPEC,
@@ -66,6 +70,65 @@ async def test_web_search_exception_is_error_not_raised(tmp_path, monkeypatch):
 
 async def test_web_search_bad_args(tmp_path):
     result = await _execute(tmp_path, WEB_SEARCH_SPEC, "web_search", {"query": "  "})
+    assert result.status == "invalid_input"
+
+
+# ---------- doubao_search ----------
+
+async def test_doubao_search_happy_path(tmp_path, monkeypatch):
+    async def fake_search(query, max_results=10, max_snippet_length=500):
+        assert query == "贵州茅台 2026 半年报"
+        assert max_results == 8
+        assert max_snippet_length == 300
+        return "1. [贵州茅台半年报前瞻](https://example.com/q1)\n   来源：雪球"
+
+    monkeypatch.setattr("harness.tools.generic.doubao_search._doubao_search", fake_search)
+    result = await _execute(tmp_path, DOUBAO_SEARCH_SPEC, "doubao_search",
+                            {"query": "贵州茅台 2026 半年报", "max_results": 8,
+                             "max_snippet_length": 300})
+    assert result.status == "ok"
+    assert "https://example.com/q1" in result.observation
+
+
+async def test_doubao_search_clamps_max_results(tmp_path, monkeypatch):
+    seen = {}
+
+    async def fake_search(query, max_results=10, max_snippet_length=500):
+        seen["max_results"] = max_results
+        seen["max_snippet_length"] = max_snippet_length
+        return "结果"
+
+    monkeypatch.setattr("harness.tools.generic.doubao_search._doubao_search", fake_search)
+    # registry 的 schema 校验会先拒绝越界值，这里直接调 handler 验证防御性截断
+    result = await _doubao_handler(tmp_path, {"query": "x", "max_results": 999,
+                                              "max_snippet_length": 99999})
+    assert result.status == "ok"
+    assert seen == {"max_results": 20, "max_snippet_length": 3000}
+
+
+async def test_doubao_search_empty_result_is_error(tmp_path, monkeypatch):
+    async def fake_search(query, max_results=10, max_snippet_length=500):
+        return ""
+
+    monkeypatch.setattr("harness.tools.generic.doubao_search._doubao_search", fake_search)
+    result = await _execute(tmp_path, DOUBAO_SEARCH_SPEC, "doubao_search", {"query": "x"})
+    assert result.status == "error"
+    assert result.error_code == "search_failed"
+    assert "未返回结果" in result.observation
+
+
+async def test_doubao_search_error_is_reported_not_raised(tmp_path, monkeypatch):
+    async def fake_search(query, max_results=10, max_snippet_length=500):
+        raise DoubaoSearchError("未配置豆包搜索 API Key")
+
+    monkeypatch.setattr("harness.tools.generic.doubao_search._doubao_search", fake_search)
+    result = await _execute(tmp_path, DOUBAO_SEARCH_SPEC, "doubao_search", {"query": "x"})
+    assert result.status == "error"
+    assert "API Key" in result.observation
+
+
+async def test_doubao_search_bad_args(tmp_path):
+    result = await _execute(tmp_path, DOUBAO_SEARCH_SPEC, "doubao_search", {"query": "  "})
     assert result.status == "invalid_input"
 
 

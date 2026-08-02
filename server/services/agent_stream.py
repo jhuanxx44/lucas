@@ -60,6 +60,7 @@ from harness.tools.generic.filesystem import (
     SEARCH_SPEC,
     WRITE_FILE_SPEC,
 )
+from harness.tools.generic.doubao_search import DOUBAO_SEARCH_SPEC
 from harness.tools.generic.web_search import WEB_SEARCH_SPEC
 from harness.tools.generic.planning import UPDATE_PLAN_SPEC
 from harness.tools.registry import ToolRuntime
@@ -118,6 +119,7 @@ _FLUSH_MAX_TICKS = 100
 _CHAT_TOOL_SPECS = [
     UPDATE_PLAN_SPEC,
     WEB_SEARCH_SPEC,
+    DOUBAO_SEARCH_SPEC,
     STOCK_QUOTE_SPEC,
     STOCK_KLINE_SPEC,
     WIKI_RECALL_SPEC,
