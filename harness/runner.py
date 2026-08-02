@@ -905,7 +905,10 @@ class AgentRunner:
                         "step": step,
                         "tool": tool,
                         "call_id": call.call_id,
-                        "args": args,
+                        # 每个调用必须携带自己发出的参数：不能用第一个循环残留的
+                        # 变量 args（整批共享最后一个 call 的参数）；signature 是
+                        # 发起调用时的参数快照，与模型发出的参数完全一致
+                        "args": json.loads(signature),
                         "ok": result.ok,
                         "observation": observation,
                     })

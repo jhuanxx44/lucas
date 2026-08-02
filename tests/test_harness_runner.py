@@ -1024,3 +1024,33 @@ async def test_context_hard_line_fifo_drops_oldest_turns(tmp_path):
     # step 0（初始 user 消息）与最近一步（step 2）保留
     assert third_items[0]["role"] == "user"
     assert "call_2" in serialized and "small" in serialized
+
+
+@pytest.mark.asyncio
+async def test_parallel_tool_calls_tool_step_args_match_each_call(tmp_path):
+    """并行工具调用时，每个 tool_step 事件必须携带自己那次调用的 args。
+
+    回归：此前 tool_step 复用第一个循环残留的 args 变量，同一批所有事件
+    都带上最后一个 call 的参数，导致前端 trace 面板把不同调用显示成同一调用。
+    """
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("beta", encoding="utf-8")
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "read_file", {"path": "a.txt"}, "读 a"),
+            ("c2", "read_file", {"path": "b.txt"}, "读 b"),
+        ]),
+        _answer("done"),
+    ])
+    events = []
+
+    await _runner(tmp_path, model).run(
+        "read", ["read_file"], _limits(), on_event=events.append
+    )
+
+    steps = [e for e in events if e["kind"] == "tool_step"]
+    assert [e["call_id"] for e in steps] == ["c1", "c2"]
+    assert [e["args"] for e in steps] == [
+        {"path": "a.txt"},
+        {"path": "b.txt"},
+    ]
