@@ -160,6 +160,7 @@ class ResponsesModelAdapter:
             instructions=request.instructions,
             tools=responses_tools(request.tools),
             temperature=request.temperature,
+            parallel_tool_calls=request.parallel_tool_calls,
             on_retry=provider_retries.append,
         )
         return _normalize_response(
@@ -177,6 +178,7 @@ class ResponsesModelAdapter:
             instructions=request.instructions,
             tools=responses_tools(request.tools),
             temperature=request.temperature,
+            parallel_tool_calls=request.parallel_tool_calls,
             stream=True,
             on_retry=provider_retries.append,
         )

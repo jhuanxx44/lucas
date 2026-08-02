@@ -9,16 +9,18 @@ web/src/hooks/useChat.ts 严格对齐：
   dispatch {researchers, mode}    run 开始（先于 researcher_start；
                                   useChat.ts 据此触发 onResearchTarget wiki 联动）
   researcher_start {id, name}     run 开始（固定 id="single"）
-  summary {step, text}            模型原生 function call 的 summary 参数，
-                                  展示为过程摘要；不传给业务工具。
+  summary {step, tool, call_id,   模型原生 function call 的 summary 参数，
+           text}                  展示为过程摘要；不传给业务工具。并行调用时
+                                  每 call 各发一条，前端按 call_id 区分。
                                   模型原生 reasoning 草稿实时推送为 thinking_chunk，
                                   完整文本仍记入 trace
   thinking_chunk {step, text}     每轮模型原生思考的实时增量，前端按 step
                                   以单行展示；该轮 summary/tool_start 到达时隐藏
-  tool_start {step, tool, args,   工具开始执行，前端立即展示运行中状态
-              message}
-  tool_step {step, tool, args,    每个工具 step 完成，包含面板展示所需的
-             ok, output, message} 结构化输入输出
+  tool_start {step, tool, call_id, 工具开始执行，前端立即展示运行中状态；
+              args, message}       并行调用时整批先于任何 tool_step 到达
+  tool_step {step, tool, call_id,  每个工具调用完成，包含面板展示所需的
+             args, ok, output,     结构化输入输出；call_id 与 tool_start 对应
+             message}
   synthesis_chunk {text}          最终答案（按 turn 缓冲、turn 结束确认无
                                   function_call 后按节奏冲洗推送，前端增量拼接
                                   直播上屏；工具轮中间文本静默丢弃，永不上屏）
@@ -379,6 +381,7 @@ async def chat_event_stream(
                 yield _sse("tool_start", {
                     "step": evt.get("step"),
                     "tool": evt.get("tool", "?"),
+                    "call_id": evt.get("call_id", ""),
                     "args": evt.get("args") or {},
                     "message": _status_message(evt),
                 })
@@ -396,6 +399,7 @@ async def chat_event_stream(
                 yield _sse("tool_step", {
                     "step": evt.get("step"),
                     "tool": tool_name,
+                    "call_id": evt.get("call_id", ""),
                     "args": evt.get("args") or {},
                     "ok": ok,
                     "output": obs,
@@ -415,6 +419,8 @@ async def chat_event_stream(
                     logger.info("  💬 step %s summary: %s", evt.get("step"), text[:120])
                 yield _sse("summary", {
                     "step": evt.get("step"),
+                    "tool": evt.get("tool", ""),
+                    "call_id": evt.get("call_id", ""),
                     "text": text,
                 })
             if kind == "answer_chunk":

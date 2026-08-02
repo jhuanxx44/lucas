@@ -929,3 +929,17 @@ LLM 关键词模式：
 - 顺带修复：`answer_json`/`answer_facts` grader 不认 ```json 代码块包裹的答案
   （DeepSeek 常见输出），新增 `extract_json` + 单测，避免"答案对、格式错"误判。
 - 报告：`docs/experiments/2026-08-01-context-compression-v1.md`
+
+## 2026-08-02：并行工具调用（Responses parallel_tool_calls）初步验证
+
+- 7 个真实 run（deepseek-v4-flash 直连）：MULTI-01 并行 3/3、off 1/1；LOOP-01 并行 3/3、
+  off 1/1，outcome/safety/process 全过，零 protocol correction。
+- 机制变化：`parallel_tool_calls=true`（默认）+ Runner 执行循环支持单轮多 call（先广播整批
+  tool_start，asyncio.gather 并发执行，按 call_id 回传全部 output，全部完成再进下一轮）；
+  单轮上限 4；失败签名按 tool 记录；同轮重复结果不误判停滞；prompt 允许互不依赖并行。
+- 真实能力：MULTI-01 稳定单轮 4 个并行 read_file（3/3 次）；LOOP-01 出现 1 次并行 2 检索，
+  护栏照常收敛。
+- 已知边界：DeepSeek 在 `parallel_tool_calls=false` 下仍会偶发多 call，新 Runner 一律正常
+  执行，因此 off 档不构成旧行为（拒绝多 call）的严格对照；latency 样本小不具统计意义。
+- 决策：保留并行工具调用（默认开、上限 4）；保留 `LUCAS_PARALLEL_TOOL_CALLS=0` 开关供消融。
+- 报告：`docs/experiments/2026-08-02-parallel-tool-calls-v1.md`

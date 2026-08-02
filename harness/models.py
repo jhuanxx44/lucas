@@ -58,6 +58,8 @@ class ModelRequest:
     input_items: list[dict[str, Any]]
     tools: list[ToolSpec]
     temperature: float = 0.0
+    # 是否允许模型单轮返回多个互不依赖的 function_call（并行工具调用）
+    parallel_tool_calls: bool = True
 
 
 @dataclass

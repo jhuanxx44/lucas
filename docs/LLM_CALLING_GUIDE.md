@@ -60,12 +60,19 @@ print(response.output_text)
 ```
 
 `create` 支持 `input`、`instructions`、`tools`、`temperature`、`text`、
-`stream` 和 `max_output_tokens`。传入工具时，调用层固定设置：
+`stream`、`max_output_tokens` 和 `parallel_tool_calls`。传入工具时，调用层
+默认设置：
 
 ```text
 tool_choice = auto
-parallel_tool_calls = false
+parallel_tool_calls = true
 ```
+
+`parallel_tool_calls` 允许模型单轮返回多个互不依赖的 `function_call`（并行
+工具调用）；Runner 对单轮并行数量设上限（`MAX_PARALLEL_TOOL_CALLS`，默认 4），
+超出按协议错误纠正。并行轮中每个 `function_call` 都必须返回对应的
+`function_call_output`（带各自 `call_id`）；同一批调用由 Runner 并发执行
+（先广播整批 `tool_start`，结果按原顺序回传），全部执行完再进入下一轮。
 
 ## Agent 工具循环
 

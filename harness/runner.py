@@ -6,13 +6,15 @@ from pathlib import Path
 from typing import Callable
 
 from harness.model_adapter import ModelAdapter
-from harness.models import AgentResult, ModelRequest, ModelTurn, RunLimits, StepContext
+from harness.models import AgentResult, FunctionCall, ModelRequest, ModelTurn, RunLimits, StepContext
+from harness.tools.base import ToolResult
 from harness.tools.registry import ToolRuntime
 from harness.trace import TraceRecorder
 from utils.token_tracker import TokenUsage
 
 MAX_OBSERVATION_CHARS = 10_000_000
 MAX_MODEL_CORRECTIONS = 3
+MAX_PARALLEL_TOOL_CALLS = 4  # 单轮并行工具调用上限；超出按协议错误纠正
 
 # 阶段 1 Context 管理：触发阈值与轻量预估参数
 CONTEXT_BUDGET_RATIO = 0.9          # 软线：输入 + 预留输出 > 窗口 * 0.9 时先压缩再提交
@@ -85,6 +87,7 @@ class AgentRunner:
         context_window: int = 0,
         keep_recent_steps: int = 1,
         compression_level: int = 2,
+        parallel_tool_calls: bool = True,
         summary_prompt: str | None = None,
     ):
         self.model = model
@@ -97,6 +100,7 @@ class AgentRunner:
         self.keep_recent_steps = max(1, keep_recent_steps)
         # 压缩等级：1=纯机械（实验 baseline），2=链式（低损丢弃→LLM 摘要→FIFO 兜底，默认最高）
         self.compression_level = compression_level if compression_level in (1, 2) else 2
+        self.parallel_tool_calls = parallel_tool_calls
         self.summary_prompt = summary_prompt or load_prompt_template(SUMMARY_PROMPT_PATH)
 
     def _reserved_output_tokens(self) -> int:
@@ -119,7 +123,7 @@ class AgentRunner:
             instruction=instruction,
             input_items=[{"role": "user", "content": initial_input}],
         )
-        last_failed_signature = None
+        last_failed_signatures: dict[str, str] = {}  # tool -> 上次失败调用的参数签名
         seen_result_steps: dict[str, int] = {}
         stall_count = 0
         correction_count = 0
@@ -153,8 +157,12 @@ class AgentRunner:
                 pending_items.append(item)
                 pending_added_chars += _item_chars(item)
 
-        def append_output(turn: ModelTurn, call_id: str, output: str, step_id: int, tool: str) -> None:
+        def append_model_items(turn: ModelTurn, step_id: int) -> None:
+            """把本轮模型返回的 items（message/function_call/reasoning）追加一次。"""
             append_items(turn.response_items, step_id)
+
+        def append_tool_output(call_id: str, output: str, step_id: int, tool: str) -> None:
+            """追加单个工具结果；并行多调用时每个 call_id 各追加一次。"""
             append_items([{"type": "function_call_output", "call_id": call_id, "output": output}], step_id)
             call_info[call_id] = (tool, step_id)
 
@@ -575,6 +583,7 @@ class AgentRunner:
                 input_items=list(context.input_items),
                 tools=self.tools.available(allowed_tools),
                 temperature=self.temperature,
+                parallel_tool_calls=self.parallel_tool_calls,
             )
             submitted_pending_chars = pending_added_chars
             pending_items.clear()
@@ -728,7 +737,8 @@ class AgentRunner:
                     "role": "user",
                     "content": (
                         f"上一响应不符合工具协议：{decision_error}。"
-                        "请重新作出一次决策：需要工具时只返回一个 function_call item；"
+                        "请重新作出一次决策：需要工具时只返回 function_call item"
+                        f"（单轮最多 {MAX_PARALLEL_TOOL_CALLS} 个，仅限互不依赖的调用）；"
                         "任务完成时只返回最终答案。"
                     ),
                 }], step)
@@ -756,119 +766,150 @@ class AgentRunner:
                     cost_usd=cost_usd,
                 )
 
-            call = turn.function_calls[0]
-            tool, args = call.name, call.arguments
-            trace.record("function_call_received", {
-                "step_id": context.step_id,
-                "tool_call_id": call.call_id,
-                "tool": tool,
-                "args": args,
-                "summary": call.summary,
-            })
-            if on_event is not None:
-                on_event({"kind": "summary", "step": step, "text": call.summary})
-
-            signature = (tool, json.dumps(args, sort_keys=True, ensure_ascii=False))
-            if signature == last_failed_signature:
-                observation = (
-                    f"警告：{tool} 连续两次以相同参数调用失败。"
-                    "请换用其他工具、换一组参数，或基于已有信息作答。"
-                )
-                trace.record("tool_call_repeated_failure", {
+            # 并行工具调用：模型 items 只追加一次；同一批调用先广播全部 tool_start，
+            # 再并发执行，最后按原顺序回传各 call 的 output。
+            # Responses API 要求同一批 function_call 的 function_call_output 一起提交，
+            # 因此全部调用执行完、全部 output 追加完才进入下一轮。
+            append_model_items(turn, step)
+            pending: list[tuple[FunctionCall, tuple[str, str]]] = []
+            for call in turn.function_calls:
+                tool, args = call.name, call.arguments
+                trace.record("function_call_received", {
                     "step_id": context.step_id,
+                    "tool_call_id": call.call_id,
+                    "tool": tool,
+                    "args": args,
+                    "summary": call.summary,
+                })
+                if on_event is not None:
+                    on_event({
+                        "kind": "summary", "step": step, "tool": tool,
+                        "call_id": call.call_id, "text": call.summary,
+                    })
+
+                signature = (tool, json.dumps(args, sort_keys=True, ensure_ascii=False))
+                if last_failed_signatures.get(tool) == signature:
+                    observation = (
+                        f"警告：{tool} 连续两次以相同参数调用失败。"
+                        "请换用其他工具、换一组参数，或基于已有信息作答。"
+                    )
+                    trace.record("tool_call_repeated_failure", {
+                        "step_id": context.step_id,
+                        "tool": tool,
+                        "args": args,
+                    })
+                    append_tool_output(call.call_id, observation, step, tool)
+                    trace.record("function_call_output", {
+                        "tool_call_id": call.call_id,
+                        "observation": observation,
+                    })
+                    if on_event is not None:
+                        on_event({
+                            "kind": "tool_step",
+                            "step": step,
+                            "tool": tool,
+                            "call_id": call.call_id,
+                            "args": args,
+                            "ok": False,
+                            "observation": observation,
+                        })
+                    continue
+
+                pending.append((call, signature))
+                trace.record("tool_call_started", {
+                    "tool_call_id": call.call_id,
                     "tool": tool,
                     "args": args,
                 })
-                append_output(turn, call.call_id, observation, step, call.name)
+                if on_event is not None:
+                    on_event({
+                        "kind": "tool_start",
+                        "step": step,
+                        "tool": tool,
+                        "call_id": call.call_id,
+                        "args": args,
+                    })
+
+            # 并发执行全部待执行调用；结果按原顺序处理，观测预算/停滞检测保持确定性
+            outcomes = await asyncio.gather(
+                *(
+                    await_before_deadline(self.tools.execute(call.name, call.arguments, allowed_tools))
+                    for call, _ in pending
+                ),
+                return_exceptions=True,
+            )
+            for (call, (tool, signature)), outcome in zip(pending, outcomes):
+                if isinstance(outcome, asyncio.CancelledError):
+                    raise outcome
+                if isinstance(outcome, _RunDeadlineExceeded):
+                    return timeout_result("tool_call")
+                if isinstance(outcome, BaseException):
+                    result = ToolResult(
+                        status="error",
+                        error_code="handler_exception",
+                        observation=f"{type(outcome).__name__}: {outcome}",
+                    )
+                else:
+                    result = outcome
+                full_observation = _format_observation(tool, result)
+                remaining_observation_chars = max(0, MAX_OBSERVATION_CHARS - total_observation_chars)
+                observation, was_truncated = _truncate_observation(
+                    full_observation,
+                    min(MAX_OBSERVATION_CHARS, remaining_observation_chars),
+                )
+                if was_truncated:
+                    result.truncated = True
+                total_observation_chars += len(observation)
+
+                if result.ok:
+                    trace.record("tool_call_finished", {
+                        "tool_call_id": call.call_id,
+                        "observation_chars": len(observation),
+                        "total_observation_chars": total_observation_chars,
+                        "observation": observation,
+                        "truncated": result.truncated,
+                    })
+                    last_failed_signatures.pop(tool, None)
+                    result_hash = hashlib.sha256(observation.encode("utf-8")).hexdigest()
+                    first_step = seen_result_steps.get(result_hash)
+                    # 同一并行轮内两个调用返回相同结果不算停滞（模型还没机会根据结果调整）
+                    if first_step is not None and first_step != step:
+                        stall_count += 1
+                        function_output = _stall_note(tool, first_step)
+                        trace.record("no_progress_detected", {
+                            "step_id": context.step_id,
+                            "tool": tool,
+                            "repeated_from_step": first_step,
+                            "stall_count": stall_count,
+                        })
+                    else:
+                        seen_result_steps[result_hash] = step
+                        function_output = observation
+                else:
+                    trace.record("tool_call_error", {
+                        "tool_call_id": call.call_id,
+                        "status": result.status,
+                        "error_code": result.error_code,
+                    })
+                    last_failed_signatures[tool] = (tool, signature)
+                    function_output = observation
+
+                append_tool_output(call.call_id, function_output, step, tool)
                 trace.record("function_call_output", {
                     "tool_call_id": call.call_id,
-                    "observation": observation,
+                    "observation": function_output,
                 })
-                trace.record("step_finished", {"step_id": context.step_id})
                 if on_event is not None:
                     on_event({
                         "kind": "tool_step",
                         "step": step,
                         "tool": tool,
+                        "call_id": call.call_id,
                         "args": args,
-                        "ok": False,
+                        "ok": result.ok,
                         "observation": observation,
                     })
-                continue
-
-            trace.record("tool_call_started", {
-                "tool_call_id": call.call_id,
-                "tool": tool,
-                "args": args,
-            })
-            if on_event is not None:
-                on_event({
-                    "kind": "tool_start",
-                    "step": step,
-                    "tool": tool,
-                    "args": args,
-                })
-            try:
-                result = await await_before_deadline(self.tools.execute(tool, args, allowed_tools))
-            except _RunDeadlineExceeded:
-                return timeout_result("tool_call")
-            full_observation = _format_observation(tool, result)
-            remaining_observation_chars = max(0, MAX_OBSERVATION_CHARS - total_observation_chars)
-            observation, was_truncated = _truncate_observation(
-                full_observation,
-                min(MAX_OBSERVATION_CHARS, remaining_observation_chars),
-            )
-            if was_truncated:
-                result.truncated = True
-            total_observation_chars += len(observation)
-
-            if result.ok:
-                trace.record("tool_call_finished", {
-                    "tool_call_id": call.call_id,
-                    "observation_chars": len(observation),
-                    "total_observation_chars": total_observation_chars,
-                    "observation": observation,
-                    "truncated": result.truncated,
-                })
-                last_failed_signature = None
-                result_hash = hashlib.sha256(observation.encode("utf-8")).hexdigest()
-                first_step = seen_result_steps.get(result_hash)
-                if first_step is not None:
-                    stall_count += 1
-                    function_output = _stall_note(tool, first_step)
-                    trace.record("no_progress_detected", {
-                        "step_id": context.step_id,
-                        "tool": tool,
-                        "repeated_from_step": first_step,
-                        "stall_count": stall_count,
-                    })
-                else:
-                    seen_result_steps[result_hash] = step
-                    function_output = observation
-            else:
-                trace.record("tool_call_error", {
-                    "tool_call_id": call.call_id,
-                    "status": result.status,
-                    "error_code": result.error_code,
-                })
-                last_failed_signature = signature
-                function_output = observation
-
-            append_output(turn, call.call_id, function_output, step, call.name)
-            trace.record("function_call_output", {
-                "tool_call_id": call.call_id,
-                "observation": function_output,
-            })
             trace.record("step_finished", {"step_id": context.step_id})
-            if on_event is not None:
-                on_event({
-                    "kind": "tool_step",
-                    "step": step,
-                    "tool": tool,
-                    "args": args,
-                    "ok": result.ok,
-                    "observation": observation,
-                })
 
         return AgentResult(
             finish_reason="max_steps",
@@ -908,8 +949,8 @@ class AgentRunner:
 def _decision_error(turn: ModelTurn) -> str:
     if turn.protocol_error:
         return turn.protocol_error
-    if len(turn.function_calls) > 1:
-        return "response returned more than one function call"
+    if len(turn.function_calls) > MAX_PARALLEL_TOOL_CALLS:
+        return f"response returned more than {MAX_PARALLEL_TOOL_CALLS} function calls"
     if turn.function_calls and turn.output_text.strip():
         return "response mixed a function call with final output text"
     if not turn.function_calls and not turn.output_text.strip():

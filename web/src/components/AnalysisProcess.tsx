@@ -10,9 +10,16 @@ interface AnalysisProcessProps {
   defaultOpen?: boolean;
 }
 
-// 相邻同 label 去重（旧文案链路可能重复），思考步 label 各不相同不受影响
+// 去重规则：
+// - action 行（旧文案链路可能重复）：相邻同 label 折叠
+// - 工具/摘要/思考/压缩行：id 唯一（并行调用各自独立），只折叠 id 完全相同的真重复
 function dedupe(steps: ChatTraceStep[]): ChatTraceStep[] {
-  return steps.filter((step, index) => index === 0 || steps[index - 1].label !== step.label);
+  return steps.filter((step, index) => {
+    if (index === 0) return true;
+    const prev = steps[index - 1];
+    if (step.kind !== "action") return prev.id !== step.id;
+    return prev.kind !== "action" || prev.label !== step.label;
+  });
 }
 
 // 当前句子：按中英文句号分句，只保留正在生成的最后一句，句号保留在句尾。
@@ -41,6 +48,13 @@ function StepList({ steps, live, thinkingByStep = {} }: AnalysisProcessProps) {
   const items = dedupe(steps);
   // 尚未提交 summary/tool 的轮次：渲染一行流式思考（live 专用）
   const committedSteps = new Set(items.flatMap((step) => (typeof step.step === "number" ? [step.step] : [])));
+  // 当前模型轮：live 时让该轮的过程行（摘要/思考/压缩）同步呈现进行中状态；
+  // 工具行自身有 spinner，不重复脉冲。无 step 的旧行回退到末行高亮。
+  const latestStep = live ? Math.max(0, ...items.map((step) => step.step ?? 0)) : -1;
+  const isActive = (step: ChatTraceStep, index: number) =>
+    live && (typeof step.step === "number"
+      ? step.step === latestStep && step.kind !== "tool"
+      : index === items.length - 1);
   const thinkingRows = live
     ? Object.entries(thinkingByStep)
         .map(([step, text]) => ({ step: Number(step), text }))
@@ -50,7 +64,7 @@ function StepList({ steps, live, thinkingByStep = {} }: AnalysisProcessProps) {
   return (
     <ol className="ml-1.5 mt-3 space-y-2 border-l border-zinc-200 pb-1 pl-4 dark:border-zinc-800">
       {items.map((step, index) => {
-        const active = live && index === items.length - 1;
+        const active = isActive(step, index);
         if (step.kind === "summary") {
           // 步骤摘要：醒目正文，模型每步生成的一句话旁白
           return (
@@ -114,8 +128,14 @@ function StepList({ steps, live, thinkingByStep = {} }: AnalysisProcessProps) {
 export function AnalysisProcess({ steps, live = false, thinkingByStep, defaultOpen = false }: AnalysisProcessProps) {
   if (steps.length === 0) return null;
   const items = dedupe(steps);
-  // “N 步”只计动作/工具，摘要/思考作为过程旁白不计入步数
-  const stepCount = items.filter((s) => s.kind !== "thought" && s.kind !== "summary" && s.kind !== "compression").length;
+  // “N 步”按模型轮数计：并行多调用同属一轮；旧链路无 step 信息时退回调用次数
+  const stepNumbers = new Set(
+    items
+      .filter((s) => s.kind === "tool" || s.kind === "action")
+      .flatMap((s) => (typeof s.step === "number" ? [s.step] : []))
+  );
+  const stepCount = stepNumbers.size
+    || items.filter((s) => s.kind !== "thought" && s.kind !== "summary" && s.kind !== "compression").length;
 
   if (!live) {
     return (

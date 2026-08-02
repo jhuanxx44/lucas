@@ -202,6 +202,50 @@ async def test_client_does_not_retry_non_transient_responses_error():
     sleep.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+async def test_client_sends_parallel_tool_calls_flag_with_tools():
+    env = {
+        "DEEPSEEK_API_KEY": "key",
+        "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    }
+    tools = [{"type": "function", "name": "lookup", "parameters": {"type": "object"}}]
+    with patch.dict("os.environ", env, clear=True), patch("openai.AsyncOpenAI"):
+        client = create_client()
+        client._client.responses.create = AsyncMock(
+            return_value=SimpleNamespace(output_text="", usage=None)
+        )
+        await client.create(input="hello", tools=tools, parallel_tool_calls=False)
+
+    client._client.responses.create.assert_awaited_once_with(
+        model="deepseek-v4-flash",
+        input="hello",
+        max_output_tokens=65536,
+        temperature=0.0,
+        stream=False,
+        tools=tools,
+        tool_choice="auto",
+        parallel_tool_calls=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_adapter_passes_parallel_tool_calls_through_request():
+    response = SimpleNamespace(
+        id="resp_1", output=[], output_text="", status="completed", usage=_usage()
+    )
+    client = MagicMock(model="deepseek-v4-flash")
+    client.create = AsyncMock(return_value=response)
+
+    await ResponsesModelAdapter(client).complete(ModelRequest(
+        instructions="system",
+        input_items=[{"role": "user", "content": "lookup"}],
+        tools=[_tool_spec()],
+        parallel_tool_calls=False,
+    ))
+
+    assert client.create.await_args.kwargs["parallel_tool_calls"] is False
+
+
 def test_responses_tool_injects_required_summary_without_mutating_business_schema():
     spec = _tool_spec()
 

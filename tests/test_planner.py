@@ -71,12 +71,13 @@ def _trace(tmp_path, run_id="test-run") -> TraceRecorder:
     return t
 
 
-def test_agent_loop_prompt_uses_native_single_call_and_direct_json_rules():
+def test_agent_loop_prompt_uses_native_parallel_calls_and_direct_json_rules():
     template = load_prompt_template(
         Path(__file__).resolve().parent.parent / "prompts" / "harness" / "agent-loop.md"
     )
 
-    assert "最多只能包含一个 `function_call` item" in template
+    assert "最多 4 个" in template
+    assert "多个 `function_call` item" in template
     assert "只输出可直接解析的 JSON" in template
     assert '"action"' not in template
 

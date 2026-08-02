@@ -51,9 +51,13 @@ function buildTurns(messages: ChatMessage[], liveTurn: LiveTraceTurn | null): Tr
                     .replace(/^调用 /, "Lucas 调用 "),
             status: label.includes("失败") || label.includes("取消") ? "error" as const : "done" as const,
           }));
-      const steps = rawSteps.filter((step, index) => (
-        index === 0 || rawSteps[index - 1].label !== step.label
-      ));
+      // action 行按 label 折叠（旧链路可能重复）；并行工具/摘要行 id 唯一不得折叠
+      const steps = rawSteps.filter((step, index) => {
+        if (index === 0) return true;
+        const prev = rawSteps[index - 1];
+        if (step.kind !== "action") return prev.id !== step.id;
+        return prev.kind !== "action" || prev.label !== step.label;
+      });
       if (steps.length) turns.push({
         id: message.id,
         question,

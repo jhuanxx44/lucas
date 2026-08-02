@@ -116,6 +116,7 @@ class DeepSeekResponsesClient:
         text: dict[str, Any] | None = None,
         stream: bool = False,
         max_output_tokens: int = 65_536,
+        parallel_tool_calls: bool = True,
         on_retry: Callable[[dict[str, Any]], None] | None = None,
     ):
         params: dict[str, Any] = {
@@ -132,7 +133,7 @@ class DeepSeekResponsesClient:
             params.update(
                 tools=tools,
                 tool_choice="auto",
-                parallel_tool_calls=False,
+                parallel_tool_calls=parallel_tool_calls,
             )
         if text is not None:
             params["text"] = text

@@ -341,10 +341,10 @@ export function useChat(
                 dispatch({ type: "ACTIONS", actions: streamedActions });
                 break;
               case "tool_start": {
-                const toolData = data as { step: number; tool: string; args: Record<string, unknown>; message: string };
+                const toolData = data as { step: number; tool: string; call_id?: string; args: Record<string, unknown>; message: string };
                 dispatch({ type: "THINKING_CLEAR", step: toolData.step });
                 const step: ChatTraceStep = {
-                  id: `tool-${toolData.step}-${toolData.tool}`,
+                  id: `tool-${toolData.step}-${toolData.call_id ?? toolData.tool}`,
                   kind: "tool",
                   label: toolData.message,
                   status: "running",
@@ -357,9 +357,9 @@ export function useChat(
                 break;
               }
               case "tool_step": {
-                const toolData = data as { step: number; tool: string; args: Record<string, unknown>; ok: boolean; output: string; message: string };
+                const toolData = data as { step: number; tool: string; call_id?: string; args: Record<string, unknown>; ok: boolean; output: string; message: string };
                 const step: ChatTraceStep = {
-                  id: `tool-${toolData.step}-${toolData.tool}`,
+                  id: `tool-${toolData.step}-${toolData.call_id ?? toolData.tool}`,
                   kind: "tool",
                   label: toolData.message,
                   status: toolData.ok ? "done" : "error",
@@ -373,10 +373,10 @@ export function useChat(
                 break;
               }
               case "summary": {
-                const summaryData = data as { step: number; text: string };
+                const summaryData = data as { step: number; tool?: string; call_id?: string; text: string };
                 dispatch({ type: "THINKING_CLEAR", step: summaryData.step });
                 const step: ChatTraceStep = {
-                  id: `summary-${summaryData.step}`,
+                  id: `summary-${summaryData.step}-${summaryData.call_id ?? summaryData.tool ?? ""}`,
                   kind: "summary",
                   label: summaryData.text,
                   status: "done",

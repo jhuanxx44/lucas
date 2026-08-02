@@ -40,6 +40,29 @@ def _tool(name, args, *, call_id="call_1", summary="先执行这一步", usage=N
     )
 
 
+def _parallel_tool_turn(calls):
+    """构造一个含多个 function_call 的 ModelTurn（并行工具调用）。
+
+    calls: [(call_id, name, args, summary), ...]
+    """
+    function_calls = []
+    response_items = []
+    for call_id, name, args, summary in calls:
+        raw = json.dumps({**args, "summary": summary}, ensure_ascii=False)
+        function_calls.append(FunctionCall(call_id, name, args, summary, raw))
+        response_items.append({
+            "type": "function_call",
+            "call_id": call_id,
+            "name": name,
+            "arguments": raw,
+        })
+    return ModelTurn(
+        function_calls=function_calls,
+        response_id=f"resp_{function_calls[0].call_id}",
+        response_items=response_items,
+    )
+
+
 class FakeModel:
     def __init__(self, turns, summary_text=None, summary_error=None):
         self.turns = list(turns)
@@ -101,6 +124,132 @@ async def test_native_tool_call_round_trip_uses_provider_call_id(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_parallel_tool_calls_execute_all_and_append_all_outputs(tmp_path):
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("beta", encoding="utf-8")
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "read_file", {"path": "a.txt"}, "读 a"),
+            ("c2", "read_file", {"path": "b.txt"}, "读 b"),
+        ]),
+        _answer("done"),
+    ])
+
+    result = await _runner(tmp_path, model).run("read", ["read_file"], _limits())
+
+    assert result.answer == "done"
+    assert len(model.requests) == 2
+    items = model.requests[1].input_items
+    # 模型 items 只追加一次；两个 output 都带各自 call_id 且顺序在 function_call 之后
+    calls = [i for i in items if i.get("type") == "function_call"]
+    outputs = [i for i in items if i.get("type") == "function_call_output"]
+    assert len(calls) == 2
+    assert len(outputs) == 2
+    assert [i.get("call_id") for i in outputs] == ["c1", "c2"]
+    assert "alpha" in outputs[0]["output"] and "beta" in outputs[1]["output"]
+    assert items.index(calls[-1]) < items.index(outputs[0])
+
+
+@pytest.mark.asyncio
+async def test_parallel_tool_calls_partial_failure_returns_all_outputs(tmp_path):
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "read_file", {"path": "a.txt"}, "读 a"),
+            ("c2", "read_file", {"path": "../escape.txt"}, "越界读"),
+        ]),
+        _answer("recovered"),
+    ])
+
+    result = await _runner(tmp_path, model).run("read", ["read_file"], _limits())
+
+    assert result.answer == "recovered"
+    items = model.requests[1].input_items
+    outputs = [i for i in items if i.get("type") == "function_call_output"]
+    assert len(outputs) == 2
+    assert "alpha" in outputs[0]["output"]
+    assert outputs[1]["call_id"] == "c2"
+    assert "escape" in outputs[1]["output"]
+
+
+@pytest.mark.asyncio
+async def test_parallel_tool_calls_emit_tool_events_per_call(tmp_path):
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("beta", encoding="utf-8")
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "read_file", {"path": "a.txt"}, "读 a"),
+            ("c2", "read_file", {"path": "b.txt"}, "读 b"),
+        ]),
+        _answer("done"),
+    ])
+    events = []
+
+    await _runner(tmp_path, model).run(
+        "read", ["read_file"], _limits(), on_event=events.append
+    )
+
+    starts = [e for e in events if e["kind"] == "tool_start"]
+    steps = [e for e in events if e["kind"] == "tool_step"]
+    summaries = [e for e in events if e["kind"] == "summary"]
+    assert [e["tool"] for e in starts] == ["read_file", "read_file"]
+    assert [e["call_id"] for e in starts] == ["c1", "c2"]
+    assert len(steps) == 2 and all(e["ok"] for e in steps)
+    assert [e["text"] for e in summaries] == ["读 a", "读 b"]
+    assert [e["call_id"] for e in summaries] == ["c1", "c2"]
+    # 并发语义：所有 tool_start 先于任何 tool_step（同一批并行调用的进度状态同时呈现）
+    kinds = [e["kind"] for e in events]
+    assert kinds.index("tool_step") > kinds.index("tool_start")
+    assert kinds[:kinds.index("tool_step")].count("tool_start") == 2
+
+
+@pytest.mark.asyncio
+async def test_parallel_tool_calls_execute_concurrently(tmp_path):
+    both_entered = asyncio.Event()
+    counter = 0
+    lock = asyncio.Lock()
+
+    async def barrier(workspace, args):
+        # 两个调用都进入后才放行：顺序执行会死锁等待，只有并发执行能完成
+        nonlocal counter
+        async with lock:
+            counter += 1
+            if counter >= 2:
+                both_entered.set()
+        await both_entered.wait()
+        return ToolResult(status="ok", observation="ok")
+
+    spec = ToolSpec(
+        name="echo",
+        description="echo",
+        parameters={
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
+        handler=barrier,
+    )
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "echo", {"value": "x"}, "并行一"),
+            ("c2", "echo", {"value": "y"}, "并行二"),
+        ]),
+        _answer("done"),
+    ])
+
+    result = await asyncio.wait_for(
+        _runner(tmp_path, model, [spec]).run("task", ["echo"], _limits()),
+        timeout=3,
+    )
+
+    assert result.answer == "done"
+    items = model.requests[1].input_items
+    outputs = [i for i in items if i.get("type") == "function_call_output"]
+    assert len(outputs) == 2
+
+
+@pytest.mark.asyncio
 async def test_summary_and_tool_start_are_emitted_before_tool_step(tmp_path):
     seen_args = []
 
@@ -135,6 +284,7 @@ async def test_summary_and_tool_start_are_emitted_before_tool_step(tmp_path):
         "kind": "tool_start",
         "step": 1,
         "tool": "echo",
+        "call_id": "call_1",
         "args": {"value": "x"},
     }
 
@@ -174,9 +324,10 @@ async def test_direct_output_text_finishes_without_tool(tmp_path):
         ModelTurn(output_text="text", function_calls=[
             FunctionCall("c1", "read_file", {"path": "x"}, "summary")
         ]),
+        # 超出单轮并行上限（MAX_PARALLEL_TOOL_CALLS=4）→ 协议错误
         ModelTurn(function_calls=[
-            FunctionCall("c1", "read_file", {"path": "x"}, "one"),
-            FunctionCall("c2", "read_file", {"path": "y"}, "two"),
+            FunctionCall(f"c{i}", "read_file", {"path": f"x{i}"}, "run")
+            for i in range(5)
         ]),
         ModelTurn(),
     ],

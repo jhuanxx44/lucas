@@ -27,7 +27,8 @@ class LucasSingleAgent:
     variant = "lucas-single"
 
     def __init__(self, model_adapter=None, wiki_recall_spec=None, variant=None,
-                 context_window=None, keep_recent_steps=None, compression_level=None):
+                 context_window=None, keep_recent_steps=None, compression_level=None,
+                 parallel_tool_calls=None):
         # client 延迟到 run() 建立；注入 model_adapter（测试）时不读取真实凭据。
         self.model_adapter = model_adapter
         self.wiki_recall_spec = wiki_recall_spec or WIKI_RECALL_SPEC
@@ -35,6 +36,7 @@ class LucasSingleAgent:
         self.context_window = context_window
         self.keep_recent_steps = keep_recent_steps
         self.compression_level = compression_level
+        self.parallel_tool_calls = parallel_tool_calls
         if variant is not None:
             self.variant = variant
 
@@ -78,6 +80,10 @@ class LucasSingleAgent:
         if compression_level is None:
             env_level = os.environ.get("LUCAS_COMPRESSION_LEVEL", "").strip()
             compression_level = int(env_level) if env_level else config.context_compression_level
+        parallel_tool_calls = self.parallel_tool_calls
+        if parallel_tool_calls is None:
+            env_parallel = os.environ.get("LUCAS_PARALLEL_TOOL_CALLS", "").strip()
+            parallel_tool_calls = env_parallel.lower() != "0" if env_parallel else True
         if model_adapter is None:
             system_prompt = build_single_system_prompt()
             temperature = config.temperature
@@ -92,5 +98,6 @@ class LucasSingleAgent:
             context_window=context_window,
             keep_recent_steps=keep_recent_steps,
             compression_level=compression_level,
+            parallel_tool_calls=parallel_tool_calls,
         )
         return await runner.run(instruction, allowed_tools, limits, trace)

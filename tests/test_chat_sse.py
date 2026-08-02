@@ -133,7 +133,8 @@ async def test_agent_stream_full_native_event_sequence(tmp_path):
     assert len(trace_id_events) == 1
     assert trace_id_events[0]["id"].startswith("chat-")
     assert trace_id_events[0]["file"] is None  # 默认未开启落盘
-    assert visible[4][1] == {"step": 1, "text": "先查一下资料"}
+    assert visible[4][1] == {"step": 1, "tool": "wiki_recall", "call_id": "call_1",
+                             "text": "先查一下资料"}
     assert visible[5][1]["tool"] == "wiki_recall"
     assert visible[5][1]["args"] == {"query": "贵州茅台"}
     assert visible[5][1]["message"] == "Lucas 调用 wiki_recall: 贵州茅台"
@@ -270,6 +271,37 @@ async def test_unlimited_steps_supports_multiple_native_calls(tmp_path):
 
     assert names.count("tool_step") == 3
     assert names[-1] == "done"
+
+
+@pytest.mark.asyncio
+async def test_parallel_turn_emits_multiple_tool_steps_and_summaries(tmp_path):
+    parallel = ModelTurn(
+        function_calls=[
+            FunctionCall("c1", "wiki_recall", {"query": "贵州茅台"}, "查茅台"),
+            FunctionCall("c2", "wiki_recall", {"query": "五粮液"}, "查五粮液"),
+        ],
+        response_id="resp_multi",
+        response_items=[
+            {"type": "function_call", "call_id": "c1", "name": "wiki_recall",
+             "arguments": '{"query": "贵州茅台", "summary": "查茅台"}'},
+            {"type": "function_call", "call_id": "c2", "name": "wiki_recall",
+             "arguments": '{"query": "五粮液", "summary": "查五粮液"}'},
+        ],
+    )
+    model = FakeModel([parallel, _answer("分析完成")])
+
+    events = await _collect("并行查两只股票", model=model, workspace=tmp_path)
+    names = [name for name, _ in events]
+
+    assert names.count("tool_step") == 2
+    assert names.count("summary") == 2
+    steps = [data for name, data in events if name == "tool_step"]
+    assert [s["tool"] for s in steps] == ["wiki_recall", "wiki_recall"]
+    assert [s["call_id"] for s in steps] == ["c1", "c2"]
+    summaries = [data for name, data in events if name == "summary"]
+    assert {s["tool"] for s in summaries} == {"wiki_recall"}
+    assert [s["text"] for s in summaries] == ["查茅台", "查五粮液"]
+    assert [s["call_id"] for s in summaries] == ["c1", "c2"]
 
 
 @pytest.mark.asyncio
