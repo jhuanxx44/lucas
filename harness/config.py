@@ -8,7 +8,7 @@ import yaml
 
 DEFAULT_ALLOWED_TOOLS = [
     "read_file", "apply_patch", "list_files", "search", "write_file",
-    "web_search", "doubao_search", "stock_quote", "stock_kline", "wiki_recall",
+    "web_search", "stock_quote", "stock_kline", "wiki_recall",
     "update_plan",
 ]
 

@@ -11,7 +11,7 @@ single_agent:
   model_context_window: 1000000   # V4-Flash 上下文窗口（token）；设 0 关闭压缩
   context_keep_recent_steps: 1    # 压缩时保留最近 N 步全量回放
   context_compression_level: 2    # 1=纯机械（实验 baseline） 2=链式：低损丢弃→LLM摘要→FIFO兜底（默认最高）
-  allowed_tools: [read_file, apply_patch, list_files, search, write_file, web_search, doubao_search, stock_quote, stock_kline, wiki_recall, update_plan]
+  allowed_tools: [read_file, apply_patch, list_files, search, write_file, web_search, stock_quote, stock_kline, wiki_recall, update_plan]
 
 # wiki 知识模块（server/services/knowledge.py）领域配置
 # 领域本体（行业列表、索引标题）在此维护，不进代码

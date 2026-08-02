@@ -4,7 +4,6 @@ from pathlib import Path
 from harness.tools.base import ToolSpec
 from harness.tools.business.stock import STOCK_KLINE_SPEC, STOCK_QUOTE_SPEC
 from harness.tools.business.wiki import WIKI_RECALL_SPEC
-from harness.tools.generic.doubao_search import DOUBAO_SEARCH_SPEC
 from harness.tools.generic.filesystem import (
     APPLY_PATCH_SPEC,
     LIST_FILES_SPEC,
@@ -25,7 +24,6 @@ PRODUCTION_SPECS = [
     SEARCH_SPEC,
     UPDATE_PLAN_SPEC,
     WEB_SEARCH_SPEC,
-    DOUBAO_SEARCH_SPEC,
     WIKI_RECALL_SPEC,
     STOCK_QUOTE_SPEC,
     STOCK_KLINE_SPEC,
