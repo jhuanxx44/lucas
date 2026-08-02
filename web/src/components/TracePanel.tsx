@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { Braces, Brain, Check, ChevronRight, Circle, Download, Loader2, Minimize2, Wrench, X } from "lucide-react";
-import type { ChatMessage, ChatRuntimeTraceEvent, ChatTraceStep } from "@/types";
+import type { ChatMessage, ChatRunConfig, ChatRuntimeTraceEvent, ChatTraceStep } from "@/types";
 
 export interface LiveTraceTurn {
   question: string;
   answer: string;
   steps: ChatTraceStep[];
   runtimeTrace: ChatRuntimeTraceEvent[];
+  runConfig?: ChatRunConfig;
   requestAt?: string;
   responseAt?: string;
 }
@@ -117,15 +118,18 @@ function exportTrace(turns: TraceTurn[], messages: ChatMessage[]) {
           prompt_template: runConfig.prompt_template,
         }
       : undefined,
-    turns: turns.map(({ live, runtimeTrace, requestAt, responseAt, ...turn }) => ({
-      ...turn,
-      status: live ? "running" : "finished",
-      requestAt: requestAt ?? null,
-      responseAt: responseAt ?? null,
+    turns: turns.map((turn) => ({
+      id: turn.id,
+      question: turn.question,
+      answer: turn.answer,
+      steps: turn.steps,
+      status: turn.live ? "running" : "finished",
+      requestAt: turn.requestAt ?? null,
+      responseAt: turn.responseAt ?? null,
       traceId: turn.traceId ?? null,
       traceFile: turn.traceFile ?? null,
-      completeness: traceCompleteness(runtimeTrace, live),
-      events: runtimeTrace,
+      completeness: traceCompleteness(turn.runtimeTrace, turn.live),
+      events: turn.runtimeTrace,
     })),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -154,6 +158,33 @@ function StepIcon({ step }: { step: ChatTraceStep }) {
   if (step.kind === "thought") return <Brain size={13} className="text-zinc-400" />;
   if (step.kind === "compression") return <Minimize2 size={13} className="text-amber-500" />;
   return <Check size={13} className="text-emerald-500" />;
+}
+
+function SystemConfigBlock({ runConfig }: { runConfig: ChatRunConfig }) {
+  return (
+    <details className="group rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs text-zinc-700 dark:text-zinc-300">
+        <ChevronRight size={12} className="shrink-0 transition-transform group-open:rotate-90" />
+        <Braces size={13} className="text-indigo-500" />
+        <span className="truncate font-mono">system_prompt + {runConfig.tools.length} tools</span>
+        <span className="ml-auto shrink-0 text-[10px] text-zinc-400">{runConfig.model}</span>
+      </summary>
+      <div className="space-y-3 border-t border-zinc-100 px-2.5 py-2.5 dark:border-zinc-800">
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+            <Braces size={11} /> System Prompt
+          </div>
+          <JsonBlock value={runConfig.system_prompt} />
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+            <Wrench size={11} /> Tool Specs
+          </div>
+          <JsonBlock value={runConfig.tools} />
+        </div>
+      </div>
+    </details>
+  );
 }
 
 function TraceStep({ step }: { step: ChatTraceStep }) {
@@ -214,6 +245,9 @@ function TraceStep({ step }: { step: ChatTraceStep }) {
 export function TracePanel({ messages, liveTurn }: TracePanelProps) {
   const turns = buildTurns(messages, liveTurn);
   const latestTrace = [...turns].reverse().find((turn) => turn.traceId);
+  // system prompt / tool spec 是会话级配置，只在首轮展示：
+  // 取第一条带 runConfig 的消息；首轮尚未落盘时回退到 liveTurn。
+  const firstRunConfig = messages.find((message) => message.runConfig)?.runConfig ?? liveTurn?.runConfig;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // 是否处于「贴底跟随」状态；用户手动上滚离开底部时置 false，滚回底部再恢复。
@@ -263,6 +297,14 @@ export function TracePanel({ messages, liveTurn }: TracePanelProps) {
         </button>
       </div>
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 space-y-3 overflow-y-auto p-3">
+        {firstRunConfig && (
+          <section className="space-y-1.5">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+              System Prompt &amp; Tools · 首轮配置
+            </div>
+            <SystemConfigBlock runConfig={firstRunConfig} />
+          </section>
+        )}
         {turns.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-xs text-zinc-400 dark:text-zinc-500">
             <Wrench size={20} className="mb-2 opacity-60" />

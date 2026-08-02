@@ -125,11 +125,13 @@ export function ChatPanel({
       answer: state.synthesis,
       steps: state.traceSteps,
       runtimeTrace: state.runtimeTrace,
+      runConfig: state.runConfig ?? undefined,
     });
   }, [
     onLiveTraceChange,
     state.isLoading,
     state.messages,
+    state.runConfig,
     state.runtimeTrace,
     state.synthesis,
     state.traceSteps,

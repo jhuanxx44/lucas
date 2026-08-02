@@ -1,4 +1,6 @@
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { Check, Copy } from "lucide-react";
 import type { ChatMessage as ChatMessageType, ChatTraceStep } from "@/types";
 import { AnalysisProcess } from "./AnalysisProcess";
 import { REMARK_PLUGINS } from "@/lib/markdown";
@@ -22,6 +24,27 @@ function legacySteps(message: ChatMessageType): ChatTraceStep[] {
     label,
     status: label.includes("失败") || label.includes("取消") ? "error" : "done",
   }));
+}
+
+// 极简复制按钮：点击复制本轮回答全文（原始 markdown），短暂反馈后复原
+function CopyAnswerButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? "已复制" : "复制回答"}
+      className="inline-flex items-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-300"
+      aria-label={copied ? "已复制" : "复制回答"}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  );
 }
 
 export function ChatMessage({ message, onAction, defaultOpen = false }: Props) {
@@ -54,6 +77,11 @@ export function ChatMessage({ message, onAction, defaultOpen = false }: Props) {
               {action.label}
             </button>
           ))}
+        </div>
+      )}
+      {message.content && (
+        <div className="mt-2">
+          <CopyAnswerButton content={message.content} />
         </div>
       )}
     </div>
