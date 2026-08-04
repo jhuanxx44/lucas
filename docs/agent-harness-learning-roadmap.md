@@ -562,6 +562,10 @@ Phase 0 按 `docs/agent-harness-eval-mvp.md` 的 PR 0—4 实施，MVP 术语与
 
 ## Phase 1：Tool Runtime 与安全边界
 
+> 2026-08-04：本阶段剩余部分（ToolRuntime 超时/取消、命令工具、沙箱后端）的实施规划见
+> `docs/plans/2026-08-04-tool-runtime-安全边界.md`。其中「窄口 `run_tests` + `shell_info`
+> 还是通用 `run_command`」与本文第 2 节非目标「不追求任意 Shell」存在待裁决冲突。
+
 ### 学习问题
 
 - LLM 工具调用与普通函数调用相比，需要增加哪些协议？
