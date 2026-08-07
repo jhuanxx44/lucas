@@ -28,6 +28,7 @@
 | [`WIKI-02`](WIKI-02/task.yaml) | `business-capability` | 从未索引公告页面回答股票代码 688559 对应公司的现金分红方案 | Wiki 未索引内容召回 |
 | [`WIKI-03`](WIKI-03/task.yaml) | `business-capability` | 综合两个公司页面，比较年产能并计算差值 | Wiki 多页召回、信息综合与计算 |
 | [`WIKI-04`](WIKI-04/task.yaml) | `wiki-retrieval-experiment` | 从五个名称和指标相似的较长公司页面中定位海岳材料的资本开支 | 相似干扰页、长页面、progressive disclosure 成本 |
+| [`CTX-01`](CTX-01/task.yaml) | `context-long-task-experiment` | 逐篇读 12 份长备忘录（合计约 63.5K 字符），每篇抽取字段写入 `extracts/`，最后汇总评级 | 长上下文压缩：状态外化型任务的压缩收益（与 PLAN-01 的交叉综合型对照） |
 | [`RETRIEVAL-01`](RETRIEVAL-01/task.yaml) | `retrieval-policy-experiment` | 查找长鑫存储科创板招股书原文并返回官方链接 | 显式原文请求的检索触发 |
 | [`RETRIEVAL-02`](RETRIEVAL-02/task.yaml) | `retrieval-policy-experiment` | 在用户纠正错误事实后重新核验招股书 | 用户纠错后的事实恢复与检索 |
 | [`RETRIEVAL-03`](RETRIEVAL-03/task.yaml) | `retrieval-policy-experiment` | 直接回答招股说明书披露阶段 | 稳定定义题不过度检索 |
@@ -41,6 +42,10 @@
 - `retrieval-policy-experiment`：验证何时应检索以及何时应直接回答；结论稳定前不迁入 regression。
 - `planner-complex-experiment`：专门放置具有多阶段依赖和多个环境结果的复杂任务，供
   baseline、可选 Planner 与强制 Planner 做同条件对照；plan 调用只作为诊断指标，不参与 outcome 成功判定。
+- `context-long-task-experiment`：Context 压缩的长任务对照。含 CTX-01（状态外化型，
+  抽完即写盘、原文不再需要）与 PLAN-01（交叉综合型，早期内容到最后仍要用，已知压缩
+  导致重读 +23% token），据此判断压缩在什么形状的任务上成立，而非单一 on/off；
+  结论稳定前不迁入 regression。
 
 ## 与线上聊天的关系
 

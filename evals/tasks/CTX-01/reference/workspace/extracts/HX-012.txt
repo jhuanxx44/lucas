@@ -1,0 +1,6 @@
+code: HX-012
+name: 金鼎材料
+revenue: 143500
+gross_margin: 31.0
+risk: 低
+rating: B

@@ -1,0 +1,6 @@
+code: HX-008
+name: 恒益物流
+revenue: 231700
+gross_margin: 12.6
+risk: 中
+rating: C

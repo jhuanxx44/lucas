@@ -1,0 +1,6 @@
+code: HX-004
+name: 昌盛电子
+revenue: 73200
+gross_margin: 44.1
+risk: 高
+rating: B

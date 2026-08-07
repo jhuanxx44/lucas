@@ -1,0 +1,6 @@
+code: HX-001
+name: 汇信精密
+revenue: 128600
+gross_margin: 42.3
+risk: 低
+rating: A

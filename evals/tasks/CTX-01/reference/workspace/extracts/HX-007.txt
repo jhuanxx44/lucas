@@ -1,0 +1,6 @@
+code: HX-007
+name: 联创半导
+revenue: 64500
+gross_margin: 63.8
+risk: 低
+rating: A

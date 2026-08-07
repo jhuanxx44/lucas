@@ -1,0 +1,6 @@
+code: HX-009
+name: 瑞晶光电
+revenue: 89100
+gross_margin: 40.0
+risk: 中
+rating: A

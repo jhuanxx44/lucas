@@ -1,0 +1,25 @@
+# CTX-01 长上下文压缩对照实验（2026-08-04）
+#
+# 背景：2026-08-01 的压缩实验两个窗口档都不在有意义的区间——12K 触发过频（PLAN-01
+# 累计 token +23%，9 次压缩导致重读 5 个文件），1M 则永不触发（现有任务单轮峰值仅
+# 14K）。CTX-01 是为此补的长任务：12 篇备忘录合计约 63.5K 字符，在 12K 窗口下累计
+# 需求约为可用输入预算的 3.3 倍，压缩必然触发。
+#
+# CTX-01 与 PLAN-01 构成任务形状的对照：
+#   CTX-01  状态外化型——每篇抽完即写入 extracts/，原文不再需要，压缩应近乎免费
+#   PLAN-01 交叉综合型——读完全部文件后要横向比较，压缩一丢就得重读（已知 +23%）
+# 因此本 suite 同时含两者，结论才能落到「压缩在什么形状的任务上成立」而非单一 on/off。
+#
+# 三臂（全部通过环境变量，不改运行时代码）：
+#   baseline  LUCAS_CONTEXT_WINDOW=0                              压缩关闭的成本基准
+#   level2    LUCAS_CONTEXT_WINDOW=12000                          链式压缩（含 LLM 摘要）
+#   level1    LUCAS_CONTEXT_WINDOW=12000 LUCAS_COMPRESSION_LEVEL=1 纯机械，测摘要那次调用值不值
+#
+# 运行前先跑 baseline 探针量出真实单轮峰值，据此确认 12K 是否仍是 3-4 倍区间。
+# 指标除 outcome/步数/累计 prompt_tokens/压缩次数外，必须统计重读次数：
+#   .venv/bin/python scripts/count_context_rereads.py 'runs/<suite-run>/runs/*'
+id: context-long-task-experiment-v1
+version: 1
+tasks:
+  - CTX-01
+  - PLAN-01

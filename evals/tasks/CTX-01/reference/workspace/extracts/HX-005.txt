@@ -1,0 +1,6 @@
+code: HX-005
+name: 华通医药
+revenue: 158900
+gross_margin: 26.5
+risk: 中
+rating: B

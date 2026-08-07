@@ -1,0 +1,6 @@
+code: HX-010
+name: 安泰重工
+revenue: 176200
+gross_margin: 24.9
+risk: 低
+rating: C

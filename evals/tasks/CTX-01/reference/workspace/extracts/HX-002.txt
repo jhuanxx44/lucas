@@ -1,0 +1,6 @@
+code: HX-002
+name: 中远新材
+revenue: 96400
+gross_margin: 51.7
+risk: 中
+rating: A

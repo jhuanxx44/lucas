@@ -1,0 +1,6 @@
+code: HX-006
+name: 明远化工
+revenue: 187300
+gross_margin: 18.2
+risk: 高
+rating: C

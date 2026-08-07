@@ -111,6 +111,8 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - 前端输入框/文本域的回车提交必须抑制输入法组合回车（含组合结束短窗口），教训见 `docs/lessons/2026-08-01-前端输入法回车陷阱.md`。
 - LLM 用 write_file 写 wiki 页面时，frontmatter 的 summary 值必须用英文单引号包裹；校验层要把 YAML 语法错误与字段缺失分开报错，教训见 `docs/lessons/2026-08-01-write_file-frontmatter-yaml-引号.md`。
 - DeepSeek Responses 工具轮也会流式输出中间文本，须按 turn 完成时是否含 function_call 决定丢弃，教训见 `docs/lessons/2026-08-01-responses工具轮流式中间文本.md`。
+- 中文散文实测约 0.60 token/字符，`DEFAULT_TOKENS_PER_CHAR = 0.35` 低估约 71%；按字符估 token 预算要留余量，别凭该常量推断压缩第几步触发，教训见 `docs/lessons/2026-08-04-中文token密度与压缩触发预估.md`。
+- Agent 级 eval 的 grader 若位于工作区内（如 pytest 判卷文件），不得内联期望值——Agent 有读权限就等于拿到答案；期望值应现场从 fixture 解析，具体数值钉在工作区外的测试里。
 
 ## 5. 两类 Harness 的边界
 

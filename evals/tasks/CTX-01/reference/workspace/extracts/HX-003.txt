@@ -1,0 +1,6 @@
+code: HX-003
+name: 泰和能源
+revenue: 214800
+gross_margin: 38.4
+risk: 低
+rating: B

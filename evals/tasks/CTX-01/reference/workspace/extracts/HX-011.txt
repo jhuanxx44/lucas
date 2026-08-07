@@ -1,0 +1,6 @@
+code: HX-011
+name: 立信软件
+revenue: 51800
+gross_margin: 55.2
+risk: 高
+rating: B

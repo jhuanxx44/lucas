@@ -358,6 +358,7 @@ def test_answer_json_accepts_code_block_wrapped_answer(tmp_path):
 @pytest.mark.parametrize("task_id", [
     "READ-01", "EDIT-01", "READ-02", "READ-03", "LIST-01", "EDIT-02", "WRITE-01",
     "WRITE-02", "WIKI-01", "WIKI-02", "WIKI-03", "PLAN-01", "PLAN-02", "PLAN-03",
+    "CTX-01",
 ])
 async def test_atomic_tasks_reject_bad_and_accept_oracle(tmp_path, task_id):
     result = await validate_task(
