@@ -4,7 +4,7 @@
 
 Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目。业务功能是验证 Agent 机制的试验场；长期学习对象包括 Planning、Tool、Context、Loop、Memory、Validation、Reliability、Evaluation 和 Trace。
 
-详细目标、阶段和实验设计见 `docs/agent-harness-learning-roadmap.md`。不要因为路线图中存在某项长期能力，就在当前任务中主动实现；始终以用户当前请求为边界。
+当前能力现状、已得结论和未完成项见 `docs/harness-status.md`（原 `docs/agent-harness-learning-roadmap.md` 已归档到 `docs/archive/`，其阶段编号和完成度评级已过期，只作设计细节查阅）。不要因为文档中登记了某项长期能力，就在当前任务中主动实现；始终以用户当前请求为边界。
 
 ## 2. 不可违反的约束
 
