@@ -99,12 +99,14 @@ def _guard_wiki_write(handler):
 _WIKI_WRITE_FILE_SPEC = replace(
     WRITE_FILE_SPEC,
     description="在 wiki/ 知识库内新建或整体写入文件（仅限 wiki/ 目录）；"
-                "文件已存在时默认拒绝，需 overwrite: true 才覆盖",
+                "文件已存在时默认拒绝，需 overwrite: true 才覆盖。"
+                "写入类工具串行执行，一次一个，不会与同批其他写入并发。",
     handler=_guard_wiki_write(WRITE_FILE_SPEC.handler),
 )
 _WIKI_APPLY_PATCH_SPEC = replace(
     APPLY_PATCH_SPEC,
-    description="对 wiki/ 知识库内文件做精确字符串替换（仅限 wiki/ 目录；old 必须唯一出现）",
+    description="对 wiki/ 知识库内文件做精确字符串替换（仅限 wiki/ 目录；old 必须唯一出现）。"
+                "写入类工具串行执行，一次一个，不会与同批其他写入并发。",
     handler=_guard_wiki_write(APPLY_PATCH_SPEC.handler),
 )
 

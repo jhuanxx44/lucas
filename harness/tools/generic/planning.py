@@ -35,7 +35,7 @@ UPDATE_PLAN_SPEC = ToolSpec(
     description=(
         "更新执行计划。仅当面对需要多步骤、多工具的复杂任务时使用。"
         "简单任务不要调用此工具。每项包含 step 和 status；调用后开始执行第一个"
-        " pending/in_progress 步骤。"
+        " pending/in_progress 步骤。写入类工具串行执行，一次一个，不会与同批其他写入并发。"
     ),
     mutates=True,
     parameters={

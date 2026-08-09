@@ -374,7 +374,8 @@ READ_FILE_SPEC = ToolSpec(
 
 APPLY_PATCH_SPEC = ToolSpec(
     name="apply_patch",
-    description="对工作区内文件做精确字符串替换（old 必须在文件中唯一出现）",
+    description="对工作区内文件做精确字符串替换（old 必须在文件中唯一出现）。"
+                "写入类工具串行执行，一次一个，不会与同批其他写入并发。",
     mutates=True,
     parameters={
         "type": "object",
@@ -412,7 +413,8 @@ WRITE_FILE_SPEC = ToolSpec(
                 "（2-4 句中文 TL;DR）。summary 的值必须用英文单引号包裹（summary: '…'），"
                 "否则摘要中的英文冒号+空格、引号等字符会导致 YAML 解析失败。"
                 "缺少 frontmatter 返回 missing_frontmatter，YAML 语法错误返回 invalid_yaml，"
-                "缺少 summary 返回 missing_summary。index.md / glossary.md 除外。",
+                "缺少 summary 返回 missing_summary。index.md / glossary.md 除外。"
+                "写入类工具串行执行，一次一个，不会与同批其他写入并发。",
     parameters={
         "type": "object",
         "properties": {
