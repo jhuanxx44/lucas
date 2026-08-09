@@ -830,15 +830,34 @@ class AgentRunner:
                         "args": args,
                     })
 
-            # 并发执行全部待执行调用；结果按原顺序处理，观测预算/停滞检测保持确定性
-            outcomes = await asyncio.gather(
-                *(
-                    await_before_deadline(self.tools.execute(call.name, call.arguments, allowed_tools))
-                    for call, _ in pending
-                ),
-                return_exceptions=True,
-            )
-            for (call, (tool, signature)), outcome in zip(pending, outcomes):
+            # 只读工具并行、写入工具串行：先并发执行全部只读调用，再按模型发出顺序
+            # 逐个执行写入调用（write_file/apply_patch/update_plan 等），避免并发写
+            # 同一文件互相竞争；结果按原调用顺序合并，观测预算/停滞检测保持确定性。
+            async def _execute_call(call: FunctionCall):
+                return await await_before_deadline(
+                    self.tools.execute(call.name, call.arguments, allowed_tools)
+                )
+
+            read_only_calls = [call for call, _ in pending if not self.tools.mutates(call.name)]
+            write_calls = [call for call, _ in pending if self.tools.mutates(call.name)]
+            outcome_by_id: dict[str, object] = {}
+            if read_only_calls:
+                read_outcomes = await asyncio.gather(
+                    *(_execute_call(call) for call in read_only_calls),
+                    return_exceptions=True,
+                )
+                outcome_by_id.update(
+                    zip((call.call_id for call in read_only_calls), read_outcomes)
+                )
+            for call in write_calls:
+                try:
+                    outcome_by_id[call.call_id] = await _execute_call(call)
+                except _RunDeadlineExceeded as error:
+                    outcome_by_id[call.call_id] = error
+                except Exception as error:  # 与 gather(return_exceptions=True) 语义一致
+                    outcome_by_id[call.call_id] = error
+            for call, (tool, signature) in pending:
+                outcome = outcome_by_id[call.call_id]
                 if isinstance(outcome, asyncio.CancelledError):
                     raise outcome
                 if isinstance(outcome, _RunDeadlineExceeded):

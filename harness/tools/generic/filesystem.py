@@ -375,6 +375,7 @@ READ_FILE_SPEC = ToolSpec(
 APPLY_PATCH_SPEC = ToolSpec(
     name="apply_patch",
     description="对工作区内文件做精确字符串替换（old 必须在文件中唯一出现）",
+    mutates=True,
     parameters={
         "type": "object",
         "properties": {
@@ -423,6 +424,7 @@ WRITE_FILE_SPEC = ToolSpec(
         "required": ["path", "content"],
         "additionalProperties": False,
     },
+    mutates=True,
     handler=write_file,
 )
 

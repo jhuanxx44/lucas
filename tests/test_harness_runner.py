@@ -250,6 +250,120 @@ async def test_parallel_tool_calls_execute_concurrently(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_write_tool_calls_execute_serially(tmp_path):
+    order: list[str] = []
+
+    async def write_handler(workspace, args):
+        order.append(f"start:{args['name']}")
+        await asyncio.sleep(0.05)
+        order.append(f"finish:{args['name']}")
+        return ToolResult(status="ok", observation=f"wrote {args['name']}")
+
+    spec = ToolSpec(
+        name="write_x",
+        description="write",
+        parameters={
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        handler=write_handler,
+        mutates=True,
+    )
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "write_x", {"name": "a"}, "写 a"),
+            ("c2", "write_x", {"name": "b"}, "写 b"),
+        ]),
+        _answer("done"),
+    ])
+
+    result = await _runner(tmp_path, model, [spec]).run("write", ["write_x"], _limits())
+
+    assert result.answer == "done"
+    # 串行语义：第一个写入完成前第二个不得开始；并发实现会出现 start:start:finish:finish
+    assert order == ["start:a", "finish:a", "start:b", "finish:b"]
+    items = model.requests[1].input_items
+    outputs = [i for i in items if i.get("type") == "function_call_output"]
+    assert [i.get("call_id") for i in outputs] == ["c1", "c2"]
+
+
+@pytest.mark.asyncio
+async def test_mixed_batch_reads_parallel_and_writes_serial_keep_original_order(tmp_path):
+    both_reads_entered = asyncio.Event()
+    read_count = 0
+    lock = asyncio.Lock()
+
+    async def barrier_read(workspace, args):
+        # 两个只读调用都进入后才放行：只读并行则完成，只读串行则死锁超时
+        nonlocal read_count
+        async with lock:
+            read_count += 1
+            if read_count >= 2:
+                both_reads_entered.set()
+        await both_reads_entered.wait()
+        return ToolResult(status="ok", observation=f"read {args['path']}")
+
+    write_events: list[str] = []
+
+    async def write_handler(workspace, args):
+        write_events.append(f"start:{args['name']}")
+        await asyncio.sleep(0.05)
+        write_events.append(f"finish:{args['name']}")
+        return ToolResult(status="ok", observation=f"wrote {args['name']}")
+
+    read_spec = ToolSpec(
+        name="read_x",
+        description="read",
+        parameters={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        handler=barrier_read,
+    )
+    write_spec = ToolSpec(
+        name="write_x",
+        description="write",
+        parameters={
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        handler=write_handler,
+        mutates=True,
+    )
+    model = FakeModel([
+        _parallel_tool_turn([
+            ("c1", "write_x", {"name": "a"}, "写 a"),
+            ("c2", "read_x", {"path": "x"}, "读 x"),
+            ("c3", "write_x", {"name": "b"}, "写 b"),
+            ("c4", "read_x", {"path": "y"}, "读 y"),
+        ]),
+        _answer("done"),
+    ])
+
+    result = await asyncio.wait_for(
+        _runner(tmp_path, model, [read_spec, write_spec]).run(
+            "mixed", ["read_x", "write_x"], _limits()
+        ),
+        timeout=3,
+    )
+
+    assert result.answer == "done"
+    # 写入工具即使与只读工具同批，也严格串行
+    assert write_events == ["start:a", "finish:a", "start:b", "finish:b"]
+    # 结果仍按模型发出的原顺序回传
+    items = model.requests[1].input_items
+    outputs = [i for i in items if i.get("type") == "function_call_output"]
+    assert [i.get("call_id") for i in outputs] == ["c1", "c2", "c3", "c4"]
+    assert all("read " in outputs[i]["output"] for i in (1, 3))
+
+
+@pytest.mark.asyncio
 async def test_summary_and_tool_start_are_emitted_before_tool_step(tmp_path):
     seen_args = []
 

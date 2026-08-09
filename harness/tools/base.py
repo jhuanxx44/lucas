@@ -14,6 +14,7 @@ class ToolSpec:
     description: str
     parameters: dict
     handler: ToolHandler
+    mutates: bool = False  # 有写入副作用（write_file/apply_patch/update_plan 等）→ 串行执行
 
     def __post_init__(self) -> None:
         """尽早拒绝无法作为 function tool 参数使用的基础 schema。"""

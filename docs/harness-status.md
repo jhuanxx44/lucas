@@ -21,7 +21,7 @@ Skill 接入原则、Wiki 访问策略消融设计），但**其阶段编号、�
 |---|---|
 | 统一 Agent 循环（Responses 原生 function calling） | `harness/runner.py` |
 | 全量消息回放（message/function_call/reasoning 都是历史一等条目） | `harness/runner.py` `append_model_items` |
-| 单轮并行工具调用（上限 4，asyncio.gather，按 call_id 回传） | `harness/runner.py` |
+| 单轮工具调用（上限 4；只读工具并行、写入工具串行，按 call_id 原序回传） | `harness/runner.py`、`harness/tools/base.py` |
 | 分级链式上下文压缩（低损丢弃 → LLM 摘要 → FIFO 兜底） | `harness/runner.py` `compress_context` |
 | run / model_call / tool_call 三层 deadline 与结构化 finish_reason | `harness/runner.py` `await_before_deadline` |
 | provider retry（3 次，指数等待，独立 trace 事件） | `utils/llm_client.py` |

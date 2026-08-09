@@ -77,6 +77,12 @@ def test_required_parameters_match_handler_contract(spec: ToolSpec, required: se
     assert set(spec.parameters["required"]) == required
 
 
+def test_write_tools_marked_mutating_and_read_tools_not():
+    write_names = {spec.name for spec in (WRITE_FILE_SPEC, APPLY_PATCH_SPEC, UPDATE_PLAN_SPEC)}
+    for spec in PRODUCTION_SPECS:
+        assert spec.mutates == (spec.name in write_names)
+
+
 def test_tool_spec_rejects_an_open_parameter_schema():
     with pytest.raises(ValueError, match="forbid additional properties"):
         ToolSpec(
