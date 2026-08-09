@@ -357,6 +357,7 @@ def search(workspace: Path, args: dict) -> ToolResult:
 READ_FILE_SPEC = ToolSpec(
     name="read_file",
     description="读取工作区内文件内容（只读）",
+    parallelizable=True,
     parameters={
         "type": "object",
         "properties": {
@@ -376,7 +377,6 @@ APPLY_PATCH_SPEC = ToolSpec(
     name="apply_patch",
     description="对工作区内文件做精确字符串替换（old 必须在文件中唯一出现）。"
                 "写入类工具串行执行，一次一个，不会与同批其他写入并发。",
-    mutates=True,
     parameters={
         "type": "object",
         "properties": {
@@ -393,6 +393,7 @@ APPLY_PATCH_SPEC = ToolSpec(
 LIST_FILES_SPEC = ToolSpec(
     name="list_files",
     description="列出工作区内目录结构（含文件大小，只读）",
+    parallelizable=True,
     parameters={
         "type": "object",
         "properties": {
@@ -426,13 +427,13 @@ WRITE_FILE_SPEC = ToolSpec(
         "required": ["path", "content"],
         "additionalProperties": False,
     },
-    mutates=True,
     handler=write_file,
 )
 
 SEARCH_SPEC = ToolSpec(
     name="search",
     description="在工作区内搜索文本（默认字面匹配；query 以 re: 开头时按正则处理）",
+    parallelizable=True,
     parameters={
         "type": "object",
         "properties": {

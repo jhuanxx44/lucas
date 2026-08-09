@@ -830,16 +830,16 @@ class AgentRunner:
                         "args": args,
                     })
 
-            # 只读工具并行、写入工具串行：先并发执行全部只读调用，再按模型发出顺序
-            # 逐个执行写入调用（write_file/apply_patch/update_plan 等），避免并发写
-            # 同一文件互相竞争；结果按原调用顺序合并，观测预算/停滞检测保持确定性。
+            # 只读工具并行、写入工具串行：标记 parallelizable 的调用并发执行（只读类），
+            # 其余（写入类 write_file/apply_patch/update_plan 等）按模型发出顺序逐个执行，
+            # 避免并发写同一文件互相竞争；结果按原调用顺序合并，观测预算/停滞检测保持确定性。
             async def _execute_call(call: FunctionCall):
                 return await await_before_deadline(
                     self.tools.execute(call.name, call.arguments, allowed_tools)
                 )
 
-            read_only_calls = [call for call, _ in pending if not self.tools.mutates(call.name)]
-            write_calls = [call for call, _ in pending if self.tools.mutates(call.name)]
+            read_only_calls = [call for call, _ in pending if self.tools.parallelizable(call.name)]
+            write_calls = [call for call, _ in pending if not self.tools.parallelizable(call.name)]
             outcome_by_id: dict[str, object] = {}
             if read_only_calls:
                 read_outcomes = await asyncio.gather(

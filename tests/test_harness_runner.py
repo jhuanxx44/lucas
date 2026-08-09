@@ -229,6 +229,7 @@ async def test_parallel_tool_calls_execute_concurrently(tmp_path):
             "additionalProperties": False,
         },
         handler=barrier,
+        parallelizable=True,
     )
     model = FakeModel([
         _parallel_tool_turn([
@@ -269,7 +270,6 @@ async def test_write_tool_calls_execute_serially(tmp_path):
             "additionalProperties": False,
         },
         handler=write_handler,
-        mutates=True,
     )
     model = FakeModel([
         _parallel_tool_turn([
@@ -323,6 +323,7 @@ async def test_mixed_batch_reads_parallel_and_writes_serial_keep_original_order(
             "additionalProperties": False,
         },
         handler=barrier_read,
+        parallelizable=True,
     )
     write_spec = ToolSpec(
         name="write_x",
@@ -334,7 +335,6 @@ async def test_mixed_batch_reads_parallel_and_writes_serial_keep_original_order(
             "additionalProperties": False,
         },
         handler=write_handler,
-        mutates=True,
     )
     model = FakeModel([
         _parallel_tool_turn([

@@ -79,6 +79,7 @@ async def stock_kline(workspace: Path, args: dict) -> ToolResult:
 STOCK_QUOTE_SPEC = ToolSpec(
     name="stock_quote",
     description="查询 A 股个股实时行情（最新价、涨跌幅、成交量、市盈率、市值等）",
+    parallelizable=True,
     parameters={
         "type": "object",
         "properties": {
@@ -97,6 +98,7 @@ STOCK_QUOTE_SPEC = ToolSpec(
 STOCK_KLINE_SPEC = ToolSpec(
     name="stock_kline",
     description="查询 A 股个股历史 K 线（开盘/收盘/最高/最低/成交量/涨跌幅）",
+    parallelizable=True,
     parameters={
         "type": "object",
         "properties": {

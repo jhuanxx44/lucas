@@ -37,7 +37,6 @@ UPDATE_PLAN_SPEC = ToolSpec(
         "简单任务不要调用此工具。每项包含 step 和 status；调用后开始执行第一个"
         " pending/in_progress 步骤。写入类工具串行执行，一次一个，不会与同批其他写入并发。"
     ),
-    mutates=True,
     parameters={
         "type": "object",
         "properties": {

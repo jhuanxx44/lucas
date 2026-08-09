@@ -40,6 +40,7 @@ def wiki_recall(workspace: Path, args: dict) -> ToolResult:
 
 WIKI_RECALL_SPEC = ToolSpec(
     name="wiki_recall",
+    parallelizable=True,
     description="从本地 wiki 知识库召回相关页面（BM25 相关性排序）。"
                 "query 应为 LLM 预分词的关键词（空格、逗号或顿号分隔），tool 直接用于检索。"
                 "返回格式：每条结果以 --- 标题（路径） --- 开头，"

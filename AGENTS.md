@@ -113,7 +113,7 @@ Lucas 是一个通过真实业务“干中学”的 Agent Harness 练习项目�
 - DeepSeek Responses 工具轮也会流式输出中间文本，须按 turn 完成时是否含 function_call 决定丢弃，教训见 `docs/lessons/2026-08-01-responses工具轮流式中间文本.md`。
 - 中文散文实测约 0.60 token/字符，`DEFAULT_TOKENS_PER_CHAR = 0.35` 低估约 71%；按字符估 token 预算要留余量，别凭该常量推断压缩第几步触发，教训见 `docs/lessons/2026-08-04-中文token密度与压缩触发预估.md`。
 - Agent 级 eval 的 grader 若位于工作区内（如 pytest 判卷文件），不得内联期望值——Agent 有读权限就等于拿到答案；期望值应现场从 fixture 解析，具体数值钉在工作区外的测试里。
-- 并行工具调用只对只读工具生效：同一批多个写入工具（write_file/apply_patch/update_plan）必须按调用顺序串行执行，靠 `ToolSpec.mutates` 标记 + Runner 分流保证，教训见 `docs/lessons/2026-08-09-并行写入竞争.md`。
+- 并行工具调用只对只读工具生效：同一批多个写入工具（write_file/apply_patch/update_plan）必须按调用顺序串行执行，靠 `ToolSpec.parallelizable` 显式标记（默认串行）+ Runner 分流保证，教训见 `docs/lessons/2026-08-09-并行写入竞争.md`。
 
 ## 5. 两类 Harness 的边界
 

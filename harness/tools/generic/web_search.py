@@ -37,6 +37,7 @@ async def web_search(workspace: Path, args: dict) -> ToolResult:
 
 WEB_SEARCH_SPEC = ToolSpec(
     name="web_search",
+    parallelizable=True,
     description=(
         "联网搜索公开网页，返回编号、标题、链接、摘要的 markdown 列表。"
         "provider 参数指定搜索供应商（默认 auto）："

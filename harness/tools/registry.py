@@ -60,10 +60,10 @@ class ToolRuntime:
     def available(self, allowed_tools: list[str]) -> list[ToolSpec]:
         return [self._specs[name] for name in allowed_tools if name in self._specs]
 
-    def mutates(self, name: str) -> bool:
-        """该工具是否有写入副作用；未注册的工具按有副作用（串行）保守处理。"""
+    def parallelizable(self, name: str) -> bool:
+        """该工具是否可安全地与同批其他调用并发执行；未注册的工具按不可并行保守处理。"""
         spec = self._specs.get(name)
-        return spec.mutates if spec is not None else True
+        return spec.parallelizable if spec is not None else False
 
     async def execute(self, name: str, args: dict, allowed_tools: list[str]) -> ToolResult:
         spec = self._specs.get(name)
